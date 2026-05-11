@@ -1087,7 +1087,11 @@ csRefs.saveCanonBtn.addEventListener('click', () => {
 
 csRefs.refFileInput.addEventListener('change', (event) => {
   const [file] = event.target.files;
-  if (!file) { csPendingFileDataUrl = null; csRefs.refPreview.innerHTML = ''; return; }
+  if (!file) {
+    csPendingFileDataUrl = null;
+    csRefs.refPreview.innerHTML = '';
+    return;
+  }
   const reader = new FileReader();
   reader.onload = (e) => {
     csPendingFileDataUrl = e.target.result;
