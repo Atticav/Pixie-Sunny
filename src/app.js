@@ -3743,14 +3743,14 @@ const irsDecisionStatusClass = (status) => {
 
 const irsLineageTagLabels = {
   original: 'original',
-  derived_variant: 'derived / variant',
-  candidate: 'candidate',
-  approved_version: 'approved version',
-  superseded_version: 'superseded version',
-  canon_promoted_version: 'canon-promoted',
-  deprecated_archived_branch: 'deprecated / archived branch',
-  current_official: 'current official',
-  source_of_truth: 'source of truth'
+  derived_variant: 'derivada / variante',
+  candidate: 'candidata',
+  approved_version: 'versão aprovada',
+  superseded_version: 'versão supersedida',
+  canon_promoted_version: 'promovida ao canon',
+  deprecated_archived_branch: 'ramo depreciado / arquivado',
+  current_official: 'oficial atual',
+  source_of_truth: 'fonte da verdade'
 };
 
 const irsAllDecisionEvents = () => {
@@ -4144,15 +4144,15 @@ const irsRenderLineageGraph = () => {
     return acc;
   }, {});
   irsRefs.lineageSummary.textContent = [
-    `Current official: ${officialLabel}`,
-    `Source of truth: ${officialLabel}`,
+    `Oficial atual: ${officialLabel}`,
+    `Fonte da verdade: ${officialLabel}`,
     `Supersessões: ${edgeStats.supersedes || 0}`,
     `Derivações/variantes: ${edgeStats.derived_variant || 0}`
   ].join(' · ');
   irsRefs.lineageList.innerHTML = '';
 
   if (!nodes.length) {
-    irsRefs.lineageList.innerHTML = '<p class="irs-hint">Nenhuma versão encontrada para os filtros de lineage atuais.</p>';
+    irsRefs.lineageList.innerHTML = '<p class="irs-hint">Nenhuma versão encontrada para os filtros de linhagem atuais.</p>';
     return;
   }
 
