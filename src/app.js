@@ -3750,7 +3750,7 @@ const irsLineageTagLabels = {
   canon_promoted_version: 'promovida ao canon',
   deprecated_archived_branch: 'ramo depreciado / arquivado',
   current_official: 'oficial atual',
-  source_of_truth: 'fonte da verdade'
+  source_of_truth: 'fonte de verdade'
 };
 
 const irsAllDecisionEvents = () => {
@@ -4136,7 +4136,7 @@ const irsRenderLineageGraph = () => {
     );
   }
 
-  irsRefs.lineageCount.textContent = `${nodes.length} / ${graph.nodes.length} versão(ões)`;
+  irsRefs.lineageCount.textContent = `${nodes.length} / ${graph.nodes.length} versões`;
   const officialNode = graph.nodes.find((node) => node.id === graph.currentOfficialId);
   const officialLabel = officialNode ? irsOutputDisplayName(officialNode.output) : '—';
   const edgeStats = graph.edges.reduce((acc, edge) => {
@@ -4181,10 +4181,18 @@ const irsRenderLineageGraph = () => {
 
     const predecessors = document.createElement('p');
     predecessors.className = 'irs-lineage-links';
-    predecessors.textContent = `Predecessores: ${node.predecessors.map((edge) => edge.from).join(', ') || '—'}`;
+    const predecessorLabels = node.predecessors.map((edge) => {
+      const related = graph.nodes.find((candidate) => candidate.id === edge.from);
+      return related ? related.label : edge.from;
+    });
+    predecessors.textContent = `Predecessores: ${predecessorLabels.join(', ') || '—'}`;
     const successors = document.createElement('p');
     successors.className = 'irs-lineage-links';
-    successors.textContent = `Sucessores/variantes: ${node.successors.map((edge) => edge.to).join(', ') || '—'}`;
+    const successorLabels = node.successors.map((edge) => {
+      const related = graph.nodes.find((candidate) => candidate.id === edge.to);
+      return related ? related.label : edge.to;
+    });
+    successors.textContent = `Sucessores/variantes: ${successorLabels.join(', ') || '—'}`;
 
     const actions = document.createElement('div');
     actions.className = 'irs-lineage-actions';

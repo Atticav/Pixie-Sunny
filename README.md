@@ -231,14 +231,13 @@ O app agora registra e navega decisões editoriais/operacionais por item:
 
 O app agora inclui uma camada estrutural de evolução de assets/outputs para visualizar cadeia de versões, supersessão e origem editorial:
 
-- modela e exibe relações de:
-  - `original`
-  - `derived / variant`
-  - `candidate`
-  - `approved version`
-  - `superseded version`
-  - `canon-promoted version`
-  - `deprecated / archived branch`
+- modela e exibe relações `original`
+- modela e exibe relações `derived / variant`
+- modela e exibe relações `candidate`
+- modela e exibe relações `approved version`
+- modela e exibe relações `superseded version`
+- modela e exibe relações `canon-promoted version`
+- modela e exibe relações `deprecated / archived branch`
 - destaca `current official` e `source of truth` por projeto/fluxo de revisão
 - permite navegar predecessores e sucessores diretamente da aba de lineage para a revisão detalhada
 - aplica filtros por tipo de asset e status de versão para inspeção rápida
