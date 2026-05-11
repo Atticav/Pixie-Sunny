@@ -71,6 +71,46 @@ const normalizeLocalWorkspaceSettings = (source) => {
   };
 };
 
+export const IMAGE_GEN_TYPES = ['character', 'scene', 'environment', 'portrait', 'variation'];
+export const IMAGE_GEN_STATUSES = ['pending', 'running', 'done', 'error'];
+export const IMAGE_GEN_PROVIDER_TYPES = ['mock', 'local-api'];
+
+const baseImageGenSettings = () => ({
+  type: 'mock',
+  endpoint: 'http://127.0.0.1:7860',
+  outputDir: 'outputs',
+  resolution: '512x768',
+  steps: 28,
+  sampler: 'DPM++ 2M Karras',
+  cfgScale: 7,
+  numImages: 1,
+  seed: -1,
+  seedLocked: false
+});
+
+const normalizeImageGenSettings = (source) => {
+  const value = recordValue(source) || {};
+  const defaults = baseImageGenSettings();
+  return {
+    ...defaults,
+    type: IMAGE_GEN_PROVIDER_TYPES.includes(stringValue(value.type)) ? stringValue(value.type) : defaults.type,
+    endpoint: stringValue(value.endpoint, defaults.endpoint),
+    outputDir: stringValue(value.outputDir, defaults.outputDir),
+    resolution: stringValue(value.resolution, defaults.resolution),
+    steps:
+      typeof value.steps === 'number' && value.steps > 0 ? Math.floor(value.steps) : defaults.steps,
+    sampler: stringValue(value.sampler, defaults.sampler),
+    cfgScale: typeof value.cfgScale === 'number' ? value.cfgScale : defaults.cfgScale,
+    numImages:
+      typeof value.numImages === 'number' && value.numImages > 0
+        ? Math.floor(value.numImages)
+        : defaults.numImages,
+    seed: typeof value.seed === 'number' ? value.seed : defaults.seed,
+    seedLocked:
+      typeof value.seedLocked === 'boolean' ? value.seedLocked : defaults.seedLocked
+  };
+};
+
 const baseSettings = () => ({
   imagePipeline: {
     provider: 'local-runner',
@@ -82,7 +122,8 @@ const baseSettings = () => ({
     modelHint: 'image-to-video-cinematic',
     extensionPoint: 'src/pipelines.js#runVideoPipeline'
   },
-  localWorkspace: baseLocalWorkspaceSettings()
+  localWorkspace: baseLocalWorkspaceSettings(),
+  imageGenProvider: baseImageGenSettings()
 });
 
 export const UNASSIGNED_CHAPTER_ID = '';
@@ -97,6 +138,7 @@ export const emptyState = () => ({
   assets: [],
   referenceImages: [],
   promptDocuments: [],
+  generationJobs: [],
   settings: baseSettings()
 });
 
@@ -279,6 +321,68 @@ export const createAsset = ({ projectId, name, type, path }) => ({
   type,
   path,
   createdAt: nowUtc()
+});
+
+export const createGenerationOutput = ({
+  projectId,
+  jobId = '',
+  characterId = '',
+  sceneId = '',
+  prompt = '',
+  params = {},
+  dataUrl = '',
+  localPath = '',
+  fileName = '',
+  generationType = 'character',
+  seed = -1
+}) => ({
+  id: newId(),
+  projectId,
+  jobId,
+  characterId,
+  sceneId,
+  prompt,
+  params,
+  dataUrl,
+  localPath,
+  fileName,
+  generationType,
+  seed,
+  isFavorite: false,
+  isCanonical: false,
+  createdAt: nowUtc()
+});
+
+export const createGenerationJob = ({
+  projectId,
+  generationType = 'character',
+  characterId = '',
+  sceneId = '',
+  promptDocumentId = '',
+  prompt = '',
+  negativePrompt = '',
+  referenceIds = [],
+  params = {},
+  providerType = 'mock',
+  providerLabel = 'Mock'
+}) => ({
+  id: newId(),
+  projectId,
+  generationType,
+  characterId,
+  sceneId,
+  promptDocumentId,
+  prompt,
+  negativePrompt,
+  referenceIds: stringList(referenceIds),
+  params,
+  providerType,
+  providerLabel,
+  status: 'pending',
+  errorMessage: '',
+  outputs: [],
+  createdAt: nowUtc(),
+  updatedAt: nowUtc()
 });
 
 const createPromptVersion = ({
@@ -521,6 +625,61 @@ const normalizeAsset = (asset) => {
   };
 };
 
+const normalizeGenerationOutput = (output) => {
+  const value = recordValue(output);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    jobId: stringValue(value.jobId),
+    characterId: stringValue(value.characterId),
+    sceneId: stringValue(value.sceneId),
+    prompt: stringValue(value.prompt),
+    params: recordValue(value.params) || {},
+    dataUrl: stringValue(value.dataUrl),
+    localPath: stringValue(value.localPath),
+    fileName: stringValue(value.fileName),
+    generationType: IMAGE_GEN_TYPES.includes(stringValue(value.generationType))
+      ? stringValue(value.generationType)
+      : 'character',
+    seed: typeof value.seed === 'number' ? value.seed : -1,
+    isFavorite: Boolean(value.isFavorite),
+    isCanonical: Boolean(value.isCanonical),
+    createdAt: stringValue(value.createdAt) || nowUtc()
+  };
+};
+
+const normalizeGenerationJob = (job) => {
+  const value = recordValue(job);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
+  const createdAt = stringValue(value.createdAt) || nowUtc();
+  const rawStatus = stringValue(value.status);
+  const outputs = (Array.isArray(value.outputs) ? value.outputs : [])
+    .map(normalizeGenerationOutput)
+    .filter(Boolean);
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    generationType: IMAGE_GEN_TYPES.includes(stringValue(value.generationType))
+      ? stringValue(value.generationType)
+      : 'character',
+    characterId: stringValue(value.characterId),
+    sceneId: stringValue(value.sceneId),
+    promptDocumentId: stringValue(value.promptDocumentId),
+    prompt: stringValue(value.prompt),
+    negativePrompt: stringValue(value.negativePrompt),
+    referenceIds: stringList(value.referenceIds),
+    params: recordValue(value.params) || {},
+    providerType: stringValue(value.providerType, 'mock'),
+    providerLabel: stringValue(value.providerLabel, 'Mock'),
+    status: IMAGE_GEN_STATUSES.includes(rawStatus) ? rawStatus : 'pending',
+    errorMessage: stringValue(value.errorMessage),
+    outputs,
+    createdAt,
+    updatedAt: stringValue(value.updatedAt) || createdAt
+  };
+};
+
 const normalizePromptVersion = (version) => {
   const value = recordValue(version);
   if (!value || !stringValue(value.id)) return null;
@@ -625,6 +784,9 @@ export const normalizeState = (raw) => {
       }
       return !promptDocument.targetId || sceneIds.has(promptDocument.targetId);
     });
+  const generationJobs = (Array.isArray(value.generationJobs) ? value.generationJobs : [])
+    .map(normalizeGenerationJob)
+    .filter((job) => job && projectIds.has(job.projectId));
 
   return {
     ...state,
@@ -637,10 +799,12 @@ export const normalizeState = (raw) => {
     assets,
     referenceImages,
     promptDocuments,
+    generationJobs,
     settings: {
       ...baseSettings(),
       ...settingsSource,
-      localWorkspace: normalizeLocalWorkspaceSettings(settingsSource.localWorkspace)
+      localWorkspace: normalizeLocalWorkspaceSettings(settingsSource.localWorkspace),
+      imageGenProvider: normalizeImageGenSettings(settingsSource.imageGenProvider)
     }
   };
 };
@@ -662,8 +826,26 @@ export const deleteEntity = (state, entityType, id) => {
       loreEntries: current.loreEntries.filter((entry) => entry.projectId !== id),
       assets: current.assets.filter((asset) => asset.projectId !== id),
       referenceImages: current.referenceImages.filter((ref) => ref.projectId !== id),
-      promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.projectId !== id)
+      promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.projectId !== id),
+      generationJobs: current.generationJobs.filter((job) => job.projectId !== id)
     });
+  }
+
+  if (entityType === 'generationJob') {
+    return {
+      ...current,
+      generationJobs: current.generationJobs.filter((job) => job.id !== id)
+    };
+  }
+
+  if (entityType === 'generationOutput') {
+    return {
+      ...current,
+      generationJobs: current.generationJobs.map((job) => ({
+        ...job,
+        outputs: job.outputs.filter((output) => output.id !== id)
+      }))
+    };
   }
 
   if (entityType === 'book') {

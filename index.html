@@ -206,6 +206,14 @@
           <pre id="promptDocumentPreview">Nenhum prompt estruturado selecionado.</pre>
         </div>
       </section>
+
+      <section>
+        <h2>Geração de Imagem Local</h2>
+        <div class="stack">
+          <button id="openImageGenStudioBtn" class="open-studio-btn">🖼 Abrir Estúdio de Geração</button>
+          <p class="storage-note">Gere imagens localmente no Mac usando prompts, personagens e referências do projeto. Requer Automatic1111 ou outro servidor local compatível com a API /sdapi/v1/txt2img, ou use o modo Mock para testar o workflow.</p>
+        </div>
+      </section>
     </main>
 
     <footer>
@@ -673,5 +681,223 @@
     </div>
 
     <script type="module" src="./src/app.js"></script>
+
+    <!-- =========== Image Generation Studio =========== -->
+    <div id="imageGenStudio" class="igs-overlay igs-hidden" role="dialog" aria-label="Estúdio de Geração de Imagem">
+      <header class="igs-header">
+        <div class="igs-header-left">
+          <button id="igsCloseBtn" class="igs-back-btn">← Voltar</button>
+        </div>
+        <div class="igs-header-center">
+          <span class="igs-title">🖼 Estúdio de Geração de Imagem Local</span>
+        </div>
+        <div class="igs-header-right">
+          <button id="igsRunBtn" class="igs-run-btn">▶ Gerar Imagem</button>
+        </div>
+      </header>
+
+      <nav class="igs-tabs-nav">
+        <button class="igs-tab igs-tab-active" id="igsTabBtnStudio">Estúdio</button>
+        <button class="igs-tab" id="igsTabBtnHistory">Histórico</button>
+        <button class="igs-tab" id="igsTabBtnConfig">Configuração</button>
+      </nav>
+
+      <!-- Studio Tab -->
+      <div id="igsTabStudio" class="igs-panel">
+        <div class="igs-body">
+          <!-- Left sidebar: context selection -->
+          <aside class="igs-sidebar igs-sidebar-left">
+            <section class="igs-section">
+              <h3 class="igs-section-title">Tipo de geração</h3>
+              <select id="igsGenType">
+                <option value="character">Personagem</option>
+                <option value="scene">Cena</option>
+                <option value="environment">Ambiente</option>
+                <option value="portrait">Retrato</option>
+                <option value="variation">Variação</option>
+              </select>
+            </section>
+
+            <section class="igs-section">
+              <h3 class="igs-section-title">Contexto</h3>
+              <label class="igs-field-label">Personagem
+                <select id="igsCharacterSelect"></select>
+              </label>
+              <label class="igs-field-label">Cena
+                <select id="igsSceneSelect"></select>
+              </label>
+              <label class="igs-field-label">Prompt salvo
+                <select id="igsPromptDocSelect"></select>
+              </label>
+              <button id="igsLoadPromptBtn">Carregar prompt selecionado</button>
+            </section>
+
+            <section class="igs-section">
+              <h3 class="igs-section-title">Referências</h3>
+              <p class="igs-hint">Selecione referências para incluir no contexto</p>
+              <div id="igsReferenceList" class="igs-reference-list"></div>
+            </section>
+          </aside>
+
+          <!-- Main: prompt + params + run -->
+          <main class="igs-main">
+            <section class="igs-section">
+              <h3 class="igs-section-title">Prompt de geração</h3>
+              <label class="igs-field-label">Prompt principal
+                <textarea id="igsPrompt" rows="6" placeholder="Descreva a imagem a ser gerada. Use o botão 'Carregar prompt' para preencher automaticamente a partir de um prompt salvo."></textarea>
+              </label>
+              <label class="igs-field-label">Negative prompt
+                <textarea id="igsNegativePrompt" rows="3" placeholder="O que não deve aparecer na imagem..."></textarea>
+              </label>
+            </section>
+
+            <section class="igs-section">
+              <h3 class="igs-section-title">Parâmetros de geração</h3>
+              <div class="igs-params-grid">
+                <label class="igs-field-label">Resolução
+                  <input id="igsResolution" placeholder="ex: 512x768" />
+                </label>
+                <label class="igs-field-label">Steps
+                  <input id="igsSteps" type="number" min="1" max="150" step="1" />
+                </label>
+                <label class="igs-field-label">CFG Scale
+                  <input id="igsCfgScale" type="number" min="1" max="30" step="0.5" />
+                </label>
+                <label class="igs-field-label">Sampler
+                  <input id="igsSampler" placeholder="ex: DPM++ 2M Karras" />
+                </label>
+                <label class="igs-field-label">Seed (-1 = aleatório)
+                  <input id="igsSeed" type="number" min="-1" step="1" />
+                </label>
+                <label class="igs-field-label">Nº de imagens
+                  <input id="igsNumImages" type="number" min="1" max="8" step="1" />
+                </label>
+              </div>
+              <label class="igs-check-label">
+                <input type="checkbox" id="igsSeedLock" /> Travar seed (reproduzir com mesmo seed)
+              </label>
+            </section>
+
+            <div class="igs-run-area">
+              <button id="igsRunBtnMain" class="igs-run-btn-main">▶ Gerar Imagem</button>
+              <span id="igsStatus" class="igs-status"></span>
+            </div>
+          </main>
+
+          <!-- Right sidebar: output gallery -->
+          <aside class="igs-sidebar igs-sidebar-right">
+            <section class="igs-section">
+              <h3 class="igs-section-title">Outputs deste job</h3>
+              <div id="igsOutputGallery" class="igs-output-gallery">
+                <p class="igs-hint">Os outputs gerados aparecerão aqui.</p>
+              </div>
+            </section>
+
+            <section id="igsOutputDetail" class="igs-section igs-hidden">
+              <h3 class="igs-section-title">Output selecionado</h3>
+              <img id="igsDetailImg" class="igs-detail-img" src="" alt="Output selecionado" />
+              <p id="igsDetailMeta" class="igs-detail-meta"></p>
+              <div class="igs-detail-actions">
+                <button id="igsDetailFavoriteBtn">☆ Favorito</button>
+                <button id="igsDetailCanonBtn">◇ Canônico</button>
+                <button id="igsDetailUseAsRefBtn" class="igs-primary-btn">📌 Usar como referência</button>
+                <button id="igsDetailVariationBtn">🔁 Gerar variação</button>
+                <button id="igsDetailRegenerateBtn">🔂 Regenerar</button>
+                <button id="igsDetailDeleteBtn" class="igs-danger-btn">🗑 Remover</button>
+              </div>
+            </section>
+
+            <section class="igs-section">
+              <h3 class="igs-section-title">Comparação</h3>
+              <div id="igsCompareArea" class="igs-compare-area">
+                <p class="igs-hint">Selecione dois outputs para comparar. Use Shift+clique na galeria.</p>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </div>
+
+      <!-- History Tab -->
+      <div id="igsTabHistory" class="igs-panel igs-hidden">
+        <div class="igs-history-layout">
+          <div class="igs-history-list-area">
+            <h3 class="igs-section-title">Jobs de geração</h3>
+            <div id="igsJobList" class="igs-job-list">
+              <p class="igs-hint">Nenhum job registrado ainda.</p>
+            </div>
+          </div>
+          <div id="igsJobDetail" class="igs-history-detail igs-hidden">
+            <h3 class="igs-section-title">Detalhes do job</h3>
+            <pre id="igsJobDetailPre" class="igs-job-detail-pre"></pre>
+            <h4 class="igs-section-title" style="margin-top:12px">Outputs</h4>
+            <div id="igsJobDetailGallery" class="igs-output-gallery"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config Tab -->
+      <div id="igsTabConfig" class="igs-panel igs-hidden">
+        <div class="igs-config-scroll">
+          <section class="igs-section">
+            <h3 class="igs-section-title">Provider local</h3>
+            <div class="igs-params-grid">
+              <label class="igs-field-label">Tipo de provider
+                <select id="igsConfigType">
+                  <option value="mock">Mock (testes, sem servidor)</option>
+                  <option value="local-api">API local (Automatic1111, ComfyUI…)</option>
+                </select>
+              </label>
+              <label class="igs-field-label">Endpoint local
+                <input id="igsConfigEndpoint" placeholder="ex: http://127.0.0.1:7860" />
+              </label>
+            </div>
+          </section>
+
+          <section class="igs-section">
+            <h3 class="igs-section-title">Parâmetros padrão</h3>
+            <div class="igs-params-grid">
+              <label class="igs-field-label">Resolução padrão
+                <input id="igsConfigResolution" placeholder="ex: 512x768" />
+              </label>
+              <label class="igs-field-label">Steps padrão
+                <input id="igsConfigSteps" type="number" min="1" max="150" step="1" />
+              </label>
+              <label class="igs-field-label">CFG Scale padrão
+                <input id="igsConfigCfgScale" type="number" min="1" max="30" step="0.5" />
+              </label>
+              <label class="igs-field-label">Sampler padrão
+                <input id="igsConfigSampler" placeholder="ex: DPM++ 2M Karras" />
+              </label>
+              <label class="igs-field-label">Seed padrão (-1 = aleatório)
+                <input id="igsConfigSeed" type="number" min="-1" step="1" />
+              </label>
+              <label class="igs-field-label">Nº de imagens padrão
+                <input id="igsConfigNumImages" type="number" min="1" max="8" step="1" />
+              </label>
+            </div>
+            <label class="igs-check-label">
+              <input type="checkbox" id="igsConfigSeedLock" /> Travar seed por padrão
+            </label>
+          </section>
+
+          <div class="igs-config-actions">
+            <button id="igsConfigSaveBtn" class="igs-primary-btn">Salvar configuração</button>
+            <span id="igsConfigStatus" class="igs-status"></span>
+          </div>
+
+          <section class="igs-section">
+            <h3 class="igs-section-title">Como configurar o provider local</h3>
+            <div class="igs-doc-block">
+              <p><strong>Modo Mock</strong> — nenhum servidor necessário. Gera imagens placeholder para testar o workflow de organização, histórico e uso de referências.</p>
+              <p><strong>API local (Automatic1111)</strong> — inicie o servidor com a flag <code>--api</code>:</p>
+              <pre class="igs-code">./webui.sh --api --listen</pre>
+              <p>O endpoint padrão é <code>http://127.0.0.1:7860</code>. A integração usa a rota <code>/sdapi/v1/txt2img</code>.</p>
+              <p><strong>API local (ComfyUI)</strong> — ComfyUI usa WebSockets. Para compatibilidade simples, use um wrapper HTTP como <code>comfyui-api</code> ou adapte o endpoint.</p>
+              <p><strong>Dica para Mac:</strong> use <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui" target="_blank" rel="noopener noreferrer">stable-diffusion-webui</a> no Terminal com o script <code>webui.sh</code>. Na primeira execução, baixa as dependências automaticamente.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

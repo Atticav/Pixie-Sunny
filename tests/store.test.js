@@ -6,12 +6,16 @@ import {
   createBook,
   createChapter,
   createCharacter,
+  createGenerationJob,
+  createGenerationOutput,
   createLoreEntry,
   createProject,
   createReferenceImage,
   createScene,
   deleteEntity,
   CHAPTER_STATUSES,
+  IMAGE_GEN_TYPES,
+  IMAGE_GEN_STATUSES,
   REFERENCE_TYPES
 } from '../src/models.js';
 import { buildCharacterPromptPack, buildScenePromptPack, inferSceneCharactersFromContext, searchLore } from '../src/assistant.js';
@@ -639,4 +643,241 @@ test('inferSceneCharactersFromContext avoids substring false positives', () => {
   const found = inferSceneCharactersFromContext([ana, kael], scene, chapter);
 
   assert.deepEqual(found.map((entry) => entry.name), ['Kael']);
+});
+
+test('IMAGE_GEN_TYPES and IMAGE_GEN_STATUSES contain expected values', () => {
+  assert.deepEqual(IMAGE_GEN_TYPES, ['character', 'scene', 'environment', 'portrait', 'variation']);
+  assert.deepEqual(IMAGE_GEN_STATUSES, ['pending', 'running', 'done', 'error']);
+});
+
+test('createGenerationJob creates a job with required fields and defaults', () => {
+  const project = createProject({ name: 'Projeto' });
+  const job = createGenerationJob({
+    projectId: project.id,
+    prompt: 'Lyra, close-up portrait',
+    generationType: 'portrait',
+    params: { resolution: '512x768', steps: 28, seed: 42 },
+    providerType: 'mock',
+    providerLabel: 'Mock'
+  });
+
+  assert.ok(job.id);
+  assert.equal(job.projectId, project.id);
+  assert.equal(job.generationType, 'portrait');
+  assert.equal(job.prompt, 'Lyra, close-up portrait');
+  assert.equal(job.status, 'pending');
+  assert.equal(job.providerType, 'mock');
+  assert.deepEqual(job.outputs, []);
+  assert.deepEqual(job.referenceIds, []);
+  assert.equal(job.errorMessage, '');
+  assert.ok(job.createdAt);
+});
+
+test('createGenerationOutput creates output with required fields and defaults', () => {
+  const project = createProject({ name: 'Projeto' });
+  const output = createGenerationOutput({
+    projectId: project.id,
+    jobId: 'job-1',
+    prompt: 'Lyra portrait',
+    generationType: 'portrait',
+    seed: 42,
+    dataUrl: 'data:image/svg+xml;base64,abc'
+  });
+
+  assert.ok(output.id);
+  assert.equal(output.projectId, project.id);
+  assert.equal(output.jobId, 'job-1');
+  assert.equal(output.prompt, 'Lyra portrait');
+  assert.equal(output.generationType, 'portrait');
+  assert.equal(output.seed, 42);
+  assert.equal(output.dataUrl, 'data:image/svg+xml;base64,abc');
+  assert.equal(output.isFavorite, false);
+  assert.equal(output.isCanonical, false);
+  assert.ok(output.createdAt);
+});
+
+test('normalizeState includes generationJobs from raw data', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'p1', name: 'Projeto A' }],
+    generationJobs: [
+      {
+        id: 'j1',
+        projectId: 'p1',
+        generationType: 'character',
+        prompt: 'Lyra portrait',
+        status: 'done',
+        outputs: [
+          {
+            id: 'o1',
+            projectId: 'p1',
+            jobId: 'j1',
+            generationType: 'character',
+            prompt: 'Lyra portrait',
+            seed: 42
+          }
+        ]
+      },
+      {
+        id: 'j2',
+        projectId: 'ghost-project',
+        generationType: 'scene',
+        prompt: 'Orphan job',
+        status: 'pending',
+        outputs: []
+      }
+    ]
+  });
+
+  assert.equal(sanitized.generationJobs.length, 1);
+  assert.equal(sanitized.generationJobs[0].id, 'j1');
+  assert.equal(sanitized.generationJobs[0].outputs.length, 1);
+  assert.equal(sanitized.generationJobs[0].outputs[0].id, 'o1');
+});
+
+test('normalizeState applies default imageGenProvider settings', () => {
+  const sanitized = sanitizeState({});
+  assert.equal(sanitized.settings.imageGenProvider.type, 'mock');
+  assert.equal(sanitized.settings.imageGenProvider.steps, 28);
+  assert.equal(sanitized.settings.imageGenProvider.seed, -1);
+  assert.equal(sanitized.settings.imageGenProvider.seedLocked, false);
+  assert.equal(sanitized.settings.imageGenProvider.resolution, '512x768');
+});
+
+test('normalizeState preserves custom imageGenProvider settings', () => {
+  const sanitized = sanitizeState({
+    settings: {
+      imageGenProvider: {
+        type: 'local-api',
+        endpoint: 'http://127.0.0.1:8080',
+        steps: 40,
+        seed: 12345,
+        seedLocked: true,
+        resolution: '768x1024',
+        cfgScale: 9
+      }
+    }
+  });
+
+  assert.equal(sanitized.settings.imageGenProvider.type, 'local-api');
+  assert.equal(sanitized.settings.imageGenProvider.endpoint, 'http://127.0.0.1:8080');
+  assert.equal(sanitized.settings.imageGenProvider.steps, 40);
+  assert.equal(sanitized.settings.imageGenProvider.seed, 12345);
+  assert.equal(sanitized.settings.imageGenProvider.seedLocked, true);
+  assert.equal(sanitized.settings.imageGenProvider.resolution, '768x1024');
+  assert.equal(sanitized.settings.imageGenProvider.cfgScale, 9);
+});
+
+test('deleteEntity removes generationJobs when project is deleted', () => {
+  const project = createProject({ name: 'P' });
+  const otherProject = createProject({ name: 'Q' });
+  const job = createGenerationJob({ projectId: project.id, prompt: 'test' });
+  const otherJob = createGenerationJob({ projectId: otherProject.id, prompt: 'other' });
+
+  const result = deleteEntity(
+    {
+      projects: [project, otherProject],
+      books: [],
+      chapters: [],
+      scenes: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [job, otherJob]
+    },
+    'project',
+    project.id
+  );
+
+  assert.equal(result.projects.length, 1);
+  assert.equal(result.generationJobs.length, 1);
+  assert.equal(result.generationJobs[0].id, otherJob.id);
+});
+
+test('deleteEntity removes a single generationJob by id', () => {
+  const project = createProject({ name: 'P' });
+  const job1 = createGenerationJob({ projectId: project.id, prompt: 'a' });
+  const job2 = createGenerationJob({ projectId: project.id, prompt: 'b' });
+
+  const result = deleteEntity(
+    {
+      projects: [project],
+      books: [],
+      chapters: [],
+      scenes: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [job1, job2]
+    },
+    'generationJob',
+    job1.id
+  );
+
+  assert.equal(result.generationJobs.length, 1);
+  assert.equal(result.generationJobs[0].id, job2.id);
+});
+
+test('deleteEntity removes a single generationOutput by id', () => {
+  const project = createProject({ name: 'P' });
+  const out1 = createGenerationOutput({ projectId: project.id, jobId: 'j1', prompt: 'a', seed: 1 });
+  const out2 = createGenerationOutput({ projectId: project.id, jobId: 'j1', prompt: 'b', seed: 2 });
+  const job = { ...createGenerationJob({ projectId: project.id, prompt: 'test' }), outputs: [out1, out2] };
+
+  const result = deleteEntity(
+    {
+      projects: [project],
+      books: [],
+      chapters: [],
+      scenes: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [job]
+    },
+    'generationOutput',
+    out1.id
+  );
+
+  assert.equal(result.generationJobs[0].outputs.length, 1);
+  assert.equal(result.generationJobs[0].outputs[0].id, out2.id);
+});
+
+test('store persists generationJobs across save/load', () => {
+  const storage = fakeStorage();
+  const store = createStore({ key: 'test-gen', storage });
+  const project = createProject({ name: 'Test' });
+  const job = createGenerationJob({
+    projectId: project.id,
+    prompt: 'portrait test',
+    generationType: 'portrait',
+    providerType: 'mock',
+    params: { seed: 99, steps: 20 }
+  });
+  const output = createGenerationOutput({
+    projectId: project.id,
+    jobId: job.id,
+    prompt: 'portrait test',
+    seed: 99,
+    generationType: 'portrait',
+    isFavorite: true
+  });
+  job.status = 'done';
+  output.isFavorite = true;
+  job.outputs = [output];
+
+  store.save({ ...store.load(), projects: [project], generationJobs: [job] });
+  const loaded = store.load();
+
+  assert.equal(loaded.generationJobs.length, 1);
+  assert.equal(loaded.generationJobs[0].id, job.id);
+  assert.equal(loaded.generationJobs[0].status, 'done');
+  assert.equal(loaded.generationJobs[0].outputs.length, 1);
+  assert.equal(loaded.generationJobs[0].outputs[0].isFavorite, true);
+  assert.equal(loaded.generationJobs[0].outputs[0].seed, 99);
 });
