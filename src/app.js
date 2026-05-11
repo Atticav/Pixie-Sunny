@@ -39,6 +39,7 @@ import {
   searchLore,
   suggestNextParagraph
 } from './assistant.js';
+import { buildAssetLineageGraph } from './asset-lineage.js';
 import { buildAssistivePlanningBundle } from './assistive-planning.js';
 import {
   initializeLocalWorkspace,
@@ -3612,9 +3613,11 @@ const irsRefs = {
   tabBtnReview: $('irsTabBtnReview'),
   tabBtnPromotions: $('irsTabBtnPromotions'),
   tabBtnDecisions: $('irsTabBtnDecisions'),
+  tabBtnLineage: $('irsTabBtnLineage'),
   tabReview: $('irsTabReview'),
   tabPromotions: $('irsTabPromotions'),
   tabDecisions: $('irsTabDecisions'),
+  tabLineage: $('irsTabLineage'),
   // Filters
   filterCharacter: $('irsFilterCharacter'),
   filterScene: $('irsFilterScene'),
@@ -3662,6 +3665,14 @@ const irsRefs = {
   decisionApplyBtn: $('irsDecisionApplyBtn'),
   decisionCount: $('irsDecisionCount'),
   decisionList: $('irsDecisionList'),
+  // Lineage
+  lineageTypeFilter: $('irsLineageTypeFilter'),
+  lineageStatusFilter: $('irsLineageStatusFilter'),
+  lineageOfficialOnly: $('irsLineageOfficialOnly'),
+  lineageApplyBtn: $('irsLineageApplyBtn'),
+  lineageCount: $('irsLineageCount'),
+  lineageSummary: $('irsLineageSummary'),
+  lineageList: $('irsLineageList'),
   // Canon modal
   canonModal: $('irsCanonModal'),
   modalImg: $('irsModalImg'),
@@ -3728,6 +3739,18 @@ const irsDecisionStatusClass = (status) => {
   if (status === 'needs_revision') return 'irs-decision-status-needs-revision';
   if (status === 'pending_review') return 'irs-decision-status-pending';
   return 'irs-decision-status-archived';
+};
+
+const irsLineageTagLabels = {
+  original: 'original',
+  derived_variant: 'derivado / variante',
+  candidate: 'candidata',
+  approved_version: 'versão aprovada',
+  superseded_version: 'versão supersedida',
+  canon_promoted_version: 'promovida ao canon',
+  deprecated_archived_branch: 'ramo depreciado / arquivado',
+  current_official: 'oficial atual',
+  source_of_truth: 'fonte de verdade'
 };
 
 const irsAllDecisionEvents = () => {
@@ -4073,6 +4096,138 @@ const irsScopeItemLabel = (scopeType, scopeId) => {
 };
 
 const irsOutputDisplayName = (output) => output.fileName || `Output ${output.id.substring(0, 8)}`;
+
+const irsLineageTagClass = (tag) => {
+  if (tag === 'current_official') return 'irs-lineage-badge irs-lineage-badge-official';
+  if (tag === 'source_of_truth') return 'irs-lineage-badge irs-lineage-badge-source';
+  if (tag === 'canon_promoted_version') return 'irs-lineage-badge irs-lineage-badge-canon';
+  if (tag === 'superseded_version') return 'irs-lineage-badge irs-lineage-badge-superseded';
+  if (tag === 'deprecated_archived_branch') return 'irs-lineage-badge irs-lineage-badge-archived';
+  return 'irs-lineage-badge';
+};
+
+const irsFindNearestLineageNodeId = (node, direction) => {
+  const links = direction === 'prev' ? node.predecessors : node.successors;
+  if (!links?.length) return '';
+  const preferredSupersession = links.find((edge) => edge.relation === 'supersedes');
+  return (preferredSupersession || links[0]).from === node.id
+    ? (preferredSupersession || links[0]).to
+    : (preferredSupersession || links[0]).from;
+};
+
+const irsRenderLineageGraph = () => {
+  const outputs = irsAllOutputs().map(({ output }) => output);
+  const graph = buildAssetLineageGraph({
+    outputs,
+    decisionEvents: irsAllDecisionEvents(),
+    canonPromotions: (state.canonPromotions || []).filter((promotion) => promotion.projectId === selectedProjectId())
+  });
+  const typeFilter = irsRefs.lineageTypeFilter.value;
+  const statusFilter = irsRefs.lineageStatusFilter.value;
+  const officialOnly = irsRefs.lineageOfficialOnly.checked;
+  let nodes = graph.nodes;
+  if (typeFilter) nodes = nodes.filter((node) => node.output.generationType === typeFilter);
+  if (statusFilter) nodes = nodes.filter((node) => node.statusTags.includes(statusFilter));
+  if (officialOnly) {
+    nodes = nodes.filter((node) =>
+      node.statusTags.includes('current_official') ||
+      node.statusTags.includes('source_of_truth') ||
+      node.statusTags.includes('superseded_version')
+    );
+  }
+
+  irsRefs.lineageCount.textContent = `${nodes.length} / ${graph.nodes.length} versões`;
+  const officialNode = graph.nodes.find((node) => node.id === graph.currentOfficialId);
+  const officialLabel = officialNode ? irsOutputDisplayName(officialNode.output) : '—';
+  const edgeStats = graph.edges.reduce((acc, edge) => {
+    acc[edge.relation] = (acc[edge.relation] || 0) + 1;
+    return acc;
+  }, {});
+  irsRefs.lineageSummary.textContent = [
+    `Oficial atual: ${officialLabel}`,
+    `Fonte da verdade: ${officialLabel}`,
+    `Supersessões: ${edgeStats.supersedes || 0}`,
+    `Derivações/variantes: ${edgeStats.derived_variant || 0}`
+  ].join(' · ');
+  irsRefs.lineageList.innerHTML = '';
+
+  if (!nodes.length) {
+    irsRefs.lineageList.innerHTML = '<p class="irs-hint">Nenhuma versão encontrada para os filtros de linhagem atuais.</p>';
+    return;
+  }
+
+  nodes.forEach((node) => {
+    const row = document.createElement('article');
+    row.className = 'irs-lineage-item';
+
+    const header = document.createElement('div');
+    header.className = 'irs-lineage-header';
+    const title = document.createElement('div');
+    title.className = 'irs-lineage-title';
+    title.textContent = node.label;
+    const titleMeta = document.createElement('span');
+    titleMeta.className = 'irs-lineage-meta';
+    titleMeta.textContent = `${node.output.generationType || 'asset'} · ${new Date(node.output.createdAt).toLocaleString('pt-BR')}`;
+    header.append(title, titleMeta);
+
+    const badges = document.createElement('div');
+    badges.className = 'irs-lineage-badges';
+    node.statusTags.forEach((tag) => {
+      const badge = document.createElement('span');
+      badge.className = irsLineageTagClass(tag);
+      badge.textContent = irsLineageTagLabels[tag] || tag;
+      badges.append(badge);
+    });
+
+    const predecessors = document.createElement('p');
+    predecessors.className = 'irs-lineage-links';
+    const predecessorLabels = node.predecessors.map((edge) => {
+      const related = graph.nodes.find((candidate) => candidate.id === edge.from);
+      return related ? related.label : edge.from;
+    });
+    predecessors.textContent = `Predecessores: ${predecessorLabels.join(', ') || '—'}`;
+    const successors = document.createElement('p');
+    successors.className = 'irs-lineage-links';
+    const successorLabels = node.successors.map((edge) => {
+      const related = graph.nodes.find((candidate) => candidate.id === edge.to);
+      return related ? related.label : edge.to;
+    });
+    successors.textContent = `Sucessores/variantes: ${successorLabels.join(', ') || '—'}`;
+
+    const actions = document.createElement('div');
+    actions.className = 'irs-lineage-actions';
+    const viewBtn = document.createElement('button');
+    viewBtn.textContent = '👁 Ver versão';
+    viewBtn.addEventListener('click', () => {
+      irsSwitchTab('review');
+      irsSelectOutput(node.id);
+    });
+    actions.append(viewBtn);
+    const prevId = irsFindNearestLineageNodeId(node, 'prev');
+    if (prevId) {
+      const prevBtn = document.createElement('button');
+      prevBtn.textContent = '← predecessor';
+      prevBtn.addEventListener('click', () => {
+        irsSwitchTab('review');
+        irsSelectOutput(prevId);
+      });
+      actions.append(prevBtn);
+    }
+    const nextId = irsFindNearestLineageNodeId(node, 'next');
+    if (nextId) {
+      const nextBtn = document.createElement('button');
+      nextBtn.textContent = 'sucessor →';
+      nextBtn.addEventListener('click', () => {
+        irsSwitchTab('review');
+        irsSelectOutput(nextId);
+      });
+      actions.append(nextBtn);
+    }
+
+    row.append(header, badges, predecessors, successors, actions);
+    irsRefs.lineageList.append(row);
+  });
+};
 
 const irsPopulateSupersedeTargets = () => {
   const currentId = irsSelectedOutputId || '';
@@ -4810,17 +4965,21 @@ const irsSwitchTab = (tab) => {
   irsRefs.tabReview.classList.toggle('irs-hidden', !isReview);
   irsRefs.tabPromotions.classList.toggle('irs-hidden', !isPromotions);
   irsRefs.tabDecisions.classList.toggle('irs-hidden', tab !== 'decisions');
+  irsRefs.tabLineage.classList.toggle('irs-hidden', tab !== 'lineage');
   irsRefs.tabBtnReview.classList.toggle('irs-tab-active', isReview);
   irsRefs.tabBtnPromotions.classList.toggle('irs-tab-active', isPromotions);
   irsRefs.tabBtnDecisions.classList.toggle('irs-tab-active', tab === 'decisions');
+  irsRefs.tabBtnLineage.classList.toggle('irs-tab-active', tab === 'lineage');
 
   if (isPromotions) irsRenderPromotionsList();
   if (tab === 'decisions') irsRenderDecisionHistory();
+  if (tab === 'lineage') irsRenderLineageGraph();
 };
 
 irsRefs.tabBtnReview.addEventListener('click', () => irsSwitchTab('review'));
 irsRefs.tabBtnPromotions.addEventListener('click', () => irsSwitchTab('promotions'));
 irsRefs.tabBtnDecisions.addEventListener('click', () => irsSwitchTab('decisions'));
+irsRefs.tabBtnLineage.addEventListener('click', () => irsSwitchTab('lineage'));
 
 irsRefs.applyFiltersBtn.addEventListener('click', () => {
   irsRenderGallery();
@@ -4828,6 +4987,10 @@ irsRefs.applyFiltersBtn.addEventListener('click', () => {
 
 irsRefs.decisionApplyBtn.addEventListener('click', () => {
   irsRenderDecisionHistory();
+});
+
+irsRefs.lineageApplyBtn.addEventListener('click', () => {
+  irsRenderLineageGraph();
 });
 
 irsRefs.clearCompareBtn.addEventListener('click', () => {

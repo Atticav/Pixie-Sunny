@@ -2254,6 +2254,89 @@ details[open].ws-context-section summary::before { content: '▾ '; }
 .irs-decision-rationale { color: var(--text); margin-top: 4px; }
 .irs-decision-time { margin-top: 4px; font-size: 0.7rem; }
 
+.irs-lineage-summary {
+  margin-bottom: 10px;
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.irs-lineage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.irs-lineage-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--panel), black 8%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.irs-lineage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.irs-lineage-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.irs-lineage-meta {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.irs-lineage-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.irs-lineage-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--line);
+}
+
+.irs-lineage-badge-official { background: #153c2f; color: #ffffff; border-color: #245f4d; }
+.irs-lineage-badge-source { background: #4c3919; color: #ffffff; border-color: #735729; }
+.irs-lineage-badge-canon { background: #1a3a6f; color: #ffffff; border-color: #2f5ca0; }
+.irs-lineage-badge-superseded { background: #342248; color: #ffffff; border-color: #563c78; }
+.irs-lineage-badge-archived { background: #2a3834; color: #ffffff; border-color: #445953; }
+
+.irs-lineage-links {
+  margin: 0;
+  font-size: 0.73rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.irs-lineage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.irs-lineage-actions button {
+  font-size: 0.74rem;
+  padding: 4px 8px;
+}
+
 /* Compare area in review */
 .irs-compare-bar {
   display: flex;
