@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore, sanitizeState } from '../src/store.js';
 import {
+  createAsset,
+  createBeat,
   createPromptDocument,
   createBook,
   createCanonPromotion,
@@ -13,13 +15,15 @@ import {
   createProject,
   createReferenceImage,
   createScene,
+  createShot,
   deleteEntity,
   CANON_PROMOTION_TYPES,
   CHAPTER_STATUSES,
   IMAGE_GEN_TYPES,
   IMAGE_GEN_STATUSES,
   OUTPUT_REVIEW_STATUSES,
-  REFERENCE_TYPES
+  REFERENCE_TYPES,
+  SHOT_STATUSES
 } from '../src/models.js';
 import { buildCharacterPromptPack, buildScenePromptPack, inferSceneCharactersFromContext, searchLore } from '../src/assistant.js';
 
@@ -1090,4 +1094,127 @@ test('store persists canonPromotions across save/load', () => {
   assert.equal(loaded.canonPromotions[0].id, promotion.id);
   assert.equal(loaded.canonPromotions[0].canonType, 'character');
   assert.equal(loaded.canonPromotions[0].reason, 'Referência definitiva do personagem');
+});
+
+test('createBeat and createShot include planning defaults', () => {
+  const project = createProject({ name: 'Planejamento' });
+  const book = createBook({ projectId: project.id, title: 'Livro' });
+  const chapter = createChapter({ projectId: project.id, bookId: book.id, title: 'Capítulo' });
+  const scene = createScene({ projectId: project.id, chapterId: chapter.id, title: 'Cena', description: 'Desc' });
+  const beat = createBeat({ projectId: project.id, chapterId: chapter.id, sceneId: scene.id, title: 'Beat 1' });
+  const shot = createShot({ projectId: project.id, chapterId: chapter.id, sceneId: scene.id, beatId: beat.id, title: 'Shot 1' });
+
+  assert.equal(beat.summary, '');
+  assert.equal(beat.order, 0);
+  assert.equal(shot.status, 'idea');
+  assert.equal(shot.shotType, '');
+  assert.equal(shot.focusCharacterId, '');
+  assert.deepEqual(shot.promptDocumentIds, []);
+  assert.deepEqual(shot.generationOutputIds, []);
+  assert.deepEqual(shot.continuityMustKeep, []);
+  assert.deepEqual(shot.continuityReferenceIds, []);
+});
+
+test('SHOT_STATUSES contains expected editorial values', () => {
+  assert.deepEqual(SHOT_STATUSES, ['idea', 'planned', 'generated', 'approved', 'canonical', 'needs redo']);
+});
+
+test('normalizeState keeps valid beats and shots while cleaning orphan links', () => {
+  const project = createProject({ name: 'Planejamento' });
+  const book = createBook({ projectId: project.id, title: 'Livro' });
+  const chapter = createChapter({ projectId: project.id, bookId: book.id, title: 'Capítulo' });
+  const scene = createScene({ projectId: project.id, chapterId: chapter.id, title: 'Cena', description: 'Desc' });
+  const character = createCharacter({ projectId: project.id, name: 'Lyra' });
+  const prompt = createPromptDocument({ projectId: project.id, title: 'Prompt', targetType: 'scene', targetId: scene.id });
+  const reference = createReferenceImage({ projectId: project.id, name: 'Canon', type: 'scene', isCanonical: true });
+  const videoAsset = createAsset({ projectId: project.id, name: 'Clip', type: 'video', path: '/tmp/clip.mp4' });
+  const output = createGenerationOutput({ projectId: project.id, jobId: 'job-1', sceneId: scene.id, fileName: 'frame.png' });
+  const beat = createBeat({ projectId: project.id, chapterId: chapter.id, sceneId: scene.id, title: 'Beat' });
+
+  const sanitized = sanitizeState({
+    projects: [project],
+    books: [book],
+    chapters: [chapter],
+    scenes: [scene],
+    characters: [character],
+    assets: [videoAsset],
+    referenceImages: [reference],
+    promptDocuments: [prompt],
+    generationJobs: [{ ...createGenerationJob({ projectId: project.id, prompt: 'test' }), outputs: [output] }],
+    beats: [beat, { id: 'beat-orphan', projectId: project.id, sceneId: 'ghost', title: 'Órfão' }],
+    shots: [
+      {
+        ...createShot({
+          projectId: project.id,
+          chapterId: 'ghost-chapter',
+          sceneId: scene.id,
+          beatId: beat.id,
+          title: 'Shot limpo',
+          focusCharacterId: character.id,
+          promptDocumentIds: [prompt.id, 'ghost-prompt'],
+          generationOutputIds: [output.id, 'ghost-output'],
+          videoAssetIds: [videoAsset.id, 'ghost-video'],
+          referenceImageIds: [reference.id, 'ghost-reference'],
+          linkedCharacterIds: [character.id, 'ghost-character'],
+          continuityReferenceIds: [reference.id, 'ghost-reference']
+        })
+      },
+      { id: 'shot-orphan', projectId: project.id, sceneId: 'ghost', title: 'Órfão' }
+    ]
+  });
+
+  assert.equal(sanitized.beats.length, 1);
+  assert.equal(sanitized.shots.length, 1);
+  assert.equal(sanitized.shots[0].chapterId, chapter.id);
+  assert.deepEqual(sanitized.shots[0].promptDocumentIds, [prompt.id]);
+  assert.deepEqual(sanitized.shots[0].generationOutputIds, [output.id]);
+  assert.deepEqual(sanitized.shots[0].videoAssetIds, [videoAsset.id]);
+  assert.deepEqual(sanitized.shots[0].referenceImageIds, [reference.id]);
+  assert.deepEqual(sanitized.shots[0].linkedCharacterIds, [character.id]);
+  assert.deepEqual(sanitized.shots[0].continuityReferenceIds, [reference.id]);
+});
+
+test('deleteEntity updates shot planning links for beat and generation output removals', () => {
+  const project = createProject({ name: 'Planejamento' });
+  const book = createBook({ projectId: project.id, title: 'Livro' });
+  const chapter = createChapter({ projectId: project.id, bookId: book.id, title: 'Capítulo' });
+  const scene = createScene({ projectId: project.id, chapterId: chapter.id, title: 'Cena', description: 'Desc' });
+  const beat = createBeat({ projectId: project.id, chapterId: chapter.id, sceneId: scene.id, title: 'Beat' });
+  const output = createGenerationOutput({ projectId: project.id, jobId: 'job-1', sceneId: scene.id, fileName: 'frame.png' });
+  const job = { ...createGenerationJob({ projectId: project.id, prompt: 'test' }), outputs: [output] };
+  const shot = createShot({
+    projectId: project.id,
+    chapterId: chapter.id,
+    sceneId: scene.id,
+    beatId: beat.id,
+    title: 'Shot',
+    generationOutputIds: [output.id]
+  });
+
+  const afterBeatDelete = deleteEntity(
+    {
+      projects: [project],
+      books: [book],
+      chapters: [chapter],
+      scenes: [scene],
+      beats: [beat],
+      shots: [shot],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [job],
+      canonPromotions: []
+    },
+    'beat',
+    beat.id
+  );
+
+  assert.equal(afterBeatDelete.beats.length, 0);
+  assert.equal(afterBeatDelete.shots[0].beatId, '');
+
+  const afterOutputDelete = deleteEntity(afterBeatDelete, 'generationOutput', output.id);
+  assert.equal(afterOutputDelete.generationJobs[0].outputs.length, 0);
+  assert.deepEqual(afterOutputDelete.shots[0].generationOutputIds, []);
 });

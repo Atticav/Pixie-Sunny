@@ -7,6 +7,9 @@ const nowUtc = () => new Date().toISOString();
 
 const stringValue = (value, fallback = '') => (typeof value === 'string' ? value : fallback);
 
+const normalizeOrderIndex = (value) =>
+  typeof value === 'number' && value >= 0 ? Math.floor(value) : 0;
+
 const stringList = (value) =>
   Array.isArray(value)
     ? value.map((entry) => stringValue(entry).trim()).filter(Boolean)
@@ -76,6 +79,7 @@ export const IMAGE_GEN_STATUSES = ['pending', 'running', 'done', 'error'];
 export const IMAGE_GEN_PROVIDER_TYPES = ['mock', 'local-api'];
 export const OUTPUT_REVIEW_STATUSES = ['unreviewed', 'candidate', 'favorite', 'rejected', 'archived'];
 export const CANON_PROMOTION_TYPES = ['character', 'place', 'scene', 'aesthetic'];
+export const SHOT_STATUSES = ['idea', 'planned', 'generated', 'approved', 'canonical', 'needs redo'];
 
 const baseImageGenSettings = () => ({
   type: 'mock',
@@ -135,6 +139,8 @@ export const emptyState = () => ({
   books: [],
   chapters: [],
   scenes: [],
+  beats: [],
+  shots: [],
   characters: [],
   loreEntries: [],
   assets: [],
@@ -313,6 +319,90 @@ export const createScene = ({
   title,
   description,
   location,
+  createdAt: nowUtc(),
+  updatedAt: nowUtc()
+});
+
+export const createBeat = ({
+  projectId,
+  chapterId = UNASSIGNED_CHAPTER_ID,
+  sceneId,
+  title,
+  summary = '',
+  order = 0
+}) => ({
+  id: newId(),
+  projectId,
+  chapterId,
+  sceneId,
+  title,
+  summary,
+  order: normalizeOrderIndex(order),
+  createdAt: nowUtc(),
+  updatedAt: nowUtc()
+});
+
+export const createShot = ({
+  projectId,
+  chapterId = UNASSIGNED_CHAPTER_ID,
+  sceneId,
+  beatId = '',
+  title,
+  order = 0,
+  status = 'idea',
+  shotType = '',
+  angle = '',
+  cameraMovement = '',
+  focusCharacterId = '',
+  dominantEmotion = '',
+  environment = '',
+  narrativeObjective = '',
+  pacingIntensity = '',
+  directorNotes = '',
+  visualProgression = '',
+  narrativeProgression = '',
+  templateId = '',
+  languagePresetId = '',
+  promptDocumentIds = [],
+  generationOutputIds = [],
+  videoAssetIds = [],
+  referenceImageIds = [],
+  linkedCharacterIds = [],
+  continuityMustKeep = [],
+  continuityMayVary = [],
+  continuityRisks = [],
+  continuityReferenceIds = []
+}) => ({
+  id: newId(),
+  projectId,
+  chapterId,
+  sceneId,
+  beatId,
+  title,
+  order: normalizeOrderIndex(order),
+  status: SHOT_STATUSES.includes(status) ? status : 'idea',
+  shotType,
+  angle,
+  cameraMovement,
+  focusCharacterId,
+  dominantEmotion,
+  environment,
+  narrativeObjective,
+  pacingIntensity,
+  directorNotes,
+  visualProgression,
+  narrativeProgression,
+  templateId,
+  languagePresetId,
+  promptDocumentIds: stringList(promptDocumentIds),
+  generationOutputIds: stringList(generationOutputIds),
+  videoAssetIds: stringList(videoAssetIds),
+  referenceImageIds: stringList(referenceImageIds),
+  linkedCharacterIds: stringList(linkedCharacterIds),
+  continuityMustKeep: stringList(continuityMustKeep),
+  continuityMayVary: stringList(continuityMayVary),
+  continuityRisks: stringList(continuityRisks),
+  continuityReferenceIds: stringList(continuityReferenceIds),
   createdAt: nowUtc(),
   updatedAt: nowUtc()
 });
@@ -645,6 +735,64 @@ const normalizeScene = (scene) => {
   };
 };
 
+const normalizeBeat = (beat) => {
+  const value = recordValue(beat);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId', 'sceneId'])) return null;
+  const createdAt = stringValue(value.createdAt) || nowUtc();
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    chapterId: stringValue(value.chapterId, UNASSIGNED_CHAPTER_ID),
+    sceneId: value.sceneId,
+    title: stringValue(value.title, 'Beat sem título'),
+    summary: stringValue(value.summary),
+    order: normalizeOrderIndex(value.order),
+    createdAt,
+    updatedAt: stringValue(value.updatedAt) || createdAt
+  };
+};
+
+const normalizeShot = (shot) => {
+  const value = recordValue(shot);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId', 'sceneId'])) return null;
+  const createdAt = stringValue(value.createdAt) || nowUtc();
+  const rawStatus = stringValue(value.status);
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    chapterId: stringValue(value.chapterId, UNASSIGNED_CHAPTER_ID),
+    sceneId: value.sceneId,
+    beatId: stringValue(value.beatId),
+    title: stringValue(value.title, 'Shot sem título'),
+    order: normalizeOrderIndex(value.order),
+    status: SHOT_STATUSES.includes(rawStatus) ? rawStatus : 'idea',
+    shotType: stringValue(value.shotType),
+    angle: stringValue(value.angle),
+    cameraMovement: stringValue(value.cameraMovement),
+    focusCharacterId: stringValue(value.focusCharacterId),
+    dominantEmotion: stringValue(value.dominantEmotion),
+    environment: stringValue(value.environment),
+    narrativeObjective: stringValue(value.narrativeObjective),
+    pacingIntensity: stringValue(value.pacingIntensity),
+    directorNotes: stringValue(value.directorNotes),
+    visualProgression: stringValue(value.visualProgression),
+    narrativeProgression: stringValue(value.narrativeProgression),
+    templateId: stringValue(value.templateId),
+    languagePresetId: stringValue(value.languagePresetId),
+    promptDocumentIds: stringList(value.promptDocumentIds),
+    generationOutputIds: stringList(value.generationOutputIds),
+    videoAssetIds: stringList(value.videoAssetIds),
+    referenceImageIds: stringList(value.referenceImageIds),
+    linkedCharacterIds: stringList(value.linkedCharacterIds),
+    continuityMustKeep: stringList(value.continuityMustKeep),
+    continuityMayVary: stringList(value.continuityMayVary),
+    continuityRisks: stringList(value.continuityRisks),
+    continuityReferenceIds: stringList(value.continuityReferenceIds),
+    createdAt,
+    updatedAt: stringValue(value.updatedAt) || createdAt
+  };
+};
+
 const normalizeAsset = (asset) => {
   const value = recordValue(asset);
   if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
@@ -822,6 +970,7 @@ export const normalizeState = (raw) => {
     .filter((character) => character && projectIds.has(character.projectId));
   const characterIds = new Set(characters.map((character) => character.id));
   const sceneIds = new Set(scenes.map((scene) => scene.id));
+  const sceneById = new Map(scenes.map((scene) => [scene.id, scene]));
   const loreEntries = (Array.isArray(value.loreEntries) ? value.loreEntries : [])
     .map(normalizeLoreEntry)
     .filter((entry) => entry && projectIds.has(entry.projectId));
@@ -846,6 +995,46 @@ export const normalizeState = (raw) => {
   const canonPromotions = (Array.isArray(value.canonPromotions) ? value.canonPromotions : [])
     .map(normalizeCanonPromotion)
     .filter((p) => p && projectIds.has(p.projectId));
+  const beats = (Array.isArray(value.beats) ? value.beats : [])
+    .map(normalizeBeat)
+    .filter(
+      (beat) =>
+        beat &&
+        projectIds.has(beat.projectId) &&
+        sceneIds.has(beat.sceneId)
+    )
+    .map((beat) => ({
+      ...beat,
+      chapterId: sceneById.get(beat.sceneId)?.chapterId || beat.chapterId || UNASSIGNED_CHAPTER_ID
+    }));
+  const beatIds = new Set(beats.map((beat) => beat.id));
+  const promptDocumentIds = new Set(promptDocuments.map((promptDocument) => promptDocument.id));
+  const assetIds = new Set(assets.map((asset) => asset.id));
+  const referenceImageIds = new Set(referenceImages.map((referenceImage) => referenceImage.id));
+  const generationOutputIds = new Set(
+    generationJobs.flatMap((job) => (Array.isArray(job.outputs) ? job.outputs : []).map((output) => output.id))
+  );
+  const shots = (Array.isArray(value.shots) ? value.shots : [])
+    .map(normalizeShot)
+    .filter(
+      (shot) =>
+        shot &&
+        projectIds.has(shot.projectId) &&
+        sceneIds.has(shot.sceneId) &&
+        (!shot.beatId || beatIds.has(shot.beatId))
+    )
+    .map((shot) => ({
+      ...shot,
+      chapterId: sceneById.get(shot.sceneId)?.chapterId || shot.chapterId || UNASSIGNED_CHAPTER_ID,
+      beatId: shot.beatId && beatIds.has(shot.beatId) ? shot.beatId : '',
+      focusCharacterId: characterIds.has(shot.focusCharacterId) ? shot.focusCharacterId : '',
+      promptDocumentIds: shot.promptDocumentIds.filter((id) => promptDocumentIds.has(id)),
+      generationOutputIds: shot.generationOutputIds.filter((id) => generationOutputIds.has(id)),
+      videoAssetIds: shot.videoAssetIds.filter((id) => assetIds.has(id)),
+      referenceImageIds: shot.referenceImageIds.filter((id) => referenceImageIds.has(id)),
+      linkedCharacterIds: shot.linkedCharacterIds.filter((id) => characterIds.has(id)),
+      continuityReferenceIds: shot.continuityReferenceIds.filter((id) => referenceImageIds.has(id))
+    }));
 
   return {
     ...state,
@@ -853,6 +1042,8 @@ export const normalizeState = (raw) => {
     books,
     chapters,
     scenes,
+    beats,
+    shots,
     characters,
     loreEntries,
     assets,
@@ -882,6 +1073,8 @@ export const deleteEntity = (state, entityType, id) => {
       books: current.books.filter((book) => book.projectId !== id),
       chapters: current.chapters.filter((chapter) => !bookIds.has(chapter.bookId)),
       scenes: current.scenes.filter((scene) => scene.projectId !== id && !chapterIds.has(scene.chapterId)),
+      beats: (current.beats || []).filter((beat) => beat.projectId !== id),
+      shots: (current.shots || []).filter((shot) => shot.projectId !== id),
       characters: current.characters.filter((character) => character.projectId !== id),
       loreEntries: current.loreEntries.filter((entry) => entry.projectId !== id),
       assets: current.assets.filter((asset) => asset.projectId !== id),
@@ -893,9 +1086,16 @@ export const deleteEntity = (state, entityType, id) => {
   }
 
   if (entityType === 'generationJob') {
+    const removedOutputIds = new Set(
+      current.generationJobs.find((job) => job.id === id)?.outputs?.map((output) => output.id) || []
+    );
     return {
       ...current,
-      generationJobs: current.generationJobs.filter((job) => job.id !== id)
+      generationJobs: current.generationJobs.filter((job) => job.id !== id),
+      shots: (current.shots || []).map((shot) => ({
+        ...shot,
+        generationOutputIds: shot.generationOutputIds.filter((outputId) => !removedOutputIds.has(outputId))
+      }))
     };
   }
 
@@ -905,6 +1105,10 @@ export const deleteEntity = (state, entityType, id) => {
       generationJobs: current.generationJobs.map((job) => ({
         ...job,
         outputs: job.outputs.filter((output) => output.id !== id)
+      })),
+      shots: (current.shots || []).map((shot) => ({
+        ...shot,
+        generationOutputIds: shot.generationOutputIds.filter((outputId) => outputId !== id)
       }))
     };
   }
@@ -928,41 +1132,61 @@ export const deleteEntity = (state, entityType, id) => {
   }
 
   if (entityType === 'scene') {
-    return {
+    return normalizeState({
       ...current,
       scenes: current.scenes.filter((scene) => scene.id !== id),
+      beats: (current.beats || []).filter((beat) => beat.sceneId !== id),
+      shots: (current.shots || []).filter((shot) => shot.sceneId !== id),
       promptDocuments: current.promptDocuments.filter(
         (promptDocument) => !(promptDocument.targetType === 'scene' && promptDocument.targetId === id)
       )
-    };
+    });
   }
 
   if (entityType === 'character') {
-    return {
+    return normalizeState({
       ...current,
       characters: current.characters.filter((character) => character.id !== id),
       referenceImages: current.referenceImages.filter((ref) => ref.characterId !== id),
       promptDocuments: current.promptDocuments.filter(
         (promptDocument) => !(promptDocument.targetType === 'character' && promptDocument.targetId === id)
       )
-    };
+    });
   }
 
   if (entityType === 'referenceImage') {
-    return {
+    return normalizeState({
       ...current,
       referenceImages: current.referenceImages.filter((ref) => ref.id !== id),
       promptDocuments: current.promptDocuments.map((promptDocument) => ({
         ...promptDocument,
         referenceIds: promptDocument.referenceIds.filter((referenceId) => referenceId !== id)
       }))
-    };
+    });
   }
 
   if (entityType === 'promptDocument') {
-    return {
+    return normalizeState({
       ...current,
       promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.id !== id)
+    });
+  }
+
+  if (entityType === 'beat') {
+    return normalizeState({
+      ...current,
+      beats: (current.beats || []).filter((beat) => beat.id !== id),
+      shots: (current.shots || []).map((shot) => ({
+        ...shot,
+        beatId: shot.beatId === id ? '' : shot.beatId
+      }))
+    });
+  }
+
+  if (entityType === 'shot') {
+    return {
+      ...current,
+      shots: (current.shots || []).filter((shot) => shot.id !== id)
     };
   }
 
@@ -971,7 +1195,10 @@ export const deleteEntity = (state, entityType, id) => {
   }
 
   if (entityType === 'asset') {
-    return { ...current, assets: current.assets.filter((asset) => asset.id !== id) };
+    return normalizeState({
+      ...current,
+      assets: current.assets.filter((asset) => asset.id !== id)
+    });
   }
 
   if (entityType === 'canonPromotion') {

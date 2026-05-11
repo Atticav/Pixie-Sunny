@@ -181,6 +181,150 @@
         </div>
       </section>
 
+      <section class="sp-section">
+        <h2>Shot Planner &amp; Continuidade Visual</h2>
+        <p class="storage-note">
+          Planeje sequência cinematográfica local-first por capítulo, cena, beat e shot, conectando
+          prompts, imagens, vídeos, referências e personagens já aprovados no pipeline do Mac.
+        </p>
+        <div class="sp-layout">
+          <div class="sp-column">
+            <div class="sp-card stack">
+              <h3 class="sp-card-title">Filtros &amp; navegação</h3>
+              <label>Capítulo
+                <select id="shotFilterChapter"></select>
+              </label>
+              <label>Cena
+                <select id="shotFilterScene"></select>
+              </label>
+              <label>Personagem
+                <select id="shotFilterCharacter"></select>
+              </label>
+              <label>Status
+                <select id="shotFilterStatus"></select>
+              </label>
+              <label>Tipo de plano
+                <select id="shotFilterType"></select>
+              </label>
+            </div>
+
+            <div class="sp-card stack">
+              <h3 class="sp-card-title">Beats da cena</h3>
+              <input id="newBeatTitle" placeholder="Novo beat (ex: Entrada no salão)" />
+              <textarea id="newBeatSummary" rows="2" placeholder="Função narrativa do beat"></textarea>
+              <button id="createBeatBtn">Criar beat</button>
+              <label>Beat atual
+                <select id="shotBeatSelect"></select>
+              </label>
+              <input id="beatTitleInput" placeholder="Título do beat selecionado" />
+              <textarea id="beatSummaryInput" rows="2" placeholder="Resumo do beat selecionado"></textarea>
+              <div class="inline-actions">
+                <button id="saveBeatBtn">Salvar beat</button>
+                <button id="deleteBeatBtn">Excluir beat</button>
+              </div>
+            </div>
+
+            <div class="sp-card stack">
+              <h3 class="sp-card-title">Criar shot</h3>
+              <input id="newShotTitle" placeholder="Novo shot (ex: Close da descoberta)" />
+              <label>Template
+                <select id="shotTemplateSelect"></select>
+              </label>
+              <label>Preset cinematográfico
+                <select id="shotLanguagePresetSelect"></select>
+              </label>
+              <div class="inline-actions">
+                <button id="createShotBtn">Criar shot</button>
+                <button id="moveShotUpBtn">↑ Subir</button>
+                <button id="moveShotDownBtn">↓ Descer</button>
+              </div>
+              <label>Shot atual
+                <select id="shotSelect"></select>
+              </label>
+              <div id="shotTimeline" class="sp-list"></div>
+            </div>
+          </div>
+
+          <div class="sp-column sp-column-wide">
+            <div class="sp-card stack">
+              <h3 class="sp-card-title">Editor do shot</h3>
+              <div class="sp-fields-2col">
+                <input id="shotTitleInput" placeholder="Título do shot" />
+                <label>Status editorial
+                  <select id="shotStatusSelect"></select>
+                </label>
+                <input id="shotTypeInput" placeholder="Tipo de plano" />
+                <input id="shotAngleInput" placeholder="Ângulo" />
+                <input id="shotCameraMovementInput" placeholder="Movimento de câmera" />
+                <label>Personagem em foco
+                  <select id="shotFocusCharacterSelect"></select>
+                </label>
+                <input id="shotDominantEmotionInput" placeholder="Emoção dominante" />
+                <input id="shotEnvironmentInput" placeholder="Ambiente" />
+                <input id="shotNarrativeObjectiveInput" placeholder="Objetivo narrativo do shot" />
+                <input id="shotPacingIntensityInput" placeholder="Ritmo / intensidade" />
+                <input id="shotVisualProgressionInput" placeholder="Progressão visual" />
+                <input id="shotNarrativeProgressionInput" placeholder="Progressão narrativa" />
+                <textarea id="shotDirectorNotes" rows="4" class="sp-field-full" placeholder="Notas do diretor"></textarea>
+              </div>
+              <div class="inline-actions">
+                <button id="applyShotTemplateBtn">Aplicar template</button>
+                <button id="applyShotLanguagePresetBtn">Aplicar preset</button>
+                <button id="saveShotBtn">Salvar shot</button>
+                <button id="deleteShotBtn">Excluir shot</button>
+              </div>
+            </div>
+
+            <div class="sp-card stack">
+              <h3 class="sp-card-title">Associações do shot</h3>
+              <div class="sp-association-grid">
+                <div>
+                  <h4>Prompts</h4>
+                  <div id="shotPromptLinks" class="sp-checkbox-list"></div>
+                </div>
+                <div>
+                  <h4>Imagens aprovadas / canônicas</h4>
+                  <div id="shotOutputLinks" class="sp-checkbox-list"></div>
+                </div>
+                <div>
+                  <h4>Vídeos gerados</h4>
+                  <div id="shotVideoLinks" class="sp-checkbox-list"></div>
+                </div>
+                <div>
+                  <h4>Referências visuais</h4>
+                  <div id="shotReferenceLinks" class="sp-checkbox-list"></div>
+                </div>
+                <div>
+                  <h4>Personagens canônicos</h4>
+                  <div id="shotCharacterLinks" class="sp-checkbox-list"></div>
+                </div>
+                <div>
+                  <h4>Referências canônicas da continuidade</h4>
+                  <div id="shotContinuityReferenceLinks" class="sp-checkbox-list"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="sp-card stack">
+              <h3 class="sp-card-title">Continuidade visual</h3>
+              <div class="sp-fields-2col">
+                <textarea id="shotContinuityKeep" rows="4" placeholder="O que deve permanecer consistente (um por linha)"></textarea>
+                <textarea id="shotContinuityVary" rows="4" placeholder="O que pode variar (um por linha)"></textarea>
+                <textarea id="shotContinuityRisks" rows="4" class="sp-field-full" placeholder="Riscos de quebra de continuidade (um por linha)"></textarea>
+              </div>
+              <pre id="shotContinuityPreview">Nenhum shot selecionado.</pre>
+            </div>
+
+            <div class="sp-card stack">
+              <h3 class="sp-card-title">Progressão da sequência</h3>
+              <pre id="shotProgressionPreview">Nenhum shot planejado.</pre>
+              <h3 class="sp-card-title">Comparação contextual</h3>
+              <pre id="shotComparisonPreview">Selecione um shot para comparar com o anterior e o próximo.</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section>
         <h2>Base de vídeo</h2>
         <div class="stack">

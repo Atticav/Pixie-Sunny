@@ -131,6 +131,131 @@ select:disabled {
   font-weight: 600;
 }
 
+/* =========== Shot Planner =========== */
+.sp-section {
+  grid-column: 1 / -1;
+}
+
+.sp-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.sp-column {
+  display: grid;
+  gap: 12px;
+}
+
+.sp-column-wide {
+  min-width: 0;
+}
+
+.sp-card {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.sp-card-title {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.sp-fields-2col,
+.sp-association-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.sp-field-full {
+  grid-column: 1 / -1;
+}
+
+.sp-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sp-shot-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #121824;
+  cursor: pointer;
+}
+
+.sp-shot-item.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent), transparent 60%);
+}
+
+.sp-shot-item strong {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.sp-shot-meta,
+.sp-shot-detail {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.sp-checkbox-list {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.sp-checkbox-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #121824;
+}
+
+.sp-checkbox-item strong,
+.sp-association-grid h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.sp-checkbox-item small {
+  display: block;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.sp-empty {
+  color: var(--muted);
+  font-size: 0.78rem;
+  padding: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+
+@media (max-width: 1080px) {
+  .sp-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* =========== Writer Studio =========== */
 .ws-overlay {
   position: fixed;
@@ -2090,4 +2215,3 @@ details[open].ws-context-section summary::before { content: '▾ '; }
     border-bottom: 1px solid var(--line);
   }
 }
-
