@@ -4,6 +4,7 @@ import { createStore, sanitizeState } from '../src/store.js';
 import {
   createPromptDocument,
   createBook,
+  createCanonPromotion,
   createChapter,
   createCharacter,
   createGenerationJob,
@@ -13,9 +14,11 @@ import {
   createReferenceImage,
   createScene,
   deleteEntity,
+  CANON_PROMOTION_TYPES,
   CHAPTER_STATUSES,
   IMAGE_GEN_TYPES,
   IMAGE_GEN_STATUSES,
+  OUTPUT_REVIEW_STATUSES,
   REFERENCE_TYPES
 } from '../src/models.js';
 import { buildCharacterPromptPack, buildScenePromptPack, inferSceneCharactersFromContext, searchLore } from '../src/assistant.js';
@@ -880,4 +883,211 @@ test('store persists generationJobs across save/load', () => {
   assert.equal(loaded.generationJobs[0].outputs.length, 1);
   assert.equal(loaded.generationJobs[0].outputs[0].isFavorite, true);
   assert.equal(loaded.generationJobs[0].outputs[0].seed, 99);
+});
+
+test('OUTPUT_REVIEW_STATUSES and CANON_PROMOTION_TYPES contain expected values', () => {
+  assert.deepEqual(OUTPUT_REVIEW_STATUSES, ['unreviewed', 'candidate', 'favorite', 'rejected', 'archived']);
+  assert.deepEqual(CANON_PROMOTION_TYPES, ['character', 'place', 'scene', 'aesthetic']);
+});
+
+test('createGenerationOutput includes review fields with correct defaults', () => {
+  const project = createProject({ name: 'P' });
+  const output = createGenerationOutput({
+    projectId: project.id,
+    jobId: 'j1',
+    prompt: 'Lyra portrait',
+    generationType: 'portrait',
+    seed: 42
+  });
+
+  assert.equal(output.reviewStatus, 'unreviewed');
+  assert.equal(output.isBestReference, false);
+  assert.equal(output.notes, '');
+  assert.equal(output.score, 0);
+});
+
+test('createGenerationOutput stores custom review fields', () => {
+  const project = createProject({ name: 'P' });
+  const output = createGenerationOutput({
+    projectId: project.id,
+    jobId: 'j1',
+    prompt: 'test',
+    reviewStatus: 'candidate',
+    isBestReference: true,
+    notes: 'boa composição',
+    score: 4
+  });
+
+  assert.equal(output.reviewStatus, 'candidate');
+  assert.equal(output.isBestReference, true);
+  assert.equal(output.notes, 'boa composição');
+  assert.equal(output.score, 4);
+});
+
+test('normalizeState coerces invalid reviewStatus to unreviewed', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'p1', name: 'P' }],
+    generationJobs: [
+      {
+        id: 'j1',
+        projectId: 'p1',
+        generationType: 'character',
+        prompt: 'test',
+        status: 'done',
+        outputs: [
+          { id: 'o1', projectId: 'p1', jobId: 'j1', generationType: 'character', seed: -1, reviewStatus: 'invalid-status' }
+        ]
+      }
+    ]
+  });
+  assert.equal(sanitized.generationJobs[0].outputs[0].reviewStatus, 'unreviewed');
+});
+
+test('createCanonPromotion creates a promotion with required fields', () => {
+  const project = createProject({ name: 'P' });
+  const character = createCharacter({ projectId: project.id, name: 'Lyra' });
+  const promotion = createCanonPromotion({
+    projectId: project.id,
+    outputId: 'output-1',
+    jobId: 'job-1',
+    canonType: 'character',
+    targetId: character.id,
+    targetType: 'character',
+    reason: 'Melhor representação visual da Lyra',
+    notes: 'sardas e olhos bem definidos'
+  });
+
+  assert.ok(promotion.id);
+  assert.equal(promotion.projectId, project.id);
+  assert.equal(promotion.outputId, 'output-1');
+  assert.equal(promotion.jobId, 'job-1');
+  assert.equal(promotion.canonType, 'character');
+  assert.equal(promotion.targetId, character.id);
+  assert.equal(promotion.targetType, 'character');
+  assert.equal(promotion.reason, 'Melhor representação visual da Lyra');
+  assert.equal(promotion.notes, 'sardas e olhos bem definidos');
+  assert.ok(promotion.promotedAt);
+});
+
+test('createCanonPromotion coerces invalid canonType to character', () => {
+  const project = createProject({ name: 'P' });
+  const promotion = createCanonPromotion({
+    projectId: project.id,
+    outputId: 'o1',
+    canonType: 'invalid-type',
+    reason: 'test'
+  });
+  assert.equal(promotion.canonType, 'character');
+});
+
+test('normalizeState includes canonPromotions from raw data', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'p1', name: 'P' }],
+    canonPromotions: [
+      {
+        id: 'cp1',
+        projectId: 'p1',
+        outputId: 'o1',
+        jobId: 'j1',
+        canonType: 'scene',
+        targetId: 's1',
+        targetType: 'scene',
+        reason: 'Cena icônica',
+        notes: '',
+        promotedAt: new Date().toISOString()
+      },
+      {
+        id: 'cp2',
+        projectId: 'ghost-project',
+        outputId: 'o2',
+        canonType: 'character',
+        reason: 'Orphan',
+        promotedAt: new Date().toISOString()
+      }
+    ]
+  });
+
+  assert.equal(sanitized.canonPromotions.length, 1);
+  assert.equal(sanitized.canonPromotions[0].id, 'cp1');
+  assert.equal(sanitized.canonPromotions[0].canonType, 'scene');
+});
+
+test('deleteEntity removes canonPromotions when project is deleted', () => {
+  const project = createProject({ name: 'P' });
+  const otherProject = createProject({ name: 'Q' });
+  const job = createGenerationJob({ projectId: project.id, prompt: 'test' });
+  const promotion = createCanonPromotion({ projectId: project.id, outputId: 'o1', canonType: 'character', reason: 'test' });
+  const otherPromotion = createCanonPromotion({ projectId: otherProject.id, outputId: 'o2', canonType: 'scene', reason: 'other' });
+
+  const result = deleteEntity(
+    {
+      projects: [project, otherProject],
+      books: [],
+      chapters: [],
+      scenes: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [job],
+      canonPromotions: [promotion, otherPromotion]
+    },
+    'project',
+    project.id
+  );
+
+  assert.equal(result.canonPromotions.length, 1);
+  assert.equal(result.canonPromotions[0].id, otherPromotion.id);
+});
+
+test('deleteEntity removes a single canonPromotion by id', () => {
+  const project = createProject({ name: 'P' });
+  const promotion1 = createCanonPromotion({ projectId: project.id, outputId: 'o1', canonType: 'character', reason: 'a' });
+  const promotion2 = createCanonPromotion({ projectId: project.id, outputId: 'o2', canonType: 'scene', reason: 'b' });
+
+  const result = deleteEntity(
+    {
+      projects: [project],
+      books: [],
+      chapters: [],
+      scenes: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [],
+      canonPromotions: [promotion1, promotion2]
+    },
+    'canonPromotion',
+    promotion1.id
+  );
+
+  assert.equal(result.canonPromotions.length, 1);
+  assert.equal(result.canonPromotions[0].id, promotion2.id);
+});
+
+test('store persists canonPromotions across save/load', () => {
+  const storage = fakeStorage();
+  const store = createStore({ key: 'test-canon', storage });
+  const project = createProject({ name: 'Test' });
+  const promotion = createCanonPromotion({
+    projectId: project.id,
+    outputId: 'o1',
+    jobId: 'j1',
+    canonType: 'character',
+    targetId: 'c1',
+    targetType: 'character',
+    reason: 'Referência definitiva do personagem',
+    notes: 'olhos e sardas perfeitos'
+  });
+
+  store.save({ ...store.load(), projects: [project], canonPromotions: [promotion] });
+  const loaded = store.load();
+
+  assert.equal(loaded.canonPromotions.length, 1);
+  assert.equal(loaded.canonPromotions[0].id, promotion.id);
+  assert.equal(loaded.canonPromotions[0].canonType, 'character');
+  assert.equal(loaded.canonPromotions[0].reason, 'Referência definitiva do personagem');
 });
