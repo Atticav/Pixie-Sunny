@@ -26,6 +26,7 @@ import {
   SHOT_STATUSES
 } from '../src/models.js';
 import { buildCharacterPromptPack, buildScenePromptPack, inferSceneCharactersFromContext, searchLore } from '../src/assistant.js';
+import { buildAssistivePlanningBundle } from '../src/assistive-planning.js';
 
 const fakeStorage = () => {
   const map = new Map();
@@ -1217,4 +1218,85 @@ test('deleteEntity updates shot planning links for beat and generation output re
   const afterOutputDelete = deleteEntity(afterBeatDelete, 'generationOutput', output.id);
   assert.equal(afterOutputDelete.generationJobs[0].outputs.length, 0);
   assert.deepEqual(afterOutputDelete.shots[0].generationOutputIds, []);
+});
+
+test('assistive planning flags missing dependencies as blocked', () => {
+  const project = createProject({ name: 'P' });
+  const book = createBook({ projectId: project.id, title: 'Livro' });
+  const chapter = createChapter({ projectId: project.id, bookId: book.id, title: 'Capítulo' });
+  const scene = createScene({ projectId: project.id, chapterId: chapter.id, title: 'Cena', description: 'Desc' });
+
+  const bundle = buildAssistivePlanningBundle({
+    state: { projects: [project], books: [book], chapters: [chapter], scenes: [scene] },
+    projectId: project.id,
+    scopeType: 'scene',
+    scopeValue: scene.id
+  });
+
+  assert.ok(bundle.recommendations.some((entry) => entry.type === 'missing dependency' && entry.status === 'blocked'));
+  assert.ok(bundle.recommendations.some((entry) => entry.type === 'scene not production-ready'));
+});
+
+test('assistive planning emits review required when outputs are pending review', () => {
+  const project = createProject({ name: 'P' });
+  const book = createBook({ projectId: project.id, title: 'Livro' });
+  const chapter = createChapter({ projectId: project.id, bookId: book.id, title: 'Capítulo' });
+  const scene = createScene({ projectId: project.id, chapterId: chapter.id, title: 'Cena', description: 'Desc' });
+  const prompt = createPromptDocument({ projectId: project.id, title: 'Prompt', targetType: 'scene', targetId: scene.id });
+  const shot = createShot({ projectId: project.id, chapterId: chapter.id, sceneId: scene.id, title: 'Shot 1' });
+  const output = createGenerationOutput({
+    projectId: project.id,
+    sceneId: scene.id,
+    jobId: 'job-1',
+    generationType: 'scene',
+    reviewStatus: 'candidate'
+  });
+  const job = { ...createGenerationJob({ projectId: project.id, sceneId: scene.id, prompt: 'test' }), outputs: [output] };
+
+  const bundle = buildAssistivePlanningBundle({
+    state: {
+      projects: [project],
+      books: [book],
+      chapters: [chapter],
+      scenes: [scene],
+      promptDocuments: [prompt],
+      shots: [shot],
+      generationJobs: [job]
+    },
+    projectId: project.id
+  });
+
+  assert.ok(bundle.recommendations.some((entry) => entry.type === 'review required' && entry.status === 'ready-to-review'));
+});
+
+test('assistive planning respects sequence scope and suggests generation', () => {
+  const project = createProject({ name: 'P' });
+  const book = createBook({ projectId: project.id, title: 'Livro' });
+  const chapter = createChapter({ projectId: project.id, bookId: book.id, title: 'Capítulo' });
+  const scene = createScene({ projectId: project.id, chapterId: chapter.id, title: 'Cena', description: 'Desc' });
+  const beat = createBeat({ projectId: project.id, chapterId: chapter.id, sceneId: scene.id, title: 'Sequência 1' });
+  const shot = createShot({ projectId: project.id, chapterId: chapter.id, sceneId: scene.id, beatId: beat.id, title: 'Shot 1' });
+  const prompt = createPromptDocument({ projectId: project.id, title: 'Prompt', targetType: 'scene', targetId: scene.id });
+
+  const bundle = buildAssistivePlanningBundle({
+    state: {
+      projects: [project],
+      books: [book],
+      chapters: [chapter],
+      scenes: [scene],
+      beats: [beat],
+      shots: [shot],
+      promptDocuments: [prompt]
+    },
+    projectId: project.id,
+    scopeType: 'sequence',
+    scopeValue: beat.id
+  });
+
+  assert.ok(bundle.recommendations.every((entry) => entry.sceneId === scene.id));
+  assert.ok(
+    bundle.recommendations.some(
+      (entry) => entry.type === 'recommended asset to generate' && entry.status === 'ready-to-generate'
+    )
+  );
 });

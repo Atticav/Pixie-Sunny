@@ -325,6 +325,31 @@
         </div>
       </section>
 
+      <section class="ap-section">
+        <h2>Assistive Planning / Creative Orchestration</h2>
+        <p class="storage-note">
+          Copiloto operacional local-first para MacBook: recomenda próximas ações, dependências faltantes,
+          prioridades de review e prontidão de produção por projeto, capítulo, sequência e cena.
+        </p>
+        <div class="ap-layout">
+          <div class="ap-controls stack">
+            <label>Escopo
+              <select id="assistiveScopeType">
+                <option value="project">Projeto</option>
+                <option value="chapter">Capítulo</option>
+                <option value="sequence">Sequência</option>
+                <option value="scene">Cena</option>
+              </select>
+            </label>
+            <label>Filtro
+              <select id="assistiveScopeValue"></select>
+            </label>
+            <pre id="assistiveSummary"></pre>
+          </div>
+          <div id="assistiveRecommendationList" class="ap-list"></div>
+        </div>
+      </section>
+
       <section>
         <h2>Base de vídeo</h2>
         <div class="stack">
