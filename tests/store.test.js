@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createStore } from '../src/store.js';
-import { createProject } from '../src/models.js';
+import { createStore, sanitizeState } from '../src/store.js';
+import {
+  createBook,
+  createChapter,
+  createCharacter,
+  createLoreEntry,
+  createProject,
+  createScene,
+  deleteEntity
+} from '../src/models.js';
 import { searchLore } from '../src/assistant.js';
 
 const fakeStorage = () => {
@@ -61,4 +69,69 @@ test('store load ignores unexpected parsed properties', () => {
 
   assert.equal(loaded.projects.length, 1);
   assert.equal(loaded.injected, undefined);
+});
+
+test('sanitizeState removes orphaned nested records after import', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'project-1', name: 'Projeto A' }],
+    books: [
+      { id: 'book-1', projectId: 'project-1', title: 'Livro A' },
+      { id: 'book-2', projectId: 'ghost-project', title: 'Livro órfão' }
+    ],
+    chapters: [
+      { id: 'chapter-1', projectId: 'project-1', bookId: 'book-1', title: 'Capítulo A' },
+      { id: 'chapter-2', projectId: 'project-1', bookId: 'ghost-book', title: 'Capítulo órfão' }
+    ],
+    scenes: [
+      { id: 'scene-1', projectId: 'project-1', chapterId: 'chapter-1', title: 'Cena A' },
+      { id: 'scene-2', projectId: 'project-1', chapterId: 'ghost-chapter', title: 'Cena órfã' }
+    ],
+    characters: [
+      { id: 'character-1', projectId: 'project-1', name: 'Lyra' },
+      { id: 'character-2', projectId: 'ghost-project', name: 'Órfã' }
+    ],
+    loreEntries: [
+      { id: 'lore-1', projectId: 'project-1', title: 'Canon', content: 'Fato válido' },
+      { id: 'lore-2', projectId: 'ghost-project', title: 'Ghost', content: 'Fato inválido' }
+    ]
+  });
+
+  assert.deepEqual(sanitized.projects.map((entry) => entry.id), ['project-1']);
+  assert.deepEqual(sanitized.books.map((entry) => entry.id), ['book-1']);
+  assert.deepEqual(sanitized.chapters.map((entry) => entry.id), ['chapter-1']);
+  assert.deepEqual(sanitized.scenes.map((entry) => entry.id), ['scene-1']);
+  assert.deepEqual(sanitized.characters.map((entry) => entry.id), ['character-1']);
+  assert.deepEqual(sanitized.loreEntries.map((entry) => entry.id), ['lore-1']);
+});
+
+test('deleteEntity removes a whole project graph', () => {
+  const project = createProject({ name: 'Universo', tone: 'Sombrio' });
+  const otherProject = createProject({ name: 'Outro', tone: 'Solar' });
+  const book = createBook({ projectId: project.id, title: 'Livro' });
+  const chapter = createChapter({ projectId: project.id, bookId: book.id, title: 'Capítulo' });
+  const scene = createScene({ projectId: project.id, chapterId: chapter.id, title: 'Cena', description: 'Acontece algo' });
+  const character = createCharacter({ projectId: project.id, name: 'Nora' });
+  const lore = createLoreEntry({ projectId: project.id, title: 'Lei', content: 'Nada de ferro frio.' });
+
+  const next = deleteEntity(
+    {
+      projects: [project, otherProject],
+      books: [book],
+      chapters: [chapter],
+      scenes: [scene],
+      characters: [character],
+      loreEntries: [lore],
+      assets: [],
+      settings: {}
+    },
+    'project',
+    project.id
+  );
+
+  assert.deepEqual(next.projects.map((entry) => entry.id), [otherProject.id]);
+  assert.equal(next.books.length, 0);
+  assert.equal(next.chapters.length, 0);
+  assert.equal(next.scenes.length, 0);
+  assert.equal(next.characters.length, 0);
+  assert.equal(next.loreEntries.length, 0);
 });

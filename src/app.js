@@ -5,7 +5,9 @@ import {
   createCharacter,
   createLoreEntry,
   createProject,
-  createScene
+  createScene,
+  deleteEntity,
+  UNASSIGNED_CHAPTER_ID
 } from './models.js';
 import { createStore, sanitizeState } from './store.js';
 import { buildSceneSpec, buildVideoSpec, searchLore, suggestNextParagraph } from './assistant.js';
@@ -20,11 +22,27 @@ const refs = {
   bookSelect: $('bookSelect'),
   chapterSelect: $('chapterSelect'),
   characterSelect: $('characterSelect'),
+  loreSelect: $('loreSelect'),
   sceneSelect: $('sceneSelect'),
   videoImageAssetSelect: $('videoImageAssetSelect'),
   loreList: $('loreList'),
-  assetList: $('assetList')
+  assetList: $('assetList'),
+  chapterContent: $('chapterContent'),
+  writingSuggestion: $('writingSuggestion'),
+  characterPreview: $('characterPreview'),
+  sceneSpec: $('sceneSpec'),
+  videoSpec: $('videoSpec')
 };
+
+const parseTextList = (value, separator) =>
+  (typeof value === 'string' ? value : '')
+    .split(separator)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+const parseLines = (value) => parseTextList(value, '\n');
+
+const parseTags = (value) => parseTextList(value, ',');
 
 const selectedProjectId = () => refs.projectSelect.value;
 
@@ -32,8 +50,23 @@ const selectedBookId = () => refs.bookSelect.value;
 
 const selectedChapterId = () => refs.chapterSelect.value;
 
-const renderOptions = (select, options, selectedId) => {
+const selectedCharacterId = () => refs.characterSelect.value;
+
+const selectedLoreId = () => refs.loreSelect.value;
+
+const selectedSceneId = () => refs.sceneSelect.value;
+
+const renderOptions = (select, options, selectedId, emptyLabel = 'Nenhum item cadastrado') => {
   select.innerHTML = '';
+  if (!options.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = emptyLabel;
+    select.append(option);
+    select.value = '';
+    return;
+  }
+
   options.forEach((item) => {
     const option = document.createElement('option');
     option.value = item.id;
@@ -41,9 +74,33 @@ const renderOptions = (select, options, selectedId) => {
     if (selectedId && selectedId === item.id) option.selected = true;
     select.append(option);
   });
+
+  if (!select.value && options[0]) {
+    select.value = options[0].id;
+  }
+};
+
+const setValue = (id, value) => {
+  $(id).value = value || '';
+};
+
+const setDisabled = (ids, disabled) => {
+  ids.forEach((id) => {
+    $(id).disabled = disabled;
+  });
 };
 
 const currentProject = () => state.projects.find((project) => project.id === selectedProjectId());
+
+const currentBook = () => state.books.find((book) => book.id === selectedBookId());
+
+const currentChapter = () => state.chapters.find((chapter) => chapter.id === selectedChapterId());
+
+const currentCharacter = () => state.characters.find((character) => character.id === selectedCharacterId());
+
+const currentLoreEntry = () => state.loreEntries.find((entry) => entry.id === selectedLoreId());
+
+const currentScene = () => state.scenes.find((scene) => scene.id === selectedSceneId());
 
 const projectBooks = () => state.books.filter((book) => book.projectId === selectedProjectId());
 
@@ -56,7 +113,14 @@ const projectCharacters = () => state.characters.filter((character) => character
 
 const projectLore = () => state.loreEntries.filter((entry) => entry.projectId === selectedProjectId());
 
-const projectScenes = () => state.scenes.filter((scene) => scene.projectId === selectedProjectId());
+const projectScenes = () =>
+  state.scenes.filter(
+    (scene) =>
+      scene.projectId === selectedProjectId() &&
+      (!selectedChapterId() ||
+        scene.chapterId === UNASSIGNED_CHAPTER_ID ||
+        scene.chapterId === selectedChapterId())
+  );
 
 const projectAssets = () => state.assets.filter((asset) => asset.projectId === selectedProjectId());
 
@@ -64,9 +128,11 @@ const renderLore = () => {
   const query = $('loreSearch').value;
   const entries = searchLore(projectLore(), query);
   refs.loreList.innerHTML = '';
+
   entries.forEach((entry) => {
     const li = document.createElement('li');
-    li.textContent = `${entry.title}: ${entry.content}`;
+    const tags = entry.tags.length ? ` [${entry.tags.join(', ')}]` : '';
+    li.textContent = `${entry.title}${tags}: ${entry.content}`;
     refs.loreList.append(li);
   });
 };
@@ -74,6 +140,7 @@ const renderLore = () => {
 const renderAssets = () => {
   refs.assetList.innerHTML = '';
   const assets = projectAssets();
+
   assets.forEach((asset) => {
     const li = document.createElement('li');
     li.textContent = `${asset.type} · ${asset.name} · ${asset.path}`;
@@ -81,103 +148,205 @@ const renderAssets = () => {
   });
 
   const imageAssets = assets.filter((asset) => asset.type.toLowerCase() === 'image');
-  renderOptions(refs.videoImageAssetSelect, imageAssets, refs.videoImageAssetSelect.value || imageAssets[0]?.id);
+  renderOptions(
+    refs.videoImageAssetSelect,
+    imageAssets,
+    refs.videoImageAssetSelect.value || imageAssets[0]?.id,
+    'Nenhuma imagem cadastrada'
+  );
+};
+
+const renderProjectEditor = () => {
+  const project = currentProject();
+  setValue('projectNameInput', project?.name);
+  setValue('projectToneInput', project?.tone);
+  setValue('projectDescriptionInput', project?.description);
+  setDisabled(['saveProjectBtn', 'deleteProjectBtn'], !project);
+};
+
+const renderBookEditor = () => {
+  const book = currentBook();
+  setValue('bookTitleInput', book?.title);
+  setValue('bookSynopsisInput', book?.synopsis);
+  setDisabled(['saveBookBtn', 'deleteBookBtn', 'createChapterBtn'], !book);
+};
+
+const renderChapterEditor = () => {
+  const chapter = currentChapter();
+  setValue('chapterTitleInput', chapter?.title);
+  setValue('chapterSummaryInput', chapter?.summary);
+  refs.chapterContent.value = chapter?.content || '';
+  setDisabled(['saveChapterBtn', 'deleteChapterBtn', 'suggestTextBtn'], !chapter);
+};
+
+const renderCharacterEditor = () => {
+  const character = currentCharacter();
+  setValue('characterNameInput', character?.name);
+  setValue('characterNotesInput', character?.notes);
+  setValue('characterCanonInput', character?.canonTraits?.join('\n'));
+  setValue('characterPromptInput', character?.masterPrompt);
+  setValue('characterNegativePromptInput', character?.negativePrompt);
+  refs.characterPreview.textContent = character
+    ? JSON.stringify(character, null, 2)
+    : 'Sem personagem selecionado.';
+  setDisabled(['saveCharacterBtn', 'deleteCharacterBtn'], !character);
+};
+
+const renderLoreEditor = () => {
+  const entry = currentLoreEntry();
+  setValue('loreTitleInput', entry?.title);
+  setValue('loreContentInput', entry?.content);
+  setValue('loreTagsInput', entry?.tags?.join(', '));
+  setDisabled(['saveLoreBtn', 'deleteLoreBtn'], !entry);
+};
+
+const renderSceneEditor = () => {
+  const scene = currentScene();
+  setValue('sceneTitleInput', scene?.title);
+  setValue('sceneDescriptionInput', scene?.description);
+  setValue('sceneLocationInput', scene?.location);
+  setDisabled(['saveSceneBtn', 'deleteSceneBtn', 'generateSceneSpecBtn'], !scene);
 };
 
 const render = () => {
-  if (!state.projects.length) {
-    const seedProject = createProject({
-      name: 'Meu Universo',
-      tone: 'fantasia sombria cinematográfica, tons frios e textura realista'
-    });
-    state.projects.push(seedProject);
-    store.save(state);
-  }
-
-  renderOptions(refs.projectSelect, state.projects, selectedProjectId() || state.projects[0].id);
+  renderOptions(refs.projectSelect, state.projects, selectedProjectId(), 'Crie seu primeiro projeto');
 
   const books = projectBooks();
-  renderOptions(refs.bookSelect, books, selectedBookId() || books[0]?.id);
+  renderOptions(refs.bookSelect, books, selectedBookId(), 'Nenhum livro neste projeto');
 
   const chapters = projectChapters();
-  renderOptions(refs.chapterSelect, chapters, selectedChapterId() || chapters[0]?.id);
+  renderOptions(refs.chapterSelect, chapters, selectedChapterId(), 'Nenhum capítulo neste livro');
 
-  const chars = projectCharacters();
-  renderOptions(refs.characterSelect, chars, refs.characterSelect.value || chars[0]?.id);
+  const characters = projectCharacters();
+  renderOptions(refs.characterSelect, characters, selectedCharacterId(), 'Nenhum personagem neste projeto');
+
+  const loreEntries = projectLore();
+  renderOptions(refs.loreSelect, loreEntries, selectedLoreId(), 'Nenhuma entrada de lore');
 
   const scenes = projectScenes();
-  renderOptions(refs.sceneSelect, scenes, refs.sceneSelect.value || scenes[0]?.id);
+  renderOptions(refs.sceneSelect, scenes, selectedSceneId(), 'Nenhuma cena neste contexto');
 
-  const chapter = state.chapters.find((item) => item.id === selectedChapterId());
-  $('chapterContent').value = chapter?.content || '';
-
-  const selectedCharacter = chars.find((item) => item.id === refs.characterSelect.value);
-  $('characterPreview').textContent = selectedCharacter
-    ? JSON.stringify(selectedCharacter, null, 2)
-    : 'Sem personagem selecionado.';
-
+  renderProjectEditor();
+  renderBookEditor();
+  renderChapterEditor();
+  renderCharacterEditor();
+  renderLoreEditor();
+  renderSceneEditor();
   renderLore();
   renderAssets();
+
+  setDisabled(['createBookBtn', 'createCharacterBtn', 'createLoreBtn', 'createSceneBtn', 'saveAssetBtn'], !selectedProjectId());
 };
 
 const persist = () => {
-  store.save(state);
+  state = store.save(state);
   render();
 };
 
 $('createProjectBtn').addEventListener('click', () => {
   const name = $('newProjectName').value.trim();
   const tone = $('newProjectTone').value.trim();
+  const description = $('newProjectDescription').value.trim();
   if (!name) return;
-  state.projects.push(createProject({ name, tone }));
-  $('newProjectName').value = '';
-  $('newProjectTone').value = '';
+
+  state.projects.push(createProject({ name, tone, description }));
+  setValue('newProjectName', '');
+  setValue('newProjectTone', '');
+  setValue('newProjectDescription', '');
   persist();
 });
 
-$('projectSelect').addEventListener('change', render);
-$('bookSelect').addEventListener('change', render);
-$('chapterSelect').addEventListener('change', render);
-$('characterSelect').addEventListener('change', render);
-$('sceneSelect').addEventListener('change', render);
-$('loreSearch').addEventListener('input', renderLore);
+$('saveProjectBtn').addEventListener('click', () => {
+  const project = currentProject();
+  if (!project) return;
+
+  project.name = $('projectNameInput').value.trim() || project.name;
+  project.tone = $('projectToneInput').value.trim();
+  project.description = $('projectDescriptionInput').value.trim();
+  project.updatedAt = new Date().toISOString();
+  persist();
+});
+
+$('deleteProjectBtn').addEventListener('click', () => {
+  const project = currentProject();
+  if (!project || !window.confirm(`Excluir o projeto "${project.name}" e todos os dados relacionados?`)) return;
+
+  state = deleteEntity(state, 'project', project.id);
+  persist();
+});
 
 $('createBookBtn').addEventListener('click', () => {
   const title = $('newBookTitle').value.trim();
+  const synopsis = $('newBookSynopsis').value.trim();
   if (!title || !selectedProjectId()) return;
-  state.books.push(createBook({ projectId: selectedProjectId(), title }));
-  $('newBookTitle').value = '';
+
+  state.books.push(createBook({ projectId: selectedProjectId(), title, synopsis }));
+  setValue('newBookTitle', '');
+  setValue('newBookSynopsis', '');
+  persist();
+});
+
+$('saveBookBtn').addEventListener('click', () => {
+  const book = currentBook();
+  if (!book) return;
+
+  book.title = $('bookTitleInput').value.trim() || book.title;
+  book.synopsis = $('bookSynopsisInput').value.trim();
+  book.updatedAt = new Date().toISOString();
+  persist();
+});
+
+$('deleteBookBtn').addEventListener('click', () => {
+  const book = currentBook();
+  if (!book || !window.confirm(`Excluir o livro "${book.title}" e seus capítulos/cenas?`)) return;
+
+  state = deleteEntity(state, 'book', book.id);
   persist();
 });
 
 $('createChapterBtn').addEventListener('click', () => {
   const title = $('newChapterTitle').value.trim();
+  const summary = $('newChapterSummary').value.trim();
   if (!title || !selectedProjectId() || !selectedBookId()) return;
+
   state.chapters.push(
     createChapter({
       projectId: selectedProjectId(),
       bookId: selectedBookId(),
       title,
+      summary,
       content: ''
     })
   );
-  $('newChapterTitle').value = '';
+  setValue('newChapterTitle', '');
+  setValue('newChapterSummary', '');
   persist();
 });
 
 $('saveChapterBtn').addEventListener('click', () => {
-  const chapterId = selectedChapterId();
-  const chapter = state.chapters.find((entry) => entry.id === chapterId);
+  const chapter = currentChapter();
   if (!chapter) return;
-  chapter.content = $('chapterContent').value;
+
+  chapter.title = $('chapterTitleInput').value.trim() || chapter.title;
+  chapter.summary = $('chapterSummaryInput').value.trim();
+  chapter.content = refs.chapterContent.value;
   chapter.updatedAt = new Date().toISOString();
   persist();
 });
 
+$('deleteChapterBtn').addEventListener('click', () => {
+  const chapter = currentChapter();
+  if (!chapter || !window.confirm(`Excluir o capítulo "${chapter.title}" e suas cenas?`)) return;
+
+  state = deleteEntity(state, 'chapter', chapter.id);
+  persist();
+});
+
 $('suggestTextBtn').addEventListener('click', () => {
-  const chapter = state.chapters.find((entry) => entry.id === selectedChapterId());
+  const chapter = currentChapter();
   if (!chapter) return;
-  $('writingSuggestion').textContent = suggestNextParagraph({
+
+  refs.writingSuggestion.textContent = suggestNextParagraph({
     chapterContent: chapter.content,
     chapterTitle: chapter.title,
     loreEntries: projectLore(),
@@ -188,23 +357,44 @@ $('suggestTextBtn').addEventListener('click', () => {
 $('createCharacterBtn').addEventListener('click', () => {
   const name = $('newCharacterName').value.trim();
   if (!name || !selectedProjectId()) return;
-  const canonTraits = $('newCharacterCanon').value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+
   state.characters.push(
     createCharacter({
       projectId: selectedProjectId(),
       name,
-      canonTraits,
+      notes: $('newCharacterNotes').value.trim(),
+      canonTraits: parseLines($('newCharacterCanon').value),
       masterPrompt: $('newCharacterPrompt').value.trim(),
       negativePrompt: $('newCharacterNegativePrompt').value.trim()
     })
   );
-  $('newCharacterName').value = '';
-  $('newCharacterCanon').value = '';
-  $('newCharacterPrompt').value = '';
-  $('newCharacterNegativePrompt').value = '';
+
+  setValue('newCharacterName', '');
+  setValue('newCharacterNotes', '');
+  setValue('newCharacterCanon', '');
+  setValue('newCharacterPrompt', '');
+  setValue('newCharacterNegativePrompt', '');
+  persist();
+});
+
+$('saveCharacterBtn').addEventListener('click', () => {
+  const character = currentCharacter();
+  if (!character) return;
+
+  character.name = $('characterNameInput').value.trim() || character.name;
+  character.notes = $('characterNotesInput').value.trim();
+  character.canonTraits = parseLines($('characterCanonInput').value);
+  character.masterPrompt = $('characterPromptInput').value.trim();
+  character.negativePrompt = $('characterNegativePromptInput').value.trim();
+  character.updatedAt = new Date().toISOString();
+  persist();
+});
+
+$('deleteCharacterBtn').addEventListener('click', () => {
+  const character = currentCharacter();
+  if (!character || !window.confirm(`Excluir o personagem "${character.name}"?`)) return;
+
+  state = deleteEntity(state, 'character', character.id);
   persist();
 });
 
@@ -212,9 +402,37 @@ $('createLoreBtn').addEventListener('click', () => {
   const title = $('newLoreTitle').value.trim();
   const content = $('newLoreContent').value.trim();
   if (!title || !content || !selectedProjectId()) return;
-  state.loreEntries.push(createLoreEntry({ projectId: selectedProjectId(), title, content }));
-  $('newLoreTitle').value = '';
-  $('newLoreContent').value = '';
+
+  state.loreEntries.push(
+    createLoreEntry({
+      projectId: selectedProjectId(),
+      title,
+      content,
+      tags: parseTags($('newLoreTags').value)
+    })
+  );
+  setValue('newLoreTitle', '');
+  setValue('newLoreContent', '');
+  setValue('newLoreTags', '');
+  persist();
+});
+
+$('saveLoreBtn').addEventListener('click', () => {
+  const entry = currentLoreEntry();
+  if (!entry) return;
+
+  entry.title = $('loreTitleInput').value.trim() || entry.title;
+  entry.content = $('loreContentInput').value.trim();
+  entry.tags = parseTags($('loreTagsInput').value);
+  entry.updatedAt = new Date().toISOString();
+  persist();
+});
+
+$('deleteLoreBtn').addEventListener('click', () => {
+  const entry = currentLoreEntry();
+  if (!entry || !window.confirm(`Excluir a entrada de lore "${entry.title}"?`)) return;
+
+  state = deleteEntity(state, 'lore', entry.id);
   persist();
 });
 
@@ -222,28 +440,51 @@ $('createSceneBtn').addEventListener('click', () => {
   const title = $('newSceneTitle').value.trim();
   const description = $('newSceneDescription').value.trim();
   if (!title || !description || !selectedProjectId()) return;
+
   state.scenes.push(
     createScene({
       projectId: selectedProjectId(),
-      chapterId: selectedChapterId(),
+      chapterId: selectedChapterId() || UNASSIGNED_CHAPTER_ID,
       title,
-      description
+      description,
+      location: $('newSceneLocation').value.trim()
     })
   );
-  $('newSceneTitle').value = '';
-  $('newSceneDescription').value = '';
+  setValue('newSceneTitle', '');
+  setValue('newSceneDescription', '');
+  setValue('newSceneLocation', '');
+  persist();
+});
+
+$('saveSceneBtn').addEventListener('click', () => {
+  const scene = currentScene();
+  if (!scene) return;
+
+  scene.title = $('sceneTitleInput').value.trim() || scene.title;
+  scene.description = $('sceneDescriptionInput').value.trim();
+  scene.location = $('sceneLocationInput').value.trim();
+  scene.updatedAt = new Date().toISOString();
+  persist();
+});
+
+$('deleteSceneBtn').addEventListener('click', () => {
+  const scene = currentScene();
+  if (!scene || !window.confirm(`Excluir a cena "${scene.title}"?`)) return;
+
+  state = deleteEntity(state, 'scene', scene.id);
   persist();
 });
 
 $('generateSceneSpecBtn').addEventListener('click', () => {
-  const scene = projectScenes().find((item) => item.id === refs.sceneSelect.value);
+  const scene = currentScene();
   if (!scene) return;
+
   const spec = buildSceneSpec({
     projectTone: currentProject()?.tone,
     scene,
     characters: projectCharacters()
   });
-  $('sceneSpec').textContent = JSON.stringify(spec, null, 2);
+  refs.sceneSpec.textContent = JSON.stringify(spec, null, 2);
 });
 
 $('saveAssetBtn').addEventListener('click', () => {
@@ -251,22 +492,21 @@ $('saveAssetBtn').addEventListener('click', () => {
   const type = $('assetType').value.trim() || 'ref';
   const path = $('assetPath').value.trim();
   if (!name || !path || !selectedProjectId()) return;
+
   state.assets.push(createAsset({ projectId: selectedProjectId(), name, type, path }));
-  $('assetName').value = '';
-  $('assetType').value = '';
-  $('assetPath').value = '';
+  setValue('assetName', '');
+  setValue('assetType', '');
+  setValue('assetPath', '');
   persist();
 });
 
 $('generateVideoSpecBtn').addEventListener('click', () => {
-  const scene = projectScenes().find((item) => item.id === refs.sceneSelect.value);
-  const imageAsset = projectAssets().find((asset) => asset.id === refs.videoImageAssetSelect.value);
   const spec = buildVideoSpec({
-    scene,
-    imageAsset,
+    scene: currentScene(),
+    imageAsset: projectAssets().find((asset) => asset.id === refs.videoImageAssetSelect.value),
     projectTone: currentProject()?.tone
   });
-  $('videoSpec').textContent = JSON.stringify(spec, null, 2);
+  refs.videoSpec.textContent = JSON.stringify(spec, null, 2);
 });
 
 $('exportDataBtn').addEventListener('click', () => {
@@ -283,15 +523,24 @@ $('exportDataBtn').addEventListener('click', () => {
 $('importDataInput').addEventListener('change', async (event) => {
   const [file] = event.target.files;
   if (!file) return;
+
   const content = await file.text();
   try {
-    const imported = JSON.parse(content);
-    state = sanitizeState(imported);
+    state = sanitizeState(JSON.parse(content));
     persist();
+    event.target.value = '';
   } catch (error) {
     console.error('Falha ao importar JSON', error);
     alert(`Erro ao importar JSON: ${error?.message || 'o arquivo não contém dados válidos ou está corrompido'}`);
   }
 });
+
+refs.projectSelect.addEventListener('change', render);
+refs.bookSelect.addEventListener('change', render);
+refs.chapterSelect.addEventListener('change', render);
+refs.characterSelect.addEventListener('change', render);
+refs.loreSelect.addEventListener('change', render);
+refs.sceneSelect.addEventListener('change', render);
+$('loreSearch').addEventListener('input', renderLore);
 
 render();

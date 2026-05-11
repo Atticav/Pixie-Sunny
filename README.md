@@ -20,7 +20,7 @@ python -m http.server 8080
 
 ## Funcionalidades já implementadas
 
-- CRUD básico local-first com persistência em `localStorage`
+- CRUD local-first com criação, edição e exclusão para projetos, livros, capítulos, personagens, cenas e lore
 - estrutura de dados para:
   - projetos
   - livros
@@ -34,6 +34,7 @@ python -m http.server 8080
 - geração de **spec** de imagem para fidelidade narrativa/visual
 - geração de **spec** de vídeo (image-to-video) com foco em pipeline local
 - exportação/importação de backup JSON
+- limpeza automática de dados órfãos ao importar backups ou remover entidades relacionadas
 
 ## Arquitetura local-first
 
@@ -43,6 +44,14 @@ python -m http.server 8080
 - Pontos de extensão para IA local:
   - `src/pipelines.js#runImagePipeline`
   - `src/pipelines.js#runVideoPipeline`
+
+### Como os dados ficam salvos localmente
+
+- chave usada no navegador: `pixieSunnyStudio`
+- local de armazenamento: `localStorage` do browser atual
+- persistência: automática a cada criação/edição/exclusão
+- portabilidade: use **Exportar JSON** para gerar um backup e **Importar JSON** para restaurar em outro navegador ou máquina
+- integridade: imports inválidos são saneados e registros órfãos são descartados para manter a hierarquia projeto → livro → capítulo → cena consistente
 
 ## Estrutura do projeto
 
