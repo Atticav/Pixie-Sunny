@@ -40,6 +40,7 @@ export const emptyState = () => ({
   loreEntries: [],
   assets: [],
   referenceImages: [],
+  promptDocuments: [],
   settings: baseSettings()
 });
 
@@ -220,6 +221,89 @@ export const createAsset = ({ projectId, name, type, path }) => ({
   createdAt: nowUtc()
 });
 
+const createPromptVersion = ({
+  id = newId(),
+  label = 'Versão inicial',
+  source = 'manual',
+  preserve = [],
+  vary = [],
+  masterPrompt = '',
+  negativePrompt = '',
+  shortPrompt = '',
+  detailedPrompt = '',
+  scenePrompt = '',
+  cinematicPrompt = '',
+  variations = [],
+  fixedChecklist = [],
+  notes = '',
+  createdAt = nowUtc()
+} = {}) => ({
+  id,
+  label,
+  source,
+  preserve: stringList(preserve),
+  vary: stringList(vary),
+  masterPrompt,
+  negativePrompt,
+  shortPrompt,
+  detailedPrompt,
+  scenePrompt,
+  cinematicPrompt,
+  variations: stringList(variations),
+  fixedChecklist: stringList(fixedChecklist),
+  notes,
+  createdAt
+});
+
+export const createPromptDocument = ({
+  projectId,
+  title,
+  targetType = 'character',
+  targetId = '',
+  promptMedium = 'image',
+  stylePreset = 'cinematic-realism',
+  cinematicPreset = 'portrait-intimate',
+  lensLightingPreset = 'natural-soft',
+  emotionalTone = '',
+  environment = '',
+  lighting = '',
+  composition = '',
+  notes = '',
+  referenceIds = [],
+  versions = [],
+  activeVersionId = '',
+  isFavorite = false,
+  isOfficial = false
+}) => {
+  const safeVersions = versions.length ? versions.map((version) => createPromptVersion(version)) : [createPromptVersion()];
+  const currentActiveVersionId = safeVersions.some((version) => version.id === activeVersionId)
+    ? activeVersionId
+    : safeVersions[0].id;
+  return {
+    id: newId(),
+    projectId,
+    title,
+    targetType: targetType === 'scene' ? 'scene' : 'character',
+    targetId,
+    promptMedium: promptMedium === 'video' ? 'video' : 'image',
+    stylePreset,
+    cinematicPreset,
+    lensLightingPreset,
+    emotionalTone,
+    environment,
+    lighting,
+    composition,
+    notes,
+    referenceIds: stringList(referenceIds),
+    versions: safeVersions,
+    activeVersionId: currentActiveVersionId,
+    isFavorite: Boolean(isFavorite),
+    isOfficial: Boolean(isOfficial),
+    createdAt: nowUtc(),
+    updatedAt: nowUtc()
+  };
+};
+
 const normalizeProject = (project) => {
   const value = recordValue(project);
   if (!value || !stringValue(value.id)) return null;
@@ -375,6 +459,65 @@ const normalizeAsset = (asset) => {
   };
 };
 
+const normalizePromptVersion = (version) => {
+  const value = recordValue(version);
+  if (!value || !stringValue(value.id)) return null;
+  const createdAt = stringValue(value.createdAt) || nowUtc();
+  return {
+    id: value.id,
+    label: stringValue(value.label, 'Versão'),
+    source: stringValue(value.source, 'manual'),
+    preserve: stringList(value.preserve),
+    vary: stringList(value.vary),
+    masterPrompt: stringValue(value.masterPrompt),
+    negativePrompt: stringValue(value.negativePrompt),
+    shortPrompt: stringValue(value.shortPrompt),
+    detailedPrompt: stringValue(value.detailedPrompt),
+    scenePrompt: stringValue(value.scenePrompt),
+    cinematicPrompt: stringValue(value.cinematicPrompt),
+    variations: stringList(value.variations),
+    fixedChecklist: stringList(value.fixedChecklist),
+    notes: stringValue(value.notes),
+    createdAt
+  };
+};
+
+const normalizePromptDocument = (promptDocument) => {
+  const value = recordValue(promptDocument);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
+  const createdAt = stringValue(value.createdAt) || nowUtc();
+  const versions = (Array.isArray(value.versions) ? value.versions : [])
+    .map(normalizePromptVersion)
+    .filter(Boolean);
+  const safeVersions = versions.length ? versions : [createPromptVersion()];
+  const activeVersionId = safeVersions.some((version) => version.id === value.activeVersionId)
+    ? value.activeVersionId
+    : safeVersions[0].id;
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    title: stringValue(value.title, 'Prompt sem título'),
+    targetType: stringValue(value.targetType) === 'scene' ? 'scene' : 'character',
+    targetId: stringValue(value.targetId),
+    promptMedium: stringValue(value.promptMedium) === 'video' ? 'video' : 'image',
+    stylePreset: stringValue(value.stylePreset, 'cinematic-realism'),
+    cinematicPreset: stringValue(value.cinematicPreset, 'portrait-intimate'),
+    lensLightingPreset: stringValue(value.lensLightingPreset, 'natural-soft'),
+    emotionalTone: stringValue(value.emotionalTone),
+    environment: stringValue(value.environment),
+    lighting: stringValue(value.lighting),
+    composition: stringValue(value.composition),
+    notes: stringValue(value.notes),
+    referenceIds: stringList(value.referenceIds),
+    versions: safeVersions,
+    activeVersionId,
+    isFavorite: Boolean(value.isFavorite),
+    isOfficial: Boolean(value.isOfficial),
+    createdAt,
+    updatedAt: stringValue(value.updatedAt) || createdAt
+  };
+};
+
 export const normalizeState = (raw) => {
   const value = recordValue(raw) || {};
   const settingsSource = recordValue(value.settings) || {};
@@ -397,6 +540,29 @@ export const normalizeState = (raw) => {
         projectIds.has(scene.projectId) &&
         (scene.chapterId === UNASSIGNED_CHAPTER_ID || chapterIds.has(scene.chapterId))
     );
+  const characters = (Array.isArray(value.characters) ? value.characters : [])
+    .map(normalizeCharacter)
+    .filter((character) => character && projectIds.has(character.projectId));
+  const characterIds = new Set(characters.map((character) => character.id));
+  const sceneIds = new Set(scenes.map((scene) => scene.id));
+  const loreEntries = (Array.isArray(value.loreEntries) ? value.loreEntries : [])
+    .map(normalizeLoreEntry)
+    .filter((entry) => entry && projectIds.has(entry.projectId));
+  const assets = (Array.isArray(value.assets) ? value.assets : [])
+    .map(normalizeAsset)
+    .filter((asset) => asset && projectIds.has(asset.projectId));
+  const referenceImages = (Array.isArray(value.referenceImages) ? value.referenceImages : [])
+    .map(normalizeReferenceImage)
+    .filter((ref) => ref && projectIds.has(ref.projectId));
+  const promptDocuments = (Array.isArray(value.promptDocuments) ? value.promptDocuments : [])
+    .map(normalizePromptDocument)
+    .filter((promptDocument) => {
+      if (!promptDocument || !projectIds.has(promptDocument.projectId)) return false;
+      if (promptDocument.targetType === 'character') {
+        return !promptDocument.targetId || characterIds.has(promptDocument.targetId);
+      }
+      return !promptDocument.targetId || sceneIds.has(promptDocument.targetId);
+    });
 
   return {
     ...state,
@@ -404,18 +570,11 @@ export const normalizeState = (raw) => {
     books,
     chapters,
     scenes,
-    characters: (Array.isArray(value.characters) ? value.characters : [])
-      .map(normalizeCharacter)
-      .filter((character) => character && projectIds.has(character.projectId)),
-    loreEntries: (Array.isArray(value.loreEntries) ? value.loreEntries : [])
-      .map(normalizeLoreEntry)
-      .filter((entry) => entry && projectIds.has(entry.projectId)),
-    assets: (Array.isArray(value.assets) ? value.assets : [])
-      .map(normalizeAsset)
-      .filter((asset) => asset && projectIds.has(asset.projectId)),
-    referenceImages: (Array.isArray(value.referenceImages) ? value.referenceImages : [])
-      .map(normalizeReferenceImage)
-      .filter((ref) => ref && projectIds.has(ref.projectId)),
+    characters,
+    loreEntries,
+    assets,
+    referenceImages,
+    promptDocuments,
     settings: {
       ...baseSettings(),
       ...settingsSource
@@ -439,7 +598,8 @@ export const deleteEntity = (state, entityType, id) => {
       characters: current.characters.filter((character) => character.projectId !== id),
       loreEntries: current.loreEntries.filter((entry) => entry.projectId !== id),
       assets: current.assets.filter((asset) => asset.projectId !== id),
-      referenceImages: current.referenceImages.filter((ref) => ref.projectId !== id)
+      referenceImages: current.referenceImages.filter((ref) => ref.projectId !== id),
+      promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.projectId !== id)
     });
   }
 
@@ -462,19 +622,42 @@ export const deleteEntity = (state, entityType, id) => {
   }
 
   if (entityType === 'scene') {
-    return { ...current, scenes: current.scenes.filter((scene) => scene.id !== id) };
+    return {
+      ...current,
+      scenes: current.scenes.filter((scene) => scene.id !== id),
+      promptDocuments: current.promptDocuments.filter(
+        (promptDocument) => !(promptDocument.targetType === 'scene' && promptDocument.targetId === id)
+      )
+    };
   }
 
   if (entityType === 'character') {
     return {
       ...current,
       characters: current.characters.filter((character) => character.id !== id),
-      referenceImages: current.referenceImages.filter((ref) => ref.characterId !== id)
+      referenceImages: current.referenceImages.filter((ref) => ref.characterId !== id),
+      promptDocuments: current.promptDocuments.filter(
+        (promptDocument) => !(promptDocument.targetType === 'character' && promptDocument.targetId === id)
+      )
     };
   }
 
   if (entityType === 'referenceImage') {
-    return { ...current, referenceImages: current.referenceImages.filter((ref) => ref.id !== id) };
+    return {
+      ...current,
+      referenceImages: current.referenceImages.filter((ref) => ref.id !== id),
+      promptDocuments: current.promptDocuments.map((promptDocument) => ({
+        ...promptDocument,
+        referenceIds: promptDocument.referenceIds.filter((referenceId) => referenceId !== id)
+      }))
+    };
+  }
+
+  if (entityType === 'promptDocument') {
+    return {
+      ...current,
+      promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.id !== id)
+    };
   }
 
   if (entityType === 'lore') {

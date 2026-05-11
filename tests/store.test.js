@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore, sanitizeState } from '../src/store.js';
 import {
+  createPromptDocument,
   createBook,
   createChapter,
   createCharacter,
@@ -13,7 +14,7 @@ import {
   CHAPTER_STATUSES,
   REFERENCE_TYPES
 } from '../src/models.js';
-import { searchLore } from '../src/assistant.js';
+import { buildCharacterPromptPack, buildScenePromptPack, searchLore } from '../src/assistant.js';
 
 const fakeStorage = () => {
   const map = new Map();
@@ -424,4 +425,169 @@ test('store persists character visual canon fields across save/load', () => {
   assert.equal(loaded.referenceImages.length, 1);
   assert.equal(loaded.referenceImages[0].name, 'Rosto');
   assert.equal(loaded.referenceImages[0].isCanonical, true);
+});
+
+test('createPromptDocument includes versioning and export-friendly defaults', () => {
+  const project = createProject({ name: 'Prompt Test' });
+  const promptDocument = createPromptDocument({
+    projectId: project.id,
+    title: 'Lyra · Prompt mestre',
+    targetType: 'character',
+    targetId: 'char-1'
+  });
+
+  assert.equal(promptDocument.promptMedium, 'image');
+  assert.equal(promptDocument.targetType, 'character');
+  assert.equal(promptDocument.targetId, 'char-1');
+  assert.equal(promptDocument.versions.length, 1);
+  assert.ok(promptDocument.activeVersionId);
+  assert.equal(promptDocument.isFavorite, false);
+  assert.equal(promptDocument.isOfficial, false);
+});
+
+test('normalizeState keeps prompt documents for valid project and target', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'p1', name: 'Projeto A' }],
+    books: [{ id: 'b1', projectId: 'p1', title: 'Livro' }],
+    chapters: [{ id: 'ch1', projectId: 'p1', bookId: 'b1', title: 'Capítulo' }],
+    scenes: [{ id: 's1', projectId: 'p1', chapterId: 'ch1', title: 'Cena', description: 'Desc' }],
+    characters: [{ id: 'c1', projectId: 'p1', name: 'Lyra' }],
+    promptDocuments: [
+      {
+        id: 'pd1',
+        projectId: 'p1',
+        title: 'Prompt personagem',
+        targetType: 'character',
+        targetId: 'c1',
+        versions: [{ id: 'v1', label: 'V1', masterPrompt: 'abc' }],
+        activeVersionId: 'v1'
+      },
+      {
+        id: 'pd2',
+        projectId: 'p1',
+        title: 'Prompt órfão',
+        targetType: 'scene',
+        targetId: 'ghost-scene',
+        versions: [{ id: 'v2', label: 'V2' }],
+        activeVersionId: 'v2'
+      }
+    ]
+  });
+
+  assert.equal(sanitized.promptDocuments.length, 1);
+  assert.equal(sanitized.promptDocuments[0].id, 'pd1');
+  assert.equal(sanitized.promptDocuments[0].versions[0].masterPrompt, 'abc');
+});
+
+test('deleteEntity removes prompt documents linked to deleted character, scene and references', () => {
+  const project = createProject({ name: 'P' });
+  const book = createBook({ projectId: project.id, title: 'Livro' });
+  const chapter = createChapter({ projectId: project.id, bookId: book.id, title: 'Capítulo' });
+  const scene = createScene({ projectId: project.id, chapterId: chapter.id, title: 'Cena', description: 'Desc' });
+  const character = createCharacter({ projectId: project.id, name: 'Lyra' });
+  const reference = createReferenceImage({ projectId: project.id, characterId: character.id, name: 'Ref' });
+  const charPrompt = createPromptDocument({
+    projectId: project.id,
+    title: 'Prompt personagem',
+    targetType: 'character',
+    targetId: character.id,
+    referenceIds: [reference.id]
+  });
+  const scenePrompt = createPromptDocument({
+    projectId: project.id,
+    title: 'Prompt cena',
+    targetType: 'scene',
+    targetId: scene.id,
+    referenceIds: [reference.id]
+  });
+
+  const afterReferenceDelete = deleteEntity(
+    {
+      projects: [project],
+      books: [book],
+      chapters: [chapter],
+      scenes: [scene],
+      characters: [character],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [reference],
+      promptDocuments: [charPrompt, scenePrompt]
+    },
+    'referenceImage',
+    reference.id
+  );
+  assert.deepEqual(afterReferenceDelete.promptDocuments.map((entry) => entry.referenceIds), [[], []]);
+
+  const afterCharacterDelete = deleteEntity(afterReferenceDelete, 'character', character.id);
+  assert.equal(afterCharacterDelete.promptDocuments.length, 1);
+  assert.equal(afterCharacterDelete.promptDocuments[0].id, scenePrompt.id);
+
+  const afterSceneDelete = deleteEntity(afterCharacterDelete, 'scene', scene.id);
+  assert.equal(afterSceneDelete.promptDocuments.length, 0);
+});
+
+test('buildCharacterPromptPack uses canon, references and preserve-vary controls', () => {
+  const character = createCharacter({
+    projectId: 'p1',
+    name: 'Lyra',
+    hair: 'ruivo acobreado',
+    eyes: 'azul-acinzentados',
+    marks: 'sardas',
+    fixedTraits: ['rosto', 'sardas'],
+    variableTraits: ['pose'],
+    consistencyRules: ['nunca mudar cor dos olhos'],
+    negativePrompt: 'baixa resolução'
+  });
+  const pack = buildCharacterPromptPack({
+    character,
+    projectTone: 'fantasia sombria',
+    references: [{ name: 'Rosto oficial', type: 'character', preserve: 'estrutura facial', mayVary: 'ângulo' }],
+    preserve: ['olhos'],
+    vary: ['expressão']
+  });
+
+  assert.match(pack.masterPrompt, /Lyra/);
+  assert.match(pack.masterPrompt, /estrutura facial/);
+  assert.match(pack.negativePrompt, /baixa resolução/);
+  assert.deepEqual(pack.fixedChecklist, ['rosto', 'sardas', 'olhos', 'estrutura facial']);
+  assert.ok(pack.variations.some((entry) => entry.includes('expressão')));
+});
+
+test('buildScenePromptPack uses chapter, lore and references for scene outputs', () => {
+  const scene = createScene({
+    projectId: 'p1',
+    chapterId: 'ch1',
+    title: 'Duelo na ponte',
+    description: 'Lyra enfrenta Kael sob chuva gelada.',
+    location: 'ponte de pedra'
+  });
+  const chapter = createChapter({
+    projectId: 'p1',
+    bookId: 'b1',
+    title: 'Capítulo',
+    summary: 'Lyra e Kael se encontram na fronteira.',
+    presentCharacters: ['Lyra', 'Kael']
+  });
+  const lyra = createCharacter({ projectId: 'p1', name: 'Lyra', fixedTraits: ['sardas'], variableTraits: ['ângulo'] });
+  const kael = createCharacter({ projectId: 'p1', name: 'Kael', fixedTraits: ['capa escura'] });
+  const pack = buildScenePromptPack({
+    projectTone: 'fantasia sombria',
+    scene,
+    chapter,
+    characters: [lyra, kael],
+    loreEntries: [{ title: 'Ponte antiga', content: 'Marco de guerra ancestral.' }],
+    references: [{ name: 'Atmosfera da ponte', type: 'place', preserve: 'névoa fria', mayVary: 'clima' }],
+    emotionalTone: 'tensão contida',
+    environment: 'chuva, névoa',
+    lighting: 'lua fria',
+    composition: 'plano médio dramático',
+    preserve: ['identidade dos personagens'],
+    vary: ['distância da câmera']
+  });
+
+  assert.match(pack.scenePrompt, /Duelo na ponte/);
+  assert.match(pack.scenePrompt, /Marco de guerra ancestral/);
+  assert.match(pack.cinematicPrompt, /tensão contida/);
+  assert.ok(pack.fixedChecklist.includes('identidade dos personagens'));
+  assert.ok(pack.variations.length >= 3);
 });

@@ -33,6 +33,10 @@ python -m http.server 8080
 - busca em memória/lore
 - geração de **spec** de imagem para fidelidade narrativa/visual
 - geração de **spec** de vídeo (image-to-video) com foco em pipeline local
+- **Prompt Builder orientado por referência** para personagens e cenas
+- saídas estruturadas: prompt mestre, negative prompt, versão curta/detalhada, prompt visual/cinematográfico
+- presets de estilo, preset cinematográfico e preset de lente/luz
+- histórico/versionamento local de prompts, duplicação, favorito/oficial e exportação `.txt`/`.json`
 - exportação/importação de backup JSON
 - limpeza automática de dados órfãos ao importar backups ou remover entidades relacionadas
 
@@ -52,6 +56,52 @@ python -m http.server 8080
 - persistência: automática a cada criação/edição/exclusão
 - portabilidade: use **Exportar JSON** para gerar um backup e **Importar JSON** para restaurar em outro navegador ou máquina
 - integridade: imports inválidos são saneados e registros órfãos são descartados para manter a hierarquia projeto → livro → capítulo → cena consistente
+- prompts estruturados ficam em `promptDocuments` no mesmo estado local-first, incluindo:
+  - alvo (`character` ou `scene`)
+  - modo (`image` ou `video`)
+  - referências selecionadas
+  - presets aplicados
+  - versões salvas com campos de preservar/variar e saídas textuais
+
+## Prompt Builder orientado por referência
+
+### Como os prompts são gerados
+
+- **Prompt de personagem** combina:
+  - ficha visual canônica
+  - referências selecionadas
+  - regras de consistência visual
+  - notas cinematográficas
+  - campos explícitos de **preservar** vs **variar**
+- **Prompt de cena** combina:
+  - capítulo/cena atual
+  - personagens inferidos pelo contexto
+  - lore relevante
+  - referências visuais selecionadas
+  - tom emocional, ambiente, iluminação e composição
+
+### Como os prompts são armazenados
+
+- cada documento de prompt é salvo localmente em `promptDocuments`
+- cada documento mantém:
+  - metadados do builder (alvo, presets, referências, contexto)
+  - status de favorito/oficial
+  - múltiplas versões
+- cada versão registra:
+  - preservar / variar
+  - prompt mestre
+  - negative prompt
+  - versão curta / detalhada
+  - prompt visual da cena
+  - prompt cinematográfico
+  - variações
+  - checklist do que deve permanecer fixo
+
+### Como exportar
+
+- use **Exportar texto** para gerar um `.txt` pronto para workflows locais
+- use **Exportar JSON** para exportar o documento ativo com metadados e versão atual
+- a exportação global do app continua disponível via backup JSON na barra superior
 
 ## Estrutura do projeto
 
@@ -60,6 +110,7 @@ python -m http.server 8080
 - `src/models.js`: modelos de dados
 - `src/store.js`: persistência local-first
 - `src/assistant.js`: fluxos iniciais de escrita/memória/specs
+- `src/assistant.js`: geração local de prompts, specs e presets
 - `src/pipelines.js`: integração futura com geradores locais
 - `src/pipelines.md`: guia de extensão de pipeline
 - `tests/store.test.js`: testes focados em persistência e busca de lore

@@ -93,6 +93,7 @@
             <button id="saveCharacterBtn">Atualizar personagem</button>
             <button id="deleteCharacterBtn">Excluir personagem</button>
             <button id="openCanonStudioBtn" class="open-studio-btn">🎨 Canon Visual</button>
+            <button id="openPromptStudioFromCharacterBtn" class="open-studio-btn">🧩 Prompt Builder</button>
           </div>
           <pre id="characterPreview"></pre>
         </div>
@@ -133,6 +134,7 @@
             <button id="saveSceneBtn">Atualizar cena</button>
             <button id="deleteSceneBtn">Excluir cena</button>
             <button id="generateSceneSpecBtn">Gerar spec de imagem</button>
+            <button id="openPromptStudioFromSceneBtn" class="open-studio-btn">🧩 Prompt Builder</button>
           </div>
           <pre id="sceneSpec"></pre>
         </div>
@@ -151,6 +153,16 @@
           <button id="generateVideoSpecBtn">Gerar spec de vídeo</button>
           <pre id="videoSpec"></pre>
           <ul id="assetList"></ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>Prompt Builder</h2>
+        <div class="stack">
+          <button id="openPromptStudioBtn" class="open-studio-btn">🧩 Abrir Prompt Builder</button>
+          <button id="createPromptDocumentBtn">Novo prompt a partir do contexto atual</button>
+          <select id="promptDocumentSelect"></select>
+          <pre id="promptDocumentPreview">Nenhum prompt estruturado selecionado.</pre>
         </div>
       </section>
     </main>
@@ -471,6 +483,151 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="promptStudio" class="ps-overlay ps-hidden" role="dialog" aria-label="Prompt Builder orientado por referência">
+      <header class="ps-header">
+        <div class="ps-header-left">
+          <button id="psCloseBtn" class="ps-back-btn">← Voltar</button>
+        </div>
+        <div class="ps-header-center">
+          <span class="ps-title">🧩 Prompt Builder orientado por referência</span>
+        </div>
+        <div class="ps-header-right">
+          <select id="psPromptSelect" class="ps-select"></select>
+          <button id="psNewPromptBtn" class="ps-primary-btn">Novo</button>
+          <button id="psDuplicatePromptBtn">Duplicar</button>
+        </div>
+      </header>
+
+      <div class="ps-body">
+        <aside class="ps-sidebar">
+          <section class="ps-section">
+            <h3 class="ps-section-title">Configuração</h3>
+            <div class="ps-stack">
+              <label class="ps-field-label">Título
+                <input id="psTitle" placeholder="ex: Lyra · Prompt mestre oficial" />
+              </label>
+              <label class="ps-field-label">Tipo de prompt
+                <select id="psTargetType">
+                  <option value="character">Personagem</option>
+                  <option value="scene">Cena</option>
+                </select>
+              </label>
+              <label class="ps-field-label">Saída
+                <select id="psPromptMedium">
+                  <option value="image">Imagem</option>
+                  <option value="video">Vídeo</option>
+                </select>
+              </label>
+              <label class="ps-field-label">Personagem / cena
+                <select id="psTargetSelect"></select>
+              </label>
+              <label class="ps-field-label">Preset de estilo
+                <select id="psStylePreset"></select>
+              </label>
+              <label class="ps-field-label">Preset cinematográfico
+                <select id="psCinematicPreset"></select>
+              </label>
+              <label class="ps-field-label">Preset de lente/luz
+                <select id="psLensLightingPreset"></select>
+              </label>
+              <label class="ps-field-label">Tom emocional
+                <input id="psEmotionalTone" placeholder="ex: tensão romântica contida" />
+              </label>
+              <label class="ps-field-label">Ambiente
+                <input id="psEnvironment" placeholder="ex: floresta úmida, névoa baixa" />
+              </label>
+              <label class="ps-field-label">Iluminação
+                <input id="psLighting" placeholder="ex: luz fria lateral, backlight suave" />
+              </label>
+              <label class="ps-field-label">Enquadramento / composição
+                <input id="psComposition" placeholder="ex: medium close-up, regra dos terços" />
+              </label>
+              <label class="ps-field-label">Notas do builder
+                <textarea id="psBuilderNotes" rows="4" placeholder="Observações extras para esta família de prompts..."></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="ps-section">
+            <h3 class="ps-section-title">Referências disponíveis</h3>
+            <div id="psReferenceList" class="ps-reference-list"></div>
+          </section>
+        </aside>
+
+        <main class="ps-main">
+          <section class="ps-section">
+            <h3 class="ps-section-title">Preservar vs variar</h3>
+            <div class="ps-grid">
+              <label class="ps-field-label">Preservar (um por linha)
+                <textarea id="psPreserve" rows="5" placeholder="rosto&#10;olhos&#10;sardas&#10;roupa base&#10;atmosfera"></textarea>
+              </label>
+              <label class="ps-field-label">Pode variar (um por linha)
+                <textarea id="psVary" rows="5" placeholder="pose&#10;ângulo&#10;clima&#10;expressão"></textarea>
+              </label>
+            </div>
+            <div class="inline-actions">
+              <button id="psGenerateBtn" class="ps-primary-btn">Gerar nova versão</button>
+              <button id="psSaveVersionBtn">Salvar edição manual como nova versão</button>
+              <button id="psFavoriteBtn">☆ Favorito</button>
+              <button id="psOfficialBtn">Oficial</button>
+            </div>
+          </section>
+
+          <section class="ps-section">
+            <h3 class="ps-section-title">Saídas estruturadas</h3>
+            <div class="ps-stack">
+              <label class="ps-field-label">Prompt mestre
+                <textarea id="psMasterPrompt" rows="4"></textarea>
+              </label>
+              <label class="ps-field-label">Negative prompt base
+                <textarea id="psNegativePrompt" rows="3"></textarea>
+              </label>
+              <div class="ps-grid">
+                <label class="ps-field-label">Versão curta
+                  <textarea id="psShortPrompt" rows="3"></textarea>
+                </label>
+                <label class="ps-field-label">Versão detalhada
+                  <textarea id="psDetailedPrompt" rows="6"></textarea>
+                </label>
+              </div>
+              <div class="ps-grid">
+                <label class="ps-field-label">Prompt visual da cena
+                  <textarea id="psScenePrompt" rows="5"></textarea>
+                </label>
+                <label class="ps-field-label">Prompt cinematográfico
+                  <textarea id="psCinematicPrompt" rows="5"></textarea>
+                </label>
+              </div>
+              <div class="ps-grid">
+                <label class="ps-field-label">Variações (uma por linha)
+                  <textarea id="psVariations" rows="5"></textarea>
+                </label>
+                <label class="ps-field-label">Checklist fixo (uma por linha)
+                  <textarea id="psFixedChecklist" rows="5"></textarea>
+                </label>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <aside class="ps-sidebar">
+          <section class="ps-section">
+            <h3 class="ps-section-title">Histórico</h3>
+            <div id="psVersionList" class="ps-version-list"></div>
+          </section>
+
+          <section class="ps-section">
+            <h3 class="ps-section-title">Exportação local</h3>
+            <div class="ps-stack">
+              <button id="psExportTextBtn">Exportar texto</button>
+              <button id="psExportJsonBtn">Exportar JSON</button>
+              <pre id="psExportPreview">Selecione ou gere um prompt para exportar.</pre>
+            </div>
+          </section>
+        </aside>
       </div>
     </div>
 
