@@ -10,6 +10,10 @@
     <header>
       <h1>Pixie Sunny · Estúdio Criativo Local</h1>
       <p>Local-first para escrita, lore e base visual de imagem/vídeo.</p>
+      <p class="storage-note">
+        Os dados ficam salvos no <code>localStorage</code> do navegador neste dispositivo. Use
+        exportação JSON para backup e importação manual entre máquinas.
+      </p>
       <div class="header-actions">
         <button id="exportDataBtn">Exportar JSON</button>
         <label class="file-btn">
@@ -28,7 +32,15 @@
           </label>
           <input id="newProjectName" placeholder="Novo projeto" />
           <textarea id="newProjectTone" rows="2" placeholder="Tom visual/narrativo"></textarea>
+          <textarea id="newProjectDescription" rows="3" placeholder="Descrição do projeto"></textarea>
           <button id="createProjectBtn">Criar projeto</button>
+          <input id="projectNameInput" placeholder="Nome do projeto selecionado" />
+          <textarea id="projectToneInput" rows="2" placeholder="Tom visual/narrativo do projeto selecionado"></textarea>
+          <textarea id="projectDescriptionInput" rows="3" placeholder="Descrição do projeto selecionado"></textarea>
+          <div class="inline-actions">
+            <button id="saveProjectBtn">Salvar projeto</button>
+            <button id="deleteProjectBtn">Excluir projeto</button>
+          </div>
         </div>
       </section>
 
@@ -36,14 +48,27 @@
         <h2>Livros e capítulos</h2>
         <div class="stack">
           <input id="newBookTitle" placeholder="Título do livro" />
+          <textarea id="newBookSynopsis" rows="2" placeholder="Sinopse do livro"></textarea>
           <button id="createBookBtn">Adicionar livro</button>
           <select id="bookSelect"></select>
+          <input id="bookTitleInput" placeholder="Título do livro selecionado" />
+          <textarea id="bookSynopsisInput" rows="2" placeholder="Sinopse do livro selecionado"></textarea>
+          <div class="inline-actions">
+            <button id="saveBookBtn">Salvar livro</button>
+            <button id="deleteBookBtn">Excluir livro</button>
+          </div>
           <input id="newChapterTitle" placeholder="Título do capítulo" />
+          <textarea id="newChapterSummary" rows="2" placeholder="Resumo do capítulo"></textarea>
           <button id="createChapterBtn">Adicionar capítulo</button>
           <select id="chapterSelect"></select>
+          <input id="chapterTitleInput" placeholder="Título do capítulo selecionado" />
+          <textarea id="chapterSummaryInput" rows="2" placeholder="Resumo do capítulo selecionado"></textarea>
           <textarea id="chapterContent" rows="8" placeholder="Escreva o capítulo..."></textarea>
-          <button id="saveChapterBtn">Salvar capítulo</button>
-          <button id="suggestTextBtn">Sugestão de escrita</button>
+          <div class="inline-actions">
+            <button id="saveChapterBtn">Salvar capítulo</button>
+            <button id="deleteChapterBtn">Excluir capítulo</button>
+            <button id="suggestTextBtn">Sugestão de escrita</button>
+          </div>
           <pre id="writingSuggestion"></pre>
         </div>
       </section>
@@ -52,11 +77,21 @@
         <h2>Personagens</h2>
         <div class="stack">
           <input id="newCharacterName" placeholder="Nome" />
+          <textarea id="newCharacterNotes" rows="2" placeholder="Função, arco ou notas"></textarea>
           <textarea id="newCharacterCanon" rows="4" placeholder="Traços canônicos (um por linha)"></textarea>
           <textarea id="newCharacterPrompt" rows="3" placeholder="Prompt mestre"></textarea>
           <textarea id="newCharacterNegativePrompt" rows="2" placeholder="Negative prompt"></textarea>
           <button id="createCharacterBtn">Salvar personagem</button>
           <select id="characterSelect"></select>
+          <input id="characterNameInput" placeholder="Nome do personagem selecionado" />
+          <textarea id="characterNotesInput" rows="2" placeholder="Notas do personagem selecionado"></textarea>
+          <textarea id="characterCanonInput" rows="4" placeholder="Traços canônicos (um por linha)"></textarea>
+          <textarea id="characterPromptInput" rows="3" placeholder="Prompt mestre do personagem selecionado"></textarea>
+          <textarea id="characterNegativePromptInput" rows="2" placeholder="Negative prompt do personagem selecionado"></textarea>
+          <div class="inline-actions">
+            <button id="saveCharacterBtn">Atualizar personagem</button>
+            <button id="deleteCharacterBtn">Excluir personagem</button>
+          </div>
           <pre id="characterPreview"></pre>
         </div>
       </section>
@@ -66,8 +101,17 @@
         <div class="stack">
           <input id="newLoreTitle" placeholder="Fato canônico" />
           <textarea id="newLoreContent" rows="3" placeholder="Descrição detalhada"></textarea>
+          <input id="newLoreTags" placeholder="Tags separadas por vírgula" />
           <button id="createLoreBtn">Salvar na memória</button>
           <input id="loreSearch" placeholder="Buscar na memória" />
+          <select id="loreSelect"></select>
+          <input id="loreTitleInput" placeholder="Título da entrada selecionada" />
+          <textarea id="loreContentInput" rows="3" placeholder="Conteúdo da entrada selecionada"></textarea>
+          <input id="loreTagsInput" placeholder="Tags da entrada selecionada" />
+          <div class="inline-actions">
+            <button id="saveLoreBtn">Atualizar lore</button>
+            <button id="deleteLoreBtn">Excluir lore</button>
+          </div>
           <ul id="loreList"></ul>
         </div>
       </section>
@@ -77,9 +121,17 @@
         <div class="stack">
           <input id="newSceneTitle" placeholder="Cena" />
           <textarea id="newSceneDescription" rows="3" placeholder="Descrição da cena"></textarea>
+          <input id="newSceneLocation" placeholder="Local da cena" />
           <button id="createSceneBtn">Salvar cena</button>
           <select id="sceneSelect"></select>
-          <button id="generateSceneSpecBtn">Gerar spec de imagem</button>
+          <input id="sceneTitleInput" placeholder="Título da cena selecionada" />
+          <textarea id="sceneDescriptionInput" rows="3" placeholder="Descrição da cena selecionada"></textarea>
+          <input id="sceneLocationInput" placeholder="Local da cena selecionada" />
+          <div class="inline-actions">
+            <button id="saveSceneBtn">Atualizar cena</button>
+            <button id="deleteSceneBtn">Excluir cena</button>
+            <button id="generateSceneSpecBtn">Gerar spec de imagem</button>
+          </div>
           <pre id="sceneSpec"></pre>
         </div>
       </section>

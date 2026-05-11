@@ -1,4 +1,4 @@
-import { emptyState } from './models.js';
+import { emptyState, normalizeState } from './models.js';
 
 const memoryStorage = () => {
   const data = new Map();
@@ -19,22 +19,8 @@ const resolveStorage = (customStorage) => {
 };
 
 export const sanitizeState = (raw) => {
-  const base = emptyState();
-  if (!raw || typeof raw !== 'object') return base;
-  return {
-    ...base,
-    projects: Array.isArray(raw.projects) ? raw.projects : base.projects,
-    books: Array.isArray(raw.books) ? raw.books : base.books,
-    chapters: Array.isArray(raw.chapters) ? raw.chapters : base.chapters,
-    scenes: Array.isArray(raw.scenes) ? raw.scenes : base.scenes,
-    characters: Array.isArray(raw.characters) ? raw.characters : base.characters,
-    loreEntries: Array.isArray(raw.loreEntries) ? raw.loreEntries : base.loreEntries,
-    assets: Array.isArray(raw.assets) ? raw.assets : base.assets,
-    settings: {
-      ...base.settings,
-      ...(raw.settings && typeof raw.settings === 'object' ? raw.settings : {})
-    }
-  };
+  if (!raw || typeof raw !== 'object') return emptyState();
+  return normalizeState(raw);
 };
 
 export const createStore = ({ key = 'pixieSunnyStudio', storage } = {}) => {
@@ -51,8 +37,9 @@ export const createStore = ({ key = 'pixieSunnyStudio', storage } = {}) => {
   };
 
   const save = (state) => {
-    db.setItem(key, JSON.stringify(state));
-    return state;
+    const next = sanitizeState(state);
+    db.setItem(key, JSON.stringify(next));
+    return next;
   };
 
   const mutate = (updater) => {

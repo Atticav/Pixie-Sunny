@@ -26,12 +26,13 @@ export const searchLore = (entries, query) => {
 export const buildSceneSpec = ({ projectTone, scene, characters }) => ({
   mode: 'image-spec',
   sceneTitle: scene?.title,
+  sceneLocation: scene?.location || 'não definido',
   cinematicTone: projectTone || 'fantasia sombria cinematográfica',
   continuityChecklist: characters.map((character) => ({
     character: character.name,
     lockTraits: character.canonTraits
   })),
-  prompt: `Cena "${scene?.title}": ${scene?.description}. Estilo realista cinematográfico, textura natural de pele e tecido, iluminação dramática coerente com o cenário descrito.`,
+  prompt: `Cena "${scene?.title}": ${scene?.description}. Local: ${scene?.location || 'não definido'}. Estilo realista cinematográfico, textura natural de pele e tecido, iluminação dramática coerente com o cenário descrito.`,
   negativePrompt: DEFAULT_NEGATIVE_PROMPT
 });
 
