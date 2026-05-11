@@ -3743,7 +3743,7 @@ const irsDecisionStatusClass = (status) => {
 
 const irsLineageTagLabels = {
   original: 'original',
-  derived_variant: 'derivada / variante',
+  derived_variant: 'derivado / variante',
   candidate: 'candidata',
   approved_version: 'versão aprovada',
   superseded_version: 'versão supersedida',
