@@ -16,6 +16,61 @@ const recordValue = (value) => (value && typeof value === 'object' ? value : nul
 
 const hasRequiredFields = (value, fields) => fields.every((field) => stringValue(value[field]));
 
+const baseLocalWorkspaceSettings = () => ({
+  mode: 'opfs',
+  enabled: true,
+  rootPath: 'MacBook/PixieSunnyStudio',
+  directories: {
+    projects: 'projects',
+    references: 'references',
+    outputs: 'outputs',
+    exports: 'exports',
+    settings: 'settings'
+  },
+  preferences: {
+    autoMirrorProjectState: true,
+    saveReferenceFilesToWorkspace: true,
+    saveExportsToWorkspace: true
+  }
+});
+
+const normalizeLocalWorkspaceSettings = (source) => {
+  const value = recordValue(source) || {};
+  const directories = recordValue(value.directories) || {};
+  const preferences = recordValue(value.preferences) || {};
+  const defaults = baseLocalWorkspaceSettings();
+  return {
+    ...defaults,
+    ...value,
+    mode: stringValue(value.mode, defaults.mode),
+    rootPath: stringValue(value.rootPath, defaults.rootPath),
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : defaults.enabled,
+    directories: {
+      ...defaults.directories,
+      projects: stringValue(directories.projects, defaults.directories.projects),
+      references: stringValue(directories.references, defaults.directories.references),
+      outputs: stringValue(directories.outputs, defaults.directories.outputs),
+      exports: stringValue(directories.exports, defaults.directories.exports),
+      settings: stringValue(directories.settings, defaults.directories.settings)
+    },
+    preferences: {
+      ...defaults.preferences,
+      autoMirrorProjectState:
+        typeof preferences.autoMirrorProjectState === 'boolean'
+          ? preferences.autoMirrorProjectState
+          : defaults.preferences.autoMirrorProjectState,
+      saveReferenceFilesToWorkspace:
+        typeof preferences.saveReferenceFilesToWorkspace === 'boolean'
+          ? preferences.saveReferenceFilesToWorkspace
+          : defaults.preferences.saveReferenceFilesToWorkspace,
+      saveExportsToWorkspace:
+        typeof preferences.saveExportsToWorkspace === 'boolean'
+          ? preferences.saveExportsToWorkspace
+          : defaults.preferences.saveExportsToWorkspace
+    }
+  };
+};
+
 const baseSettings = () => ({
   imagePipeline: {
     provider: 'local-runner',
@@ -26,7 +81,8 @@ const baseSettings = () => ({
     provider: 'local-runner',
     modelHint: 'image-to-video-cinematic',
     extensionPoint: 'src/pipelines.js#runVideoPipeline'
-  }
+  },
+  localWorkspace: baseLocalWorkspaceSettings()
 });
 
 export const UNASSIGNED_CHAPTER_ID = '';
@@ -163,6 +219,8 @@ export const createReferenceImage = ({
   name,
   type = 'character',
   dataUrl = '',
+  localPath = '',
+  fileName = '',
   linkedEntityId = '',
   linkedEntityType = '',
   isCanonical = false,
@@ -176,6 +234,8 @@ export const createReferenceImage = ({
   name,
   type,
   dataUrl,
+  localPath,
+  fileName,
   linkedEntityId,
   linkedEntityType,
   isCanonical: Boolean(isCanonical),
@@ -405,6 +465,8 @@ const normalizeReferenceImage = (ref) => {
     name: stringValue(value.name, 'Referência sem nome'),
     type: REFERENCE_TYPES.includes(rawType) ? rawType : 'character',
     dataUrl: stringValue(value.dataUrl),
+    localPath: stringValue(value.localPath),
+    fileName: stringValue(value.fileName),
     linkedEntityId: stringValue(value.linkedEntityId),
     linkedEntityType: stringValue(value.linkedEntityType),
     isCanonical: Boolean(value.isCanonical),
@@ -577,7 +639,8 @@ export const normalizeState = (raw) => {
     promptDocuments,
     settings: {
       ...baseSettings(),
-      ...settingsSource
+      ...settingsSource,
+      localWorkspace: normalizeLocalWorkspaceSettings(settingsSource.localWorkspace)
     }
   };
 };

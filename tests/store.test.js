@@ -317,12 +317,38 @@ test('createReferenceImage has correct defaults', () => {
   assert.equal(ref.characterId, '');
   assert.equal(ref.type, 'character');
   assert.equal(ref.dataUrl, '');
+  assert.equal(ref.localPath, '');
+  assert.equal(ref.fileName, '');
   assert.equal(ref.linkedEntityId, '');
   assert.equal(ref.linkedEntityType, '');
   assert.equal(ref.isCanonical, false);
   assert.equal(ref.preserve, '');
   assert.equal(ref.mayVary, '');
   assert.equal(ref.notes, '');
+});
+
+test('normalizeState preserves local workspace settings and merges defaults', () => {
+  const sanitized = sanitizeState({
+    settings: {
+      localWorkspace: {
+        enabled: false,
+        rootPath: '/Custom/Workspace',
+        directories: {
+          projects: 'my-projects'
+        },
+        preferences: {
+          saveExportsToWorkspace: false
+        }
+      }
+    }
+  });
+
+  assert.equal(sanitized.settings.localWorkspace.enabled, false);
+  assert.equal(sanitized.settings.localWorkspace.rootPath, '/Custom/Workspace');
+  assert.equal(sanitized.settings.localWorkspace.directories.projects, 'my-projects');
+  assert.equal(sanitized.settings.localWorkspace.directories.references, 'references');
+  assert.equal(sanitized.settings.localWorkspace.preferences.saveExportsToWorkspace, false);
+  assert.equal(sanitized.settings.localWorkspace.preferences.autoMirrorProjectState, true);
 });
 
 test('normalizeState includes referenceImages from raw data', () => {

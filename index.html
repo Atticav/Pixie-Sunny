@@ -11,8 +11,8 @@
       <h1>Pixie Sunny · Estúdio Criativo Local</h1>
       <p>Local-first para escrita, lore e base visual de imagem/vídeo.</p>
       <p class="storage-note">
-        Os dados ficam salvos no <code>localStorage</code> do navegador neste dispositivo. Use
-        exportação JSON para backup e importação manual entre máquinas.
+        Base local-first Mac: estado estruturado no navegador + camada de filesystem local (OPFS) para
+        projetos, referências, outputs, exportações e configurações do app.
       </p>
       <div class="header-actions">
         <button id="exportDataBtn">Exportar JSON</button>
@@ -24,6 +24,47 @@
     </header>
 
     <main class="grid">
+      <section>
+        <h2>Mac Local Workspace</h2>
+        <div class="stack">
+          <label class="check-inline">
+            <input id="workspaceEnabled" type="checkbox" checked />
+            Ativar workspace local-first
+          </label>
+          <label>Provedor local
+            <select id="workspaceMode">
+              <option value="opfs">OPFS (browser desktop)</option>
+            </select>
+          </label>
+          <input id="workspaceRootPath" placeholder="Raiz lógica no Mac (ex: MacBook/PixieSunnyStudio)" />
+          <input id="workspaceProjectsDir" placeholder="Diretório de projetos (ex: projects)" />
+          <input id="workspaceReferencesDir" placeholder="Diretório de referências (ex: references)" />
+          <input id="workspaceOutputsDir" placeholder="Diretório de outputs (ex: outputs)" />
+          <input id="workspaceExportsDir" placeholder="Diretório de exportações (ex: exports)" />
+          <input id="workspaceSettingsDir" placeholder="Diretório de settings (ex: settings)" />
+          <label class="check-inline">
+            <input id="workspaceMirrorState" type="checkbox" checked />
+            Espelhar estado estruturado do projeto no filesystem local
+          </label>
+          <label class="check-inline">
+            <input id="workspaceSaveRefs" type="checkbox" checked />
+            Salvar arquivos de referência no filesystem local
+          </label>
+          <label class="check-inline">
+            <input id="workspaceSaveExports" type="checkbox" checked />
+            Salvar exportações no filesystem local
+          </label>
+          <div class="inline-actions">
+            <button id="saveWorkspaceSettingsBtn">Salvar settings locais</button>
+            <button id="initWorkspaceBtn">Inicializar workspace</button>
+            <button id="mirrorCurrentProjectBtn">Espelhar projeto atual</button>
+          </div>
+          <p id="workspaceSupport" class="storage-note"></p>
+          <pre id="workspacePreview"></pre>
+          <small id="workspaceStatus"></small>
+        </div>
+      </section>
+
       <section>
         <h2>Projeto</h2>
         <div class="stack">
