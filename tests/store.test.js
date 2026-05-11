@@ -7,6 +7,7 @@ import {
   createPromptDocument,
   createBook,
   createCanonPromotion,
+  createDecisionEvent,
   createChapter,
   createCharacter,
   createGenerationJob,
@@ -19,6 +20,9 @@ import {
   deleteEntity,
   CANON_PROMOTION_TYPES,
   CHAPTER_STATUSES,
+  DECISION_RESULT_STATUSES,
+  DECISION_SCOPE_TYPES,
+  DECISION_TYPES,
   IMAGE_GEN_TYPES,
   IMAGE_GEN_STATUSES,
   OUTPUT_REVIEW_STATUSES,
@@ -1095,6 +1099,130 @@ test('store persists canonPromotions across save/load', () => {
   assert.equal(loaded.canonPromotions[0].id, promotion.id);
   assert.equal(loaded.canonPromotions[0].canonType, 'character');
   assert.equal(loaded.canonPromotions[0].reason, 'Referência definitiva do personagem');
+});
+
+test('DECISION enums contain expected values', () => {
+  assert.deepEqual(DECISION_TYPES, [
+    'approve',
+    'reject',
+    'promote_to_canon',
+    'supersede',
+    'send_back_for_revision',
+    'archive_deprecate'
+  ]);
+  assert.deepEqual(DECISION_SCOPE_TYPES, ['asset', 'shot', 'scene', 'sequence', 'briefing', 'canon_entry', 'reference_visual']);
+  assert.deepEqual(DECISION_RESULT_STATUSES, [
+    'pending_review',
+    'approved',
+    'rejected',
+    'current_official',
+    'superseded',
+    'needs_revision',
+    'archived_deprecated'
+  ]);
+});
+
+test('createDecisionEvent creates editorial history record with defaults', () => {
+  const project = createProject({ name: 'P' });
+  const event = createDecisionEvent({
+    projectId: project.id,
+    decisionType: 'approve',
+    scopeType: 'scene',
+    scopeId: 'scene-1',
+    targetId: 'output-1',
+    rationale: 'frame aprovado'
+  });
+
+  assert.ok(event.id);
+  assert.equal(event.projectId, project.id);
+  assert.equal(event.decisionType, 'approve');
+  assert.equal(event.scopeType, 'scene');
+  assert.equal(event.scopeId, 'scene-1');
+  assert.equal(event.targetType, 'generationOutput');
+  assert.equal(event.targetId, 'output-1');
+  assert.equal(event.resultingStatus, 'pending_review');
+  assert.ok(event.happenedAt);
+});
+
+test('normalizeState keeps valid decisionHistory events and drops orphan project events', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'p1', name: 'P' }],
+    decisionHistory: [
+      {
+        id: 'd1',
+        projectId: 'p1',
+        decisionType: 'promote_to_canon',
+        scopeType: 'canon_entry',
+        scopeId: 'c1',
+        targetType: 'generationOutput',
+        targetId: 'o1',
+        rationale: 'oficial',
+        resultingStatus: 'current_official',
+        happenedAt: new Date().toISOString()
+      },
+      {
+        id: 'd2',
+        projectId: 'ghost-project',
+        decisionType: 'approve',
+        scopeType: 'asset',
+        scopeId: 'o2',
+        targetType: 'generationOutput',
+        targetId: 'o2',
+        happenedAt: new Date().toISOString()
+      }
+    ]
+  });
+
+  assert.equal(sanitized.decisionHistory.length, 1);
+  assert.equal(sanitized.decisionHistory[0].id, 'd1');
+});
+
+test('deleteEntity removes decisionHistory records when generation output is deleted', () => {
+  const project = createProject({ name: 'P' });
+  const output1 = createGenerationOutput({ projectId: project.id, jobId: 'j1', prompt: 'one', seed: 1 });
+  const output2 = createGenerationOutput({ projectId: project.id, jobId: 'j1', prompt: 'two', seed: 2 });
+  const job = { ...createGenerationJob({ projectId: project.id, prompt: 'test' }), outputs: [output1, output2] };
+  const event1 = createDecisionEvent({
+    projectId: project.id,
+    decisionType: 'approve',
+    scopeType: 'asset',
+    scopeId: output1.id,
+    targetId: output1.id,
+    resultingStatus: 'approved'
+  });
+  const event2 = createDecisionEvent({
+    projectId: project.id,
+    decisionType: 'approve',
+    scopeType: 'asset',
+    scopeId: output2.id,
+    targetId: output2.id,
+    relatedItemType: 'generationOutput',
+    relatedItemId: output1.id,
+    resultingStatus: 'approved'
+  });
+
+  const result = deleteEntity(
+    {
+      projects: [project],
+      books: [],
+      chapters: [],
+      scenes: [],
+      beats: [],
+      shots: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [job],
+      canonPromotions: [],
+      decisionHistory: [event1, event2]
+    },
+    'generationOutput',
+    output1.id
+  );
+
+  assert.equal(result.decisionHistory.length, 0);
 });
 
 test('createBeat and createShot include planning defaults', () => {

@@ -1088,6 +1088,7 @@
       <nav class="irs-tabs-nav">
         <button class="irs-tab irs-tab-active" id="irsTabBtnReview">Revisão</button>
         <button class="irs-tab" id="irsTabBtnPromotions">Promoções Canônicas</button>
+        <button class="irs-tab" id="irsTabBtnDecisions">Histórico de Decisões</button>
       </nav>
 
       <!-- Review Tab -->
@@ -1198,6 +1199,7 @@
                 <button id="irsBtnReject" class="irs-status-btn-reject">✕ Rejeitar</button>
                 <button id="irsBtnArchive" class="irs-status-btn-archive">📦 Arquivar</button>
               </div>
+              <button id="irsBtnSendRevision" style="font-size:0.78rem;padding:5px 8px">↩ Enviar p/ revisão</button>
 
               <h4 class="irs-detail-section-title">Pontuação (1–5)</h4>
               <div class="irs-score-row">
@@ -1220,6 +1222,14 @@
                 <button id="irsBtnMarkCanon" class="irs-status-btn-canon">◇ Canônico</button>
                 <button id="irsBtnBestRef" class="irs-status-btn-best">⭐ Melhor referência</button>
                 <button id="irsBtnPromoteCanon" class="irs-canon-btn">⬆ Promover ao canon</button>
+              </div>
+
+              <h4 class="irs-detail-section-title">Supersessão</h4>
+              <div class="irs-detail-actions" style="flex-direction:column;align-items:stretch">
+                <select id="irsSupersedeTarget">
+                  <option value="">- escolher substituto -</option>
+                </select>
+                <button id="irsBtnSupersede">⇄ Marcar como superseded</button>
               </div>
 
               <h4 class="irs-detail-section-title">Reutilizar</h4>
@@ -1246,6 +1256,43 @@
           </div>
           <div id="irsPromotionList" class="irs-promotion-list">
             <p class="irs-hint">Nenhuma promoção canônica registrada ainda.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Decision History Tab -->
+      <div id="irsTabDecisions" class="irs-panel irs-hidden">
+        <div class="irs-promotions-list-area">
+          <div class="irs-promotions-header">
+            <h3 class="irs-promotions-section-title">Histórico de Aprovações e Decisões</h3>
+            <span id="irsDecisionCount" style="font-size:0.78rem;color:var(--muted)"></span>
+          </div>
+
+          <div class="irs-decision-filters">
+            <label>Escopo
+              <select id="irsDecisionScopeFilter">
+                <option value="">Todos os escopos</option>
+              </select>
+            </label>
+            <label>Status editorial
+              <select id="irsDecisionStatusFilter">
+                <option value="">Todos os status</option>
+              </select>
+            </label>
+            <label>Item
+              <select id="irsDecisionItemFilter">
+                <option value="">Todos os itens</option>
+              </select>
+            </label>
+            <label class="irs-filter-check">
+              <input type="checkbox" id="irsDecisionOnlyLatestApproved" />
+              Visão rápida: Latest Approved
+            </label>
+            <button id="irsDecisionApplyBtn" class="irs-apply-btn">Aplicar</button>
+          </div>
+
+          <div id="irsDecisionList" class="irs-decision-list">
+            <p class="irs-hint">Nenhum evento de decisão registrado ainda.</p>
           </div>
         </div>
       </div>

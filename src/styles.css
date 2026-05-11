@@ -2183,6 +2183,77 @@ details[open].ws-context-section summary::before { content: '▾ '; }
   white-space: nowrap;
 }
 
+.irs-decision-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.irs-decision-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.irs-decision-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.irs-decision-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--panel), black 10%);
+}
+
+.irs-decision-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.irs-decision-type {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.irs-decision-status {
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.irs-decision-status-approved { background: #112a44; color: #ffffff; }
+.irs-decision-status-official { background: #153c2f; color: #ffffff; }
+.irs-decision-status-rejected { background: #4b1c1c; color: #ffffff; }
+.irs-decision-status-superseded { background: #342248; color: #ffffff; }
+.irs-decision-status-needs-revision { background: #4c3919; color: #ffffff; }
+.irs-decision-status-pending { background: #1e3348; color: #ffffff; }
+.irs-decision-status-archived { background: #2a3834; color: #ffffff; }
+
+.irs-decision-meta,
+.irs-decision-rationale,
+.irs-decision-related,
+.irs-decision-time {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.irs-decision-rationale { color: var(--text); margin-top: 4px; }
+.irs-decision-time { margin-top: 4px; font-size: 0.7rem; }
+
 /* Compare area in review */
 .irs-compare-bar {
   display: flex;

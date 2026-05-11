@@ -192,6 +192,41 @@ O app agora conecta todas as camadas em um copiloto operacional:
 - usa **Story/Lore + referências** para reduzir risco de inconsistência antes de avançar
 - tudo permanece **local-first no MacBook**, sem backend SaaS
 
+## Approval & Decision History Layer
+
+O app agora registra e navega decisões editoriais/operacionais por item:
+
+- decisões suportadas:
+  - approve
+  - reject
+  - promote to canon
+  - supersede
+  - send back for revision
+  - archive/deprecate
+- escopos suportados:
+  - asset
+  - shot
+  - scene
+  - sequence
+  - briefing
+  - canon entry
+  - visual reference
+- cada evento guarda:
+  - tipo de decisão
+  - timestamp
+  - rationale/notas
+  - item alvo
+  - item relacionado/substituto (quando houver)
+  - status resultante
+
+### Onde usar no app
+
+- no **Image Review + Canon Promotion**, ações de revisão passam a registrar trilha de decisão
+- a aba **Decision History** mostra histórico navegável por escopo/item, com filtros de status editorial
+- há visão rápida de **latest approved** e destaques de **current official / superseded / pending review**
+- eventos de canon e referências conectam Story Bible, Character Canon, Reference Studio, Prompt/Briefing, Production Board e Consistency flows por escopos relacionados
+- tudo segue **local-first e Mac-first**, sem backend SaaS
+
 ## Estrutura do projeto
 
 - `index.html`: interface inicial utilizável
