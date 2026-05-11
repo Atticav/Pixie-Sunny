@@ -5,8 +5,10 @@ import {
   createCharacter,
   createLoreEntry,
   createProject,
+  createReferenceImage,
   createScene,
   deleteEntity,
+  REFERENCE_TYPES,
   UNASSIGNED_CHAPTER_ID
 } from './models.js';
 import { createStore, sanitizeState } from './store.js';
@@ -236,6 +238,7 @@ const render = () => {
   renderAssets();
 
   setDisabled(['createBookBtn', 'createCharacterBtn', 'createLoreBtn', 'createSceneBtn', 'saveAssetBtn'], !selectedProjectId());
+  setDisabled(['openCanonStudioBtn'], !selectedCharacterId() || !selectedProjectId());
 };
 
 const persist = () => {
@@ -811,6 +814,341 @@ document.addEventListener('keydown', (event) => {
     (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.tagName === 'SELECT');
   if (isMetaInput) return;
   closeWriterStudio();
+});
+
+// =========== Character Canon Studio ===========
+
+let csIsOpen = false;
+let csSelectedRefId = null;
+let csPendingFileDataUrl = null;
+
+const csRefs = {
+  overlay: $('canonStudio'),
+  closeBtn: $('csCloseBtn'),
+  characterSelect: $('csCharacterSelect'),
+  saveCanonBtn: $('csSaveCanonBtn'),
+  tabBtnVisual: $('csTabBtnVisual'),
+  tabBtnRefs: $('csTabBtnRefs'),
+  tabVisual: $('csTabVisual'),
+  tabRefs: $('csTabRefs'),
+  // Visual fields
+  apparentAge: $('csApparentAge'),
+  genderPresentation: $('csGenderPresentation'),
+  skinTone: $('csSkinTone'),
+  eyes: $('csEyes'),
+  hair: $('csHair'),
+  faceShape: $('csFaceShape'),
+  bodyType: $('csBodyType'),
+  marks: $('csMarks'),
+  typicalClothing: $('csTypicalClothing'),
+  accessories: $('csAccessories'),
+  visualAesthetic: $('csVisualAesthetic'),
+  colorPalette: $('csColorPalette'),
+  periodStyle: $('csPeriodStyle'),
+  dominantExpression: $('csDominantExpression'),
+  presence: $('csPresence'),
+  cinematicNotes: $('csCinematicNotes'),
+  fixedTraits: $('csFixedTraits'),
+  variableTraits: $('csVariableTraits'),
+  consistencyRules: $('csConsistencyRules'),
+  masterPrompt: $('csMasterPrompt'),
+  negativePrompt: $('csNegativePrompt'),
+  visualTags: $('csVisualTags'),
+  // References
+  refName: $('csRefName'),
+  refType: $('csRefType'),
+  refPreserve: $('csRefPreserve'),
+  refMayVary: $('csRefMayVary'),
+  refNotes: $('csRefNotes'),
+  refIsCanonical: $('csRefIsCanonical'),
+  refFileInput: $('csRefFileInput'),
+  refPreview: $('csRefPreview'),
+  addRefBtn: $('csAddRefBtn'),
+  refGrid: $('csRefGrid'),
+  refDetail: $('csRefDetail'),
+  refDetailImg: $('csRefDetailImg'),
+  refDetailName: $('csRefDetailName'),
+  refDetailType: $('csRefDetailType'),
+  refDetailPreserve: $('csRefDetailPreserve'),
+  refDetailMayVary: $('csRefDetailMayVary'),
+  refDetailNotes: $('csRefDetailNotes'),
+  refDetailIsCanonical: $('csRefDetailIsCanonical'),
+  refDetailSaveBtn: $('csRefDetailSaveBtn'),
+  refDetailDeleteBtn: $('csRefDetailDeleteBtn')
+};
+
+const csCurrentCharacter = () =>
+  state.characters.find((character) => character.id === csRefs.characterSelect.value);
+
+const csProjectRefs = () =>
+  state.referenceImages.filter(
+    (ref) => ref.projectId === selectedProjectId() && ref.characterId === csRefs.characterSelect.value
+  );
+
+const csLoadVisualFields = () => {
+  const character = csCurrentCharacter();
+  if (!character) {
+    csRefs.apparentAge.value = '';
+    csRefs.genderPresentation.value = '';
+    csRefs.skinTone.value = '';
+    csRefs.eyes.value = '';
+    csRefs.hair.value = '';
+    csRefs.faceShape.value = '';
+    csRefs.bodyType.value = '';
+    csRefs.marks.value = '';
+    csRefs.typicalClothing.value = '';
+    csRefs.accessories.value = '';
+    csRefs.visualAesthetic.value = '';
+    csRefs.colorPalette.value = '';
+    csRefs.periodStyle.value = '';
+    csRefs.dominantExpression.value = '';
+    csRefs.presence.value = '';
+    csRefs.cinematicNotes.value = '';
+    csRefs.fixedTraits.value = '';
+    csRefs.variableTraits.value = '';
+    csRefs.consistencyRules.value = '';
+    csRefs.masterPrompt.value = '';
+    csRefs.negativePrompt.value = '';
+    csRefs.visualTags.value = '';
+    return;
+  }
+  csRefs.apparentAge.value = character.apparentAge || '';
+  csRefs.genderPresentation.value = character.genderPresentation || '';
+  csRefs.skinTone.value = character.skinTone || '';
+  csRefs.eyes.value = character.eyes || '';
+  csRefs.hair.value = character.hair || '';
+  csRefs.faceShape.value = character.faceShape || '';
+  csRefs.bodyType.value = character.bodyType || '';
+  csRefs.marks.value = character.marks || '';
+  csRefs.typicalClothing.value = character.typicalClothing || '';
+  csRefs.accessories.value = character.accessories || '';
+  csRefs.visualAesthetic.value = character.visualAesthetic || '';
+  csRefs.colorPalette.value = character.colorPalette || '';
+  csRefs.periodStyle.value = character.periodStyle || '';
+  csRefs.dominantExpression.value = character.dominantExpression || '';
+  csRefs.presence.value = character.presence || '';
+  csRefs.cinematicNotes.value = character.cinematicNotes || '';
+  csRefs.fixedTraits.value = Array.isArray(character.fixedTraits) ? character.fixedTraits.join('\n') : '';
+  csRefs.variableTraits.value = Array.isArray(character.variableTraits) ? character.variableTraits.join('\n') : '';
+  csRefs.consistencyRules.value = Array.isArray(character.consistencyRules) ? character.consistencyRules.join('\n') : '';
+  csRefs.masterPrompt.value = character.masterPrompt || '';
+  csRefs.negativePrompt.value = character.negativePrompt || '';
+  csRefs.visualTags.value = Array.isArray(character.visualTags) ? character.visualTags.join(', ') : '';
+};
+
+const csRenderRefGrid = () => {
+  const refs = csProjectRefs();
+  csRefs.refGrid.innerHTML = '';
+  if (!refs.length) {
+    const empty = document.createElement('p');
+    empty.className = 'cs-ref-empty';
+    empty.textContent = 'Nenhuma referência cadastrada para este personagem.';
+    csRefs.refGrid.append(empty);
+    return;
+  }
+  refs.forEach((ref) => {
+    const thumb = document.createElement('div');
+    thumb.className = `cs-ref-thumb${csSelectedRefId === ref.id ? ' selected' : ''}`;
+    thumb.dataset.refId = ref.id;
+
+    if (ref.dataUrl) {
+      const img = document.createElement('img');
+      img.src = ref.dataUrl;
+      img.alt = ref.name;
+      thumb.append(img);
+    } else {
+      const placeholder = document.createElement('div');
+      placeholder.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;color:var(--muted)';
+      placeholder.textContent = '🖼';
+      thumb.append(placeholder);
+    }
+
+    const info = document.createElement('span');
+    info.className = 'cs-ref-thumb-info';
+    info.textContent = ref.name;
+    thumb.append(info);
+
+    if (ref.isCanonical) {
+      const badge = document.createElement('span');
+      badge.className = 'cs-ref-thumb-canon';
+      badge.textContent = 'Canon';
+      thumb.append(badge);
+    }
+
+    thumb.addEventListener('click', () => csSelectRef(ref.id));
+    csRefs.refGrid.append(thumb);
+  });
+};
+
+const csSelectRef = (refId) => {
+  csSelectedRefId = refId;
+  const ref = state.referenceImages.find((r) => r.id === refId);
+  if (!ref) {
+    csRefs.refDetail.classList.add('cs-hidden');
+    csRenderRefGrid();
+    return;
+  }
+  csRefs.refDetailImg.src = ref.dataUrl || '';
+  csRefs.refDetailImg.style.display = ref.dataUrl ? 'block' : 'none';
+  csRefs.refDetailName.value = ref.name;
+  csRefs.refDetailType.value = ref.type;
+  csRefs.refDetailPreserve.value = ref.preserve;
+  csRefs.refDetailMayVary.value = ref.mayVary;
+  csRefs.refDetailNotes.value = ref.notes;
+  csRefs.refDetailIsCanonical.checked = ref.isCanonical;
+  csRefs.refDetail.classList.remove('cs-hidden');
+  csRenderRefGrid();
+};
+
+const csResetRefForm = () => {
+  csRefs.refName.value = '';
+  csRefs.refType.value = REFERENCE_TYPES[0];
+  csRefs.refPreserve.value = '';
+  csRefs.refMayVary.value = '';
+  csRefs.refNotes.value = '';
+  csRefs.refIsCanonical.checked = false;
+  csRefs.refFileInput.value = '';
+  csRefs.refPreview.innerHTML = '';
+  csPendingFileDataUrl = null;
+};
+
+const openCanonStudio = () => {
+  const character = currentCharacter();
+  if (!character) return;
+  csIsOpen = true;
+  renderOptions(csRefs.characterSelect, projectCharacters(), character.id, 'Nenhum personagem');
+  csLoadVisualFields();
+  csRenderRefGrid();
+  csSelectedRefId = null;
+  csRefs.refDetail.classList.add('cs-hidden');
+  csRefs.overlay.classList.remove('cs-hidden');
+  document.body.style.overflow = 'hidden';
+};
+
+const closeCanonStudio = () => {
+  csIsOpen = false;
+  csSelectedRefId = null;
+  csRefs.overlay.classList.add('cs-hidden');
+  document.body.style.overflow = '';
+  render();
+};
+
+const csSwitchTab = (tab) => {
+  const isVisual = tab === 'visual';
+  csRefs.tabVisual.classList.toggle('cs-hidden', !isVisual);
+  csRefs.tabRefs.classList.toggle('cs-hidden', isVisual);
+  csRefs.tabBtnVisual.classList.toggle('cs-tab-active', isVisual);
+  csRefs.tabBtnRefs.classList.toggle('cs-tab-active', !isVisual);
+};
+
+$('openCanonStudioBtn').addEventListener('click', openCanonStudio);
+
+csRefs.closeBtn.addEventListener('click', closeCanonStudio);
+
+csRefs.tabBtnVisual.addEventListener('click', () => csSwitchTab('visual'));
+csRefs.tabBtnRefs.addEventListener('click', () => csSwitchTab('refs'));
+
+csRefs.characterSelect.addEventListener('change', () => {
+  refs.characterSelect.value = csRefs.characterSelect.value;
+  csSelectedRefId = null;
+  csLoadVisualFields();
+  csRenderRefGrid();
+  csRefs.refDetail.classList.add('cs-hidden');
+});
+
+csRefs.saveCanonBtn.addEventListener('click', () => {
+  const character = csCurrentCharacter();
+  if (!character) return;
+  character.apparentAge = csRefs.apparentAge.value.trim();
+  character.genderPresentation = csRefs.genderPresentation.value.trim();
+  character.skinTone = csRefs.skinTone.value.trim();
+  character.eyes = csRefs.eyes.value.trim();
+  character.hair = csRefs.hair.value.trim();
+  character.faceShape = csRefs.faceShape.value.trim();
+  character.bodyType = csRefs.bodyType.value.trim();
+  character.marks = csRefs.marks.value.trim();
+  character.typicalClothing = csRefs.typicalClothing.value.trim();
+  character.accessories = csRefs.accessories.value.trim();
+  character.visualAesthetic = csRefs.visualAesthetic.value.trim();
+  character.colorPalette = csRefs.colorPalette.value.trim();
+  character.periodStyle = csRefs.periodStyle.value.trim();
+  character.dominantExpression = csRefs.dominantExpression.value.trim();
+  character.presence = csRefs.presence.value.trim();
+  character.cinematicNotes = csRefs.cinematicNotes.value.trim();
+  character.fixedTraits = parseLines(csRefs.fixedTraits.value);
+  character.variableTraits = parseLines(csRefs.variableTraits.value);
+  character.consistencyRules = parseLines(csRefs.consistencyRules.value);
+  character.masterPrompt = csRefs.masterPrompt.value.trim();
+  character.negativePrompt = csRefs.negativePrompt.value.trim();
+  character.visualTags = parseTags(csRefs.visualTags.value);
+  character.updatedAt = new Date().toISOString();
+  state = store.save(state);
+});
+
+csRefs.refFileInput.addEventListener('change', (event) => {
+  const [file] = event.target.files;
+  if (!file) { csPendingFileDataUrl = null; csRefs.refPreview.innerHTML = ''; return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    csPendingFileDataUrl = e.target.result;
+    csRefs.refPreview.innerHTML = `<img src="${csPendingFileDataUrl}" alt="preview" />`;
+  };
+  reader.readAsDataURL(file);
+});
+
+csRefs.addRefBtn.addEventListener('click', () => {
+  const name = csRefs.refName.value.trim();
+  const character = csCurrentCharacter();
+  if (!name || !character) return;
+
+  state.referenceImages.push(
+    createReferenceImage({
+      projectId: selectedProjectId(),
+      characterId: character.id,
+      name,
+      type: csRefs.refType.value,
+      dataUrl: csPendingFileDataUrl || '',
+      isCanonical: csRefs.refIsCanonical.checked,
+      preserve: csRefs.refPreserve.value.trim(),
+      mayVary: csRefs.refMayVary.value.trim(),
+      notes: csRefs.refNotes.value.trim()
+    })
+  );
+  state = store.save(state);
+  csResetRefForm();
+  csRenderRefGrid();
+});
+
+csRefs.refDetailSaveBtn.addEventListener('click', () => {
+  const ref = state.referenceImages.find((r) => r.id === csSelectedRefId);
+  if (!ref) return;
+  ref.name = csRefs.refDetailName.value.trim() || ref.name;
+  ref.type = csRefs.refDetailType.value;
+  ref.preserve = csRefs.refDetailPreserve.value.trim();
+  ref.mayVary = csRefs.refDetailMayVary.value.trim();
+  ref.notes = csRefs.refDetailNotes.value.trim();
+  ref.isCanonical = csRefs.refDetailIsCanonical.checked;
+  state = store.save(state);
+  csRenderRefGrid();
+});
+
+csRefs.refDetailDeleteBtn.addEventListener('click', () => {
+  const ref = state.referenceImages.find((r) => r.id === csSelectedRefId);
+  if (!ref || !window.confirm(`Excluir a referência "${ref.name}"?`)) return;
+  state = deleteEntity(state, 'referenceImage', csSelectedRefId);
+  csSelectedRefId = null;
+  csRefs.refDetail.classList.add('cs-hidden');
+  csRenderRefGrid();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !csIsOpen) return;
+  const active = document.activeElement;
+  const isInput =
+    active &&
+    (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.tagName === 'SELECT');
+  if (isInput) return;
+  closeCanonStudio();
 });
 
 render();

@@ -92,6 +92,7 @@
           <div class="inline-actions">
             <button id="saveCharacterBtn">Atualizar personagem</button>
             <button id="deleteCharacterBtn">Excluir personagem</button>
+            <button id="openCanonStudioBtn" class="open-studio-btn">🎨 Canon Visual</button>
           </div>
           <pre id="characterPreview"></pre>
         </div>
@@ -260,6 +261,216 @@
             </details>
           </div>
         </aside>
+      </div>
+    </div>
+
+    <div id="canonStudio" class="cs-overlay cs-hidden" role="dialog" aria-label="Estúdio Canon Visual">
+      <header class="cs-header">
+        <div class="cs-header-left">
+          <button id="csCloseBtn" class="cs-back-btn">← Voltar</button>
+        </div>
+        <div class="cs-header-center">
+          <span class="cs-title">🎨 Estúdio Canon Visual</span>
+        </div>
+        <div class="cs-header-right">
+          <label class="cs-char-label">Personagem
+            <select id="csCharacterSelect" class="cs-char-select"></select>
+          </label>
+          <button id="csSaveCanonBtn" class="cs-save-btn">Salvar canon</button>
+        </div>
+      </header>
+
+      <nav class="cs-tabs-nav">
+        <button class="cs-tab cs-tab-active" id="csTabBtnVisual">Identidade Visual</button>
+        <button class="cs-tab" id="csTabBtnRefs">Referências</button>
+      </nav>
+
+      <!-- Visual Identity Panel -->
+      <div id="csTabVisual" class="cs-panel">
+        <div class="cs-form-scroll">
+          <section class="cs-section">
+            <h3 class="cs-section-title">Aparência Física</h3>
+            <div class="cs-fields-2col">
+              <label class="cs-field-label">Idade aparente
+                <input id="csApparentAge" placeholder="ex: 28–32 anos" />
+              </label>
+              <label class="cs-field-label">Apresentação / Gênero
+                <input id="csGenderPresentation" placeholder="ex: feminina andrógina" />
+              </label>
+              <label class="cs-field-label">Tom de pele
+                <input id="csSkinTone" placeholder="ex: médio acobreado, sardas" />
+              </label>
+              <label class="cs-field-label">Olhos
+                <input id="csEyes" placeholder="ex: azul-acinzentados, amendoados" />
+              </label>
+              <label class="cs-field-label cs-field-full">Cabelo
+                <textarea id="csHair" rows="2" placeholder="ex: ruivo acobreado, ondulado, médio"></textarea>
+              </label>
+              <label class="cs-field-label">Formato do rosto
+                <input id="csFaceShape" placeholder="ex: oval, maçãs levemente salientes" />
+              </label>
+              <label class="cs-field-label">Porte / Corpo
+                <input id="csBodyType" placeholder="ex: esguia mas forte, 1,68m" />
+              </label>
+              <label class="cs-field-label cs-field-full">Marcas / Sardas / Cicatrizes
+                <textarea id="csMarks" rows="2" placeholder="ex: sardas no nariz e bochechas, cicatriz sobrancelha esq."></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="cs-section">
+            <h3 class="cs-section-title">Estilo Visual</h3>
+            <div class="cs-fields-2col">
+              <label class="cs-field-label cs-field-full">Roupas típicas
+                <textarea id="csTypicalClothing" rows="2" placeholder="ex: capas, couro, neutros terrosos"></textarea>
+              </label>
+              <label class="cs-field-label">Acessórios
+                <input id="csAccessories" placeholder="ex: colar de bronze, bolsas de ervas" />
+              </label>
+              <label class="cs-field-label">Estética visual
+                <input id="csVisualAesthetic" placeholder="ex: dark fantasy medieval realista" />
+              </label>
+              <label class="cs-field-label">Paleta de cores
+                <input id="csColorPalette" placeholder="ex: ferrugem, ocre, azul noturno" />
+              </label>
+              <label class="cs-field-label">Período / Estilo
+                <input id="csPeriodStyle" placeholder="ex: medieval fantástico, séc. XV" />
+              </label>
+            </div>
+          </section>
+
+          <section class="cs-section">
+            <h3 class="cs-section-title">Presença &amp; Energia</h3>
+            <div class="cs-fields-2col">
+              <label class="cs-field-label">Expressão predominante
+                <input id="csDominantExpression" placeholder="ex: determinada e levemente melancólica" />
+              </label>
+              <label class="cs-field-label">Presença / Energia
+                <input id="csPresence" placeholder="ex: intensa, contida, magnetismo discreto" />
+              </label>
+              <label class="cs-field-label cs-field-full">Observações cinematográficas
+                <textarea id="csCinematicNotes" rows="3" placeholder="ex: fotografia próxima revela vulnerabilidade; luz suave exalta sardas"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="cs-section">
+            <h3 class="cs-section-title">Traços Canônicos</h3>
+            <div class="cs-fields-2col">
+              <label class="cs-field-label">Traços FIXOS (um por linha)
+                <textarea id="csFixedTraits" rows="4" placeholder="ex: sardas&#10;olhos azul-acinzentados&#10;cabelo ruivo acobreado"></textarea>
+              </label>
+              <label class="cs-field-label">Traços VARIÁVEIS (um por linha)
+                <textarea id="csVariableTraits" rows="4" placeholder="ex: expressão&#10;pose&#10;ambiente&#10;enquadramento"></textarea>
+              </label>
+              <label class="cs-field-label cs-field-full">Regras de consistência (uma por linha)
+                <textarea id="csConsistencyRules" rows="3" placeholder="ex: nunca mudar cor dos olhos&#10;não usar roupa moderna&#10;manter realismo cinematográfico"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="cs-section">
+            <h3 class="cs-section-title">Prompts &amp; Tags</h3>
+            <div class="cs-fields-2col">
+              <label class="cs-field-label cs-field-full">Prompt mestre visual
+                <textarea id="csMasterPrompt" rows="4" placeholder="Prompt descritivo completo para geração fiel de imagem..."></textarea>
+              </label>
+              <label class="cs-field-label cs-field-full">Negative prompt base
+                <textarea id="csNegativePrompt" rows="3" placeholder="O que nunca deve aparecer na imagem..."></textarea>
+              </label>
+              <label class="cs-field-label cs-field-full">Tags visuais (separadas por vírgula)
+                <input id="csVisualTags" placeholder="ex: ruiva, sardas, olhos claros, medieval, realista" />
+              </label>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- References Panel -->
+      <div id="csTabRefs" class="cs-panel cs-hidden">
+        <div class="cs-refs-layout">
+          <div class="cs-refs-add">
+            <h3 class="cs-section-title">Adicionar Referência</h3>
+            <div class="cs-ref-add-form">
+              <label class="cs-field-label">Nome da referência
+                <input id="csRefName" placeholder="ex: Rosto canônico da Lyra" />
+              </label>
+              <label class="cs-field-label">Tipo
+                <select id="csRefType">
+                  <option value="character">Personagem</option>
+                  <option value="place">Lugar</option>
+                  <option value="scene">Cena</option>
+                  <option value="clothing">Roupa</option>
+                  <option value="aesthetic">Estética</option>
+                  <option value="pose">Pose</option>
+                  <option value="lighting">Iluminação</option>
+                  <option value="object">Objeto</option>
+                </select>
+              </label>
+              <label class="cs-field-label">O que preservar
+                <textarea id="csRefPreserve" rows="2" placeholder="ex: estrutura facial, sardas, cor dos olhos"></textarea>
+              </label>
+              <label class="cs-field-label">O que pode variar
+                <textarea id="csRefMayVary" rows="2" placeholder="ex: ângulo, expressão, iluminação"></textarea>
+              </label>
+              <label class="cs-field-label">Notas
+                <textarea id="csRefNotes" rows="2" placeholder="Observações sobre esta referência..."></textarea>
+              </label>
+              <label class="cs-check-label">
+                <input type="checkbox" id="csRefIsCanonical" /> Referência canônica / oficial
+              </label>
+              <label class="cs-file-btn">
+                Selecionar imagem
+                <input id="csRefFileInput" type="file" accept="image/*" />
+              </label>
+              <div id="csRefPreview" class="cs-ref-img-preview"></div>
+              <button id="csAddRefBtn">Adicionar referência</button>
+            </div>
+          </div>
+
+          <div class="cs-refs-gallery">
+            <h3 class="cs-section-title">Referências do personagem</h3>
+            <div id="csRefGrid" class="cs-ref-grid"></div>
+          </div>
+
+          <div id="csRefDetail" class="cs-ref-detail cs-hidden">
+            <h3 class="cs-section-title">Detalhe</h3>
+            <img id="csRefDetailImg" class="cs-ref-detail-img" src="" alt="Referência selecionada" />
+            <div class="cs-ref-detail-fields">
+              <label class="cs-field-label">Nome
+                <input id="csRefDetailName" />
+              </label>
+              <label class="cs-field-label">Tipo
+                <select id="csRefDetailType">
+                  <option value="character">Personagem</option>
+                  <option value="place">Lugar</option>
+                  <option value="scene">Cena</option>
+                  <option value="clothing">Roupa</option>
+                  <option value="aesthetic">Estética</option>
+                  <option value="pose">Pose</option>
+                  <option value="lighting">Iluminação</option>
+                  <option value="object">Objeto</option>
+                </select>
+              </label>
+              <label class="cs-field-label">O que preservar
+                <textarea id="csRefDetailPreserve" rows="2"></textarea>
+              </label>
+              <label class="cs-field-label">O que pode variar
+                <textarea id="csRefDetailMayVary" rows="2"></textarea>
+              </label>
+              <label class="cs-field-label">Notas
+                <textarea id="csRefDetailNotes" rows="2"></textarea>
+              </label>
+              <label class="cs-check-label">
+                <input type="checkbox" id="csRefDetailIsCanonical" /> Canônica / oficial
+              </label>
+              <div class="inline-actions">
+                <button id="csRefDetailSaveBtn">Salvar</button>
+                <button id="csRefDetailDeleteBtn" class="cs-btn-danger">Excluir</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

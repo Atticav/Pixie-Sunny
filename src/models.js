@@ -39,6 +39,7 @@ export const emptyState = () => ({
   characters: [],
   loreEntries: [],
   assets: [],
+  referenceImages: [],
   settings: baseSettings()
 });
 
@@ -93,11 +94,33 @@ export const createChapter = ({
   updatedAt: nowUtc()
 });
 
+export const REFERENCE_TYPES = ['character', 'place', 'scene', 'clothing', 'aesthetic', 'pose', 'lighting', 'object'];
+
 export const createCharacter = ({
   projectId,
   name,
   notes = '',
   canonTraits = [],
+  fixedTraits = [],
+  variableTraits = [],
+  consistencyRules = [],
+  apparentAge = '',
+  genderPresentation = '',
+  skinTone = '',
+  hair = '',
+  eyes = '',
+  faceShape = '',
+  bodyType = '',
+  marks = '',
+  typicalClothing = '',
+  accessories = '',
+  dominantExpression = '',
+  presence = '',
+  visualAesthetic = '',
+  colorPalette = '',
+  periodStyle = '',
+  visualTags = [],
+  cinematicNotes = '',
   masterPrompt = '',
   negativePrompt = ''
 }) => ({
@@ -106,11 +129,59 @@ export const createCharacter = ({
   name,
   notes,
   canonTraits,
+  fixedTraits,
+  variableTraits,
+  consistencyRules,
+  apparentAge,
+  genderPresentation,
+  skinTone,
+  hair,
+  eyes,
+  faceShape,
+  bodyType,
+  marks,
+  typicalClothing,
+  accessories,
+  dominantExpression,
+  presence,
+  visualAesthetic,
+  colorPalette,
+  periodStyle,
+  visualTags,
+  cinematicNotes,
   masterPrompt,
   negativePrompt,
   references: [],
   createdAt: nowUtc(),
   updatedAt: nowUtc()
+});
+
+export const createReferenceImage = ({
+  projectId,
+  characterId = '',
+  name,
+  type = 'character',
+  dataUrl = '',
+  linkedEntityId = '',
+  linkedEntityType = '',
+  isCanonical = false,
+  preserve = '',
+  mayVary = '',
+  notes = ''
+}) => ({
+  id: newId(),
+  projectId,
+  characterId,
+  name,
+  type,
+  dataUrl,
+  linkedEntityId,
+  linkedEntityType,
+  isCanonical: Boolean(isCanonical),
+  preserve,
+  mayVary,
+  notes,
+  createdAt: nowUtc()
 });
 
 export const createLoreEntry = ({ projectId, title, content, tags = [] }) => ({
@@ -211,11 +282,52 @@ const normalizeCharacter = (character) => {
     name: stringValue(value.name, 'Personagem sem nome'),
     notes: stringValue(value.notes),
     canonTraits: stringList(value.canonTraits),
+    fixedTraits: stringList(value.fixedTraits),
+    variableTraits: stringList(value.variableTraits),
+    consistencyRules: stringList(value.consistencyRules),
+    apparentAge: stringValue(value.apparentAge),
+    genderPresentation: stringValue(value.genderPresentation),
+    skinTone: stringValue(value.skinTone),
+    hair: stringValue(value.hair),
+    eyes: stringValue(value.eyes),
+    faceShape: stringValue(value.faceShape),
+    bodyType: stringValue(value.bodyType),
+    marks: stringValue(value.marks),
+    typicalClothing: stringValue(value.typicalClothing),
+    accessories: stringValue(value.accessories),
+    dominantExpression: stringValue(value.dominantExpression),
+    presence: stringValue(value.presence),
+    visualAesthetic: stringValue(value.visualAesthetic),
+    colorPalette: stringValue(value.colorPalette),
+    periodStyle: stringValue(value.periodStyle),
+    visualTags: stringList(value.visualTags),
+    cinematicNotes: stringValue(value.cinematicNotes),
     masterPrompt: stringValue(value.masterPrompt),
     negativePrompt: stringValue(value.negativePrompt),
     references: stringList(value.references),
     createdAt,
     updatedAt: stringValue(value.updatedAt) || createdAt
+  };
+};
+
+const normalizeReferenceImage = (ref) => {
+  const value = recordValue(ref);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
+  const rawType = stringValue(value.type);
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    characterId: stringValue(value.characterId),
+    name: stringValue(value.name, 'Referência sem nome'),
+    type: REFERENCE_TYPES.includes(rawType) ? rawType : 'character',
+    dataUrl: stringValue(value.dataUrl),
+    linkedEntityId: stringValue(value.linkedEntityId),
+    linkedEntityType: stringValue(value.linkedEntityType),
+    isCanonical: Boolean(value.isCanonical),
+    preserve: stringValue(value.preserve),
+    mayVary: stringValue(value.mayVary),
+    notes: stringValue(value.notes),
+    createdAt: stringValue(value.createdAt) || nowUtc()
   };
 };
 
@@ -301,6 +413,9 @@ export const normalizeState = (raw) => {
     assets: (Array.isArray(value.assets) ? value.assets : [])
       .map(normalizeAsset)
       .filter((asset) => asset && projectIds.has(asset.projectId)),
+    referenceImages: (Array.isArray(value.referenceImages) ? value.referenceImages : [])
+      .map(normalizeReferenceImage)
+      .filter((ref) => ref && projectIds.has(ref.projectId)),
     settings: {
       ...baseSettings(),
       ...settingsSource
@@ -323,7 +438,8 @@ export const deleteEntity = (state, entityType, id) => {
       scenes: current.scenes.filter((scene) => scene.projectId !== id && !chapterIds.has(scene.chapterId)),
       characters: current.characters.filter((character) => character.projectId !== id),
       loreEntries: current.loreEntries.filter((entry) => entry.projectId !== id),
-      assets: current.assets.filter((asset) => asset.projectId !== id)
+      assets: current.assets.filter((asset) => asset.projectId !== id),
+      referenceImages: current.referenceImages.filter((ref) => ref.projectId !== id)
     });
   }
 
@@ -350,7 +466,15 @@ export const deleteEntity = (state, entityType, id) => {
   }
 
   if (entityType === 'character') {
-    return { ...current, characters: current.characters.filter((character) => character.id !== id) };
+    return {
+      ...current,
+      characters: current.characters.filter((character) => character.id !== id),
+      referenceImages: current.referenceImages.filter((ref) => ref.characterId !== id)
+    };
+  }
+
+  if (entityType === 'referenceImage') {
+    return { ...current, referenceImages: current.referenceImages.filter((ref) => ref.id !== id) };
   }
 
   if (entityType === 'lore') {
