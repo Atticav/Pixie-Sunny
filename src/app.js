@@ -25,6 +25,14 @@ import {
   searchLore,
   suggestNextParagraph
 } from './assistant.js';
+import {
+  initializeLocalWorkspace,
+  localWorkspaceSupported,
+  localWorkspaceSummary,
+  mirrorProjectStateToWorkspace,
+  saveExportToWorkspace,
+  saveReferenceFileToWorkspace
+} from './local-workspace.js';
 
 const store = createStore();
 let state = store.load();
@@ -51,7 +59,21 @@ const refs = {
   sceneSpec: $('sceneSpec'),
   videoSpec: $('videoSpec'),
   promptDocumentSelect: $('promptDocumentSelect'),
-  promptDocumentPreview: $('promptDocumentPreview')
+  promptDocumentPreview: $('promptDocumentPreview'),
+  workspaceEnabled: $('workspaceEnabled'),
+  workspaceMode: $('workspaceMode'),
+  workspaceRootPath: $('workspaceRootPath'),
+  workspaceProjectsDir: $('workspaceProjectsDir'),
+  workspaceReferencesDir: $('workspaceReferencesDir'),
+  workspaceOutputsDir: $('workspaceOutputsDir'),
+  workspaceExportsDir: $('workspaceExportsDir'),
+  workspaceSettingsDir: $('workspaceSettingsDir'),
+  workspaceMirrorState: $('workspaceMirrorState'),
+  workspaceSaveRefs: $('workspaceSaveRefs'),
+  workspaceSaveExports: $('workspaceSaveExports'),
+  workspaceSupport: $('workspaceSupport'),
+  workspacePreview: $('workspacePreview'),
+  workspaceStatus: $('workspaceStatus')
 };
 
 const parseTextList = (value, separator) =>
@@ -77,6 +99,12 @@ const selectedCharacterId = () => refs.characterSelect.value;
 const selectedLoreId = () => refs.loreSelect.value;
 
 const selectedSceneId = () => refs.sceneSelect.value;
+
+const workspaceSettings = () => state.settings?.localWorkspace || {};
+
+const setWorkspaceStatus = (message) => {
+  if (refs.workspaceStatus) refs.workspaceStatus.textContent = message;
+};
 
 const renderOptions = (select, options, selectedId, emptyLabel = 'Nenhum item cadastrado') => {
   select.innerHTML = '';
@@ -274,6 +302,29 @@ const renderPromptEditor = () => {
   );
 };
 
+const renderWorkspaceSettings = () => {
+  const workspace = workspaceSettings();
+  const directories = workspace.directories || {};
+  const preferences = workspace.preferences || {};
+  const summary = localWorkspaceSummary(state.settings);
+
+  refs.workspaceEnabled.checked = Boolean(workspace.enabled);
+  refs.workspaceMode.value = workspace.mode || 'opfs';
+  refs.workspaceRootPath.value = workspace.rootPath || '';
+  refs.workspaceProjectsDir.value = directories.projects || '';
+  refs.workspaceReferencesDir.value = directories.references || '';
+  refs.workspaceOutputsDir.value = directories.outputs || '';
+  refs.workspaceExportsDir.value = directories.exports || '';
+  refs.workspaceSettingsDir.value = directories.settings || '';
+  refs.workspaceMirrorState.checked = Boolean(preferences.autoMirrorProjectState);
+  refs.workspaceSaveRefs.checked = Boolean(preferences.saveReferenceFilesToWorkspace);
+  refs.workspaceSaveExports.checked = Boolean(preferences.saveExportsToWorkspace);
+  refs.workspaceSupport.textContent = localWorkspaceSupported()
+    ? 'OPFS disponível neste runtime (modo local filesystem ativo).'
+    : 'OPFS indisponível neste runtime (fallback para localStorage/browser).';
+  refs.workspacePreview.textContent = JSON.stringify(summary, null, 2);
+};
+
 const render = () => {
   renderOptions(refs.projectSelect, state.projects, selectedProjectId(), 'Crie seu primeiro projeto');
 
@@ -310,6 +361,7 @@ const render = () => {
   renderLoreEditor();
   renderSceneEditor();
   renderPromptEditor();
+  renderWorkspaceSettings();
   renderLore();
   renderAssets();
 
@@ -323,7 +375,41 @@ const render = () => {
 
 const persist = () => {
   state = store.save(state);
+  const project = currentProject();
+  if (project) {
+    mirrorProjectStateToWorkspace(state.settings, project, state).catch((error) => {
+      console.warn('Falha ao espelhar projeto no workspace local:', error);
+    });
+  }
   render();
+};
+
+const readWorkspaceSettingsFromUi = () => ({
+  mode: refs.workspaceMode.value || 'opfs',
+  enabled: refs.workspaceEnabled.checked,
+  rootPath: refs.workspaceRootPath.value.trim(),
+  directories: {
+    projects: refs.workspaceProjectsDir.value.trim() || 'projects',
+    references: refs.workspaceReferencesDir.value.trim() || 'references',
+    outputs: refs.workspaceOutputsDir.value.trim() || 'outputs',
+    exports: refs.workspaceExportsDir.value.trim() || 'exports',
+    settings: refs.workspaceSettingsDir.value.trim() || 'settings'
+  },
+  preferences: {
+    autoMirrorProjectState: refs.workspaceMirrorState.checked,
+    saveReferenceFilesToWorkspace: refs.workspaceSaveRefs.checked,
+    saveExportsToWorkspace: refs.workspaceSaveExports.checked
+  }
+});
+
+const saveWorkspaceSettings = () => {
+  state.settings = {
+    ...state.settings,
+    localWorkspace: readWorkspaceSettingsFromUi()
+  };
+  state = store.save(state);
+  renderWorkspaceSettings();
+  setWorkspaceStatus('Configurações locais salvas.');
 };
 
 $('createProjectBtn').addEventListener('click', () => {
@@ -592,15 +678,22 @@ $('generateVideoSpecBtn').addEventListener('click', () => {
   refs.videoSpec.textContent = JSON.stringify(spec, null, 2);
 });
 
-$('exportDataBtn').addEventListener('click', () => {
+$('exportDataBtn').addEventListener('click', async () => {
   const payload = JSON.stringify(state, null, 2);
+  const filename = 'pixie-sunny-studio-backup.json';
   const blob = new Blob([payload], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'pixie-sunny-studio-backup.json';
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+  try {
+    const savedPath = await saveExportToWorkspace({ settings: state.settings, filename, content: payload });
+    if (savedPath) setWorkspaceStatus(`Backup salvo em workspace local: ${savedPath}`);
+  } catch (error) {
+    console.warn('Falha ao salvar backup no workspace local:', error);
+  }
 });
 
 $('importDataInput').addEventListener('change', async (event) => {
@@ -615,6 +708,28 @@ $('importDataInput').addEventListener('change', async (event) => {
   } catch (error) {
     console.error('Falha ao importar JSON', error);
     alert(`Erro ao importar JSON: ${error?.message || 'o arquivo não contém dados válidos ou está corrompido'}`);
+  }
+});
+
+$('saveWorkspaceSettingsBtn').addEventListener('click', saveWorkspaceSettings);
+
+$('initWorkspaceBtn').addEventListener('click', async () => {
+  saveWorkspaceSettings();
+  const result = await initializeLocalWorkspace(state.settings);
+  setWorkspaceStatus(result.message);
+});
+
+$('mirrorCurrentProjectBtn').addEventListener('click', async () => {
+  const project = currentProject();
+  if (!project) {
+    setWorkspaceStatus('Selecione um projeto para espelhar no filesystem local.');
+    return;
+  }
+  try {
+    const path = await mirrorProjectStateToWorkspace(state.settings, project, state);
+    setWorkspaceStatus(path ? `Projeto espelhado em ${path}` : 'Espelhamento desativado ou indisponível.');
+  } catch (error) {
+    setWorkspaceStatus(`Falha ao espelhar projeto: ${error?.message || 'erro desconhecido'}`);
   }
 });
 
@@ -901,6 +1016,8 @@ document.addEventListener('keydown', (event) => {
 let csIsOpen = false;
 let csSelectedRefId = null;
 let csPendingFileDataUrl = null;
+let csPendingFileBlob = null;
+let csPendingFileName = '';
 
 const csRefs = {
   overlay: $('canonStudio'),
@@ -1090,6 +1207,8 @@ const csResetRefForm = () => {
   csRefs.refFileInput.value = '';
   csRefs.refPreview.innerHTML = '';
   csPendingFileDataUrl = null;
+  csPendingFileBlob = null;
+  csPendingFileName = '';
 };
 
 const openCanonStudio = () => {
@@ -1169,9 +1288,13 @@ csRefs.refFileInput.addEventListener('change', (event) => {
   const [file] = event.target.files;
   if (!file) {
     csPendingFileDataUrl = null;
+    csPendingFileBlob = null;
+    csPendingFileName = '';
     csRefs.refPreview.innerHTML = '';
     return;
   }
+  csPendingFileBlob = file;
+  csPendingFileName = file.name || '';
   const reader = new FileReader();
   reader.onload = (e) => {
     csPendingFileDataUrl = e.target.result;
@@ -1180,24 +1303,37 @@ csRefs.refFileInput.addEventListener('change', (event) => {
   reader.readAsDataURL(file);
 });
 
-csRefs.addRefBtn.addEventListener('click', () => {
+csRefs.addRefBtn.addEventListener('click', async () => {
   const name = csRefs.refName.value.trim();
   const character = csCurrentCharacter();
   if (!name || !character) return;
+  const reference = createReferenceImage({
+    projectId: selectedProjectId(),
+    characterId: character.id,
+    name,
+    type: csRefs.refType.value,
+    dataUrl: csPendingFileDataUrl || '',
+    fileName: csPendingFileName,
+    isCanonical: csRefs.refIsCanonical.checked,
+    preserve: csRefs.refPreserve.value.trim(),
+    mayVary: csRefs.refMayVary.value.trim(),
+    notes: csRefs.refNotes.value.trim()
+  });
+  if (csPendingFileBlob) {
+    try {
+      reference.localPath = await saveReferenceFileToWorkspace({
+        settings: state.settings,
+        projectId: selectedProjectId(),
+        referenceId: reference.id,
+        blob: csPendingFileBlob,
+        fileName: csPendingFileName
+      });
+    } catch (error) {
+      console.warn('Falha ao salvar referência no workspace local:', error);
+    }
+  }
 
-  state.referenceImages.push(
-    createReferenceImage({
-      projectId: selectedProjectId(),
-      characterId: character.id,
-      name,
-      type: csRefs.refType.value,
-      dataUrl: csPendingFileDataUrl || '',
-      isCanonical: csRefs.refIsCanonical.checked,
-      preserve: csRefs.refPreserve.value.trim(),
-      mayVary: csRefs.refMayVary.value.trim(),
-      notes: csRefs.refNotes.value.trim()
-    })
-  );
+  state.referenceImages.push(reference);
   state = store.save(state);
   csResetRefForm();
   csRenderRefGrid();
@@ -1824,17 +1960,31 @@ psRefs.officialBtn.addEventListener('click', () => {
 psRefs.exportTextBtn.addEventListener('click', () => {
   const payload = exportPromptPayload();
   if (!payload) return;
-  downloadFile(`${sanitizeFilename(payload.title)}.txt`, exportPromptText(payload), 'text/plain');
+  const filename = `${sanitizeFilename(payload.title)}.txt`;
+  const content = exportPromptText(payload);
+  downloadFile(filename, content, 'text/plain');
+  saveExportToWorkspace({ settings: state.settings, filename, content })
+    .then((savedPath) => {
+      if (savedPath) setWorkspaceStatus(`Exportação salva em workspace local: ${savedPath}`);
+    })
+    .catch((error) => {
+      console.warn('Falha ao salvar exportação de prompt no workspace local:', error);
+    });
 });
 
 psRefs.exportJsonBtn.addEventListener('click', () => {
   const payload = exportPromptPayload();
   if (!payload) return;
-  downloadFile(
-    `${sanitizeFilename(payload.title)}.json`,
-    JSON.stringify(payload, null, 2),
-    'application/json'
-  );
+  const filename = `${sanitizeFilename(payload.title)}.json`;
+  const content = JSON.stringify(payload, null, 2);
+  downloadFile(filename, content, 'application/json');
+  saveExportToWorkspace({ settings: state.settings, filename, content })
+    .then((savedPath) => {
+      if (savedPath) setWorkspaceStatus(`Exportação salva em workspace local: ${savedPath}`);
+    })
+    .catch((error) => {
+      console.warn('Falha ao salvar exportação JSON no workspace local:', error);
+    });
 });
 
 document.addEventListener('keydown', (event) => {

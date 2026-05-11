@@ -74,6 +74,17 @@ section {
   flex-wrap: wrap;
 }
 
+.check-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.check-inline input[type='checkbox'] {
+  width: auto;
+}
+
 input, textarea, select {
   width: 100%;
   border: 1px solid var(--line);
