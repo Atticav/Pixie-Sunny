@@ -613,5 +613,4 @@ test('inferSceneCharactersFromContext avoids substring false positives', () => {
   const found = inferSceneCharactersFromContext([ana, kael], scene, chapter);
 
   assert.deepEqual(found.map((entry) => entry.name), ['Kael']);
-  assert.equal(found.some((entry) => entry.name === 'Kael'), true);
 });

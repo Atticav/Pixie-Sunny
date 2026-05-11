@@ -84,7 +84,7 @@ const findPreset = (collection, id, fallbackId) =>
 
 const describeReference = (reference) => {
   if (!reference) return 'referência inválida';
-  const bits = [line(reference?.name) || 'referência sem nome'];
+  const bits = [line(reference.name) || 'referência sem nome'];
   if (reference.type) bits.push(`tipo ${reference.type}`);
   if (reference.preserve) bits.push(`preservar ${reference.preserve}`);
   if (reference.mayVary) bits.push(`variar ${reference.mayVary}`);
