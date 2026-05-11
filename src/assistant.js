@@ -75,13 +75,15 @@ const joinSentence = (values, fallback = '') => {
   return safeValues.length ? safeValues.join('; ') : fallback;
 };
 
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const findPreset = (collection, id, fallbackId) =>
   collection.find((item) => item.id === id) ||
   collection.find((item) => item.id === fallbackId) ||
   collection[0];
 
 const describeReference = (reference) => {
-  const bits = [reference.name];
+  const bits = [line(reference?.name) || 'referência sem nome'];
   if (reference.type) bits.push(`tipo ${reference.type}`);
   if (reference.preserve) bits.push(`preservar ${reference.preserve}`);
   if (reference.mayVary) bits.push(`variar ${reference.mayVary}`);
@@ -225,11 +227,13 @@ export const buildCharacterPromptPack = ({
   };
 };
 
-const inferSceneCharacters = (characters, scene, chapter) => {
+export const inferSceneCharactersFromContext = (characters, scene, chapter) => {
   const haystack = `${scene?.title || ''} ${scene?.description || ''} ${chapter?.summary || ''} ${(chapter?.presentCharacters || []).join(' ')}`.toLowerCase();
   return characters.filter((character) => {
     const name = line(character?.name).toLowerCase();
-    return name && haystack.includes(name);
+    if (!name) return false;
+    const matcher = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(name)}($|[^\\p{L}\\p{N}])`, 'u');
+    return matcher.test(haystack);
   });
 };
 
@@ -261,7 +265,7 @@ export const buildScenePromptPack = ({
   const style = findPreset(PROMPT_STYLE_PRESETS, stylePreset, 'cinematic-realism');
   const cinematic = findPreset(PROMPT_CINEMATIC_PRESETS, cinematicPreset, 'wide-establishing');
   const lensLighting = findPreset(PROMPT_LENS_LIGHT_PRESETS, lensLightingPreset, 'natural-soft');
-  const involvedCharacters = inferSceneCharacters(characters, scene, chapter);
+  const involvedCharacters = inferSceneCharactersFromContext(characters, scene, chapter);
   const relevantLore = inferRelevantLore(loreEntries, scene, chapter);
   const referenceList = references.map(describeReference);
   const fixedChecklist = uniqueList([

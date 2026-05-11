@@ -18,6 +18,7 @@ import {
   buildScenePromptPack,
   buildSceneSpec,
   buildVideoSpec,
+  inferSceneCharactersFromContext,
   PROMPT_CINEMATIC_PRESETS,
   PROMPT_LENS_LIGHT_PRESETS,
   PROMPT_STYLE_PRESETS,
@@ -59,6 +60,8 @@ const parseTextList = (value, separator) =>
 const parseLines = (value) => parseTextList(value, '\n');
 
 const parseTags = (value) => parseTextList(value, ',');
+
+const sanitizeFilename = (value) => (value || 'prompt').replace(/[^\w-]+/g, '-').toLowerCase();
 
 const selectedProjectId = () => refs.projectSelect.value;
 
@@ -1295,19 +1298,6 @@ const promptDefaultTitle = (targetType, targetId) => {
   return targetType === 'scene' ? `${targetLabel} · Prompt de cena` : `${targetLabel} · Prompt mestre`;
 };
 
-const inferSceneCharacters = (scene) => {
-  const chapter = state.chapters.find((entry) => entry.id === scene?.chapterId);
-  const sceneText = `${scene?.title || ''} ${scene?.description || ''}`.toLowerCase();
-  return projectCharacters().filter((character) => {
-    const name = character.name.toLowerCase();
-    return (
-      sceneText.includes(name) ||
-      (Array.isArray(chapter?.presentCharacters) &&
-        chapter.presentCharacters.some((entry) => entry.toLowerCase() === name))
-    );
-  });
-};
-
 const promptReferenceCandidates = (targetType, targetId) => {
   const projectReferences = state.referenceImages.filter((reference) => reference.projectId === selectedProjectId());
   if (targetType === 'character') {
@@ -1317,7 +1307,8 @@ const promptReferenceCandidates = (targetType, targetId) => {
   }
 
   const scene = state.scenes.find((entry) => entry.id === targetId);
-  const sceneCharacters = inferSceneCharacters(scene);
+  const chapter = state.chapters.find((entry) => entry.id === scene?.chapterId);
+  const sceneCharacters = inferSceneCharactersFromContext(projectCharacters(), scene, chapter);
   const sceneCharacterIds = new Set(sceneCharacters.map((character) => character.id));
   return projectReferences.filter(
     (reference) =>
@@ -1352,7 +1343,7 @@ const createPromptFromContext = (preferredTargetType) => {
     title: promptDefaultTitle(targetType, targetId),
     targetType,
     targetId,
-    promptMedium: targetType === 'scene' ? 'image' : 'image',
+    promptMedium: 'image',
     stylePreset: 'cinematic-realism',
     cinematicPreset: targetType === 'scene' ? 'wide-establishing' : 'portrait-intimate',
     lensLightingPreset: 'natural-soft',
@@ -1437,7 +1428,13 @@ const psRenderReferenceOptions = (promptDocument) => {
     ]
       .filter(Boolean)
       .join(' · ');
-    text.innerHTML = `<strong>${reference.name}</strong><small>${badges || 'referência visual'}</small><small>Preservar: ${reference.preserve || '—'} | Variar: ${reference.mayVary || '—'}</small>`;
+    const title = document.createElement('strong');
+    title.textContent = reference.name || 'Referência sem nome';
+    const meta = document.createElement('small');
+    meta.textContent = badges || 'referência visual';
+    const rules = document.createElement('small');
+    rules.textContent = `Preservar: ${reference.preserve || '—'} | Variar: ${reference.mayVary || '—'}`;
+    text.append(title, meta, rules);
     label.append(checkbox, text);
     psRefs.referenceList.append(label);
   });
@@ -1824,14 +1821,14 @@ psRefs.officialBtn.addEventListener('click', () => {
 psRefs.exportTextBtn.addEventListener('click', () => {
   const payload = exportPromptPayload();
   if (!payload) return;
-  downloadFile(`${payload.title.replace(/[^\w-]+/g, '-').toLowerCase() || 'prompt'}.txt`, exportPromptText(payload), 'text/plain');
+  downloadFile(`${sanitizeFilename(payload.title)}.txt`, exportPromptText(payload), 'text/plain');
 });
 
 psRefs.exportJsonBtn.addEventListener('click', () => {
   const payload = exportPromptPayload();
   if (!payload) return;
   downloadFile(
-    `${payload.title.replace(/[^\w-]+/g, '-').toLowerCase() || 'prompt'}.json`,
+    `${sanitizeFilename(payload.title)}.json`,
     JSON.stringify(payload, null, 2),
     'application/json'
   );

@@ -14,7 +14,7 @@ import {
   CHAPTER_STATUSES,
   REFERENCE_TYPES
 } from '../src/models.js';
-import { buildCharacterPromptPack, buildScenePromptPack, searchLore } from '../src/assistant.js';
+import { buildCharacterPromptPack, buildScenePromptPack, inferSceneCharactersFromContext, searchLore } from '../src/assistant.js';
 
 const fakeStorage = () => {
   const map = new Map();
@@ -590,4 +590,27 @@ test('buildScenePromptPack uses chapter, lore and references for scene outputs',
   assert.match(pack.cinematicPrompt, /tensão contida/);
   assert.ok(pack.fixedChecklist.includes('identidade dos personagens'));
   assert.ok(pack.variations.length >= 3);
+});
+
+test('inferSceneCharactersFromContext avoids substring false positives', () => {
+  const scene = createScene({
+    projectId: 'p1',
+    chapterId: 'ch1',
+    title: 'Banana na feira',
+    description: 'A análise da vila continua.',
+    location: 'mercado'
+  });
+  const chapter = createChapter({
+    projectId: 'p1',
+    bookId: 'b1',
+    title: 'Capítulo',
+    summary: 'Somente Kael está presente.',
+    presentCharacters: ['Kael']
+  });
+  const ana = createCharacter({ projectId: 'p1', name: 'Ana' });
+  const kael = createCharacter({ projectId: 'p1', name: 'Kael' });
+
+  const found = inferSceneCharactersFromContext([ana, kael], scene, chapter);
+
+  assert.deepEqual(found.map((entry) => entry.name), ['Kael']);
 });
