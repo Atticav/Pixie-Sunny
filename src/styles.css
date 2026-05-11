@@ -2233,13 +2233,13 @@ details[open].ws-context-section summary::before { content: '▾ '; }
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-.irs-decision-status-approved { background: #1a3555; color: #81c9ff; }
-.irs-decision-status-official { background: #1f4a37; color: #7fe0b8; }
-.irs-decision-status-rejected { background: #4f1f1f; color: #ff9d9d; }
-.irs-decision-status-superseded { background: #3f2b52; color: #cda5ff; }
-.irs-decision-status-needs-revision { background: #5a4420; color: #f7ca7c; }
-.irs-decision-status-pending { background: #24384f; color: #9ec7f5; }
-.irs-decision-status-archived { background: #33413e; color: #b3c4bf; }
+.irs-decision-status-approved { background: #112a44; color: #ffffff; }
+.irs-decision-status-official { background: #153c2f; color: #ffffff; }
+.irs-decision-status-rejected { background: #4b1c1c; color: #ffffff; }
+.irs-decision-status-superseded { background: #342248; color: #ffffff; }
+.irs-decision-status-needs-revision { background: #4c3919; color: #ffffff; }
+.irs-decision-status-pending { background: #1e3348; color: #ffffff; }
+.irs-decision-status-archived { background: #2a3834; color: #ffffff; }
 
 .irs-decision-meta,
 .irs-decision-rationale,

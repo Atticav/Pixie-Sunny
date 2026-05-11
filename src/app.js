@@ -3703,16 +3703,16 @@ const irsDecisionTypeLabels = {
 const irsDecisionScopeLabels = {
   asset: 'Asset',
   shot: 'Shot',
-  scene: 'Cena',
-  sequence: 'Sequência',
+  scene: 'Scene',
+  sequence: 'Sequence',
   briefing: 'Briefing',
   canon_entry: 'Canon entry',
-  reference_visual: 'Referência visual'
+  reference_visual: 'Visual reference'
 };
 
 const irsDecisionStatusLabels = {
   pending_review: 'Pending review',
-  approved: 'Latest approved',
+  approved: 'Latest Approved',
   rejected: 'Rejected',
   current_official: 'Current official',
   superseded: 'Superseded',
@@ -4049,10 +4049,10 @@ const irsScopeItemLabel = (scopeType, scopeId) => {
     return (state.shots || []).find((shot) => shot.id === scopeId)?.title || `Shot ${scopeId.substring(0, 8)}`;
   }
   if (scopeType === 'scene') {
-    return (state.scenes || []).find((scene) => scene.id === scopeId)?.title || `Cena ${scopeId.substring(0, 8)}`;
+    return (state.scenes || []).find((scene) => scene.id === scopeId)?.title || `Scene ${scopeId.substring(0, 8)}`;
   }
   if (scopeType === 'sequence') {
-    return (state.beats || []).find((beat) => beat.id === scopeId)?.title || `Sequência ${scopeId.substring(0, 8)}`;
+    return (state.beats || []).find((beat) => beat.id === scopeId)?.title || `Sequence ${scopeId.substring(0, 8)}`;
   }
   if (scopeType === 'briefing') {
     return (state.promptDocuments || []).find((doc) => doc.id === scopeId)?.title || `Briefing ${scopeId.substring(0, 8)}`;
@@ -4072,14 +4072,16 @@ const irsScopeItemLabel = (scopeType, scopeId) => {
   return scopeId;
 };
 
+const irsOutputDisplayName = (output) => output.fileName || `Output ${output.id.substring(0, 8)}`;
+
 const irsPopulateSupersedeTargets = () => {
   const currentId = irsSelectedOutputId || '';
   const all = irsAllOutputs().map(({ output }) => output).filter((output) => output.id !== currentId);
-  irsRefs.supersedeTarget.innerHTML = '<option value="">— escolher substituto —</option>';
+  irsRefs.supersedeTarget.innerHTML = '<option value="">- escolher substituto -</option>';
   all.forEach((output) => {
     const option = document.createElement('option');
     option.value = output.id;
-    option.textContent = `${output.fileName || output.id.substring(0, 8)} · ${output.generationType} · ${new Date(output.createdAt).toLocaleDateString('pt-BR')}`;
+    option.textContent = `${irsOutputDisplayName(output)} · ${output.generationType} · ${new Date(output.createdAt).toLocaleDateString('pt-BR')}`;
     irsRefs.supersedeTarget.append(option);
   });
 };
@@ -4277,6 +4279,7 @@ irsRefs.btnMarkCanon.addEventListener('click', () => {
     o.isCanonical = !o.isCanonical;
     nowCanonical = o.isCanonical;
   });
+  const canonScopeId = found.output.sceneId || found.output.characterId;
   irsRecordDecision({
     output: found.output,
     job: found.job,
@@ -4284,7 +4287,7 @@ irsRefs.btnMarkCanon.addEventListener('click', () => {
     resultingStatus: nowCanonical ? 'current_official' : 'pending_review',
     rationale: nowCanonical ? 'Output marcado como canônico.' : 'Output removido do estado canônico.',
     notes: found.output.notes || '',
-    extraScopes: nowCanonical ? [{ scopeType: 'canon_entry', scopeId: found.output.sceneId || found.output.characterId || found.output.id }] : []
+    extraScopes: nowCanonical && canonScopeId ? [{ scopeType: 'canon_entry', scopeId: canonScopeId }] : []
   });
   irsRefreshDetail();
 });
@@ -4711,7 +4714,7 @@ const irsPopulateDecisionItemFilter = () => {
   });
   irsRefs.decisionItemFilter.innerHTML = '<option value="">Todos os itens</option>';
   [...catalog.values()]
-    .sort((a, b) => a.label.localeCompare(b.label))
+    .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
     .forEach((entry) => {
       const option = document.createElement('option');
       option.value = entry.key;
@@ -4776,13 +4779,8 @@ const irsRenderDecisionHistory = () => {
     const scopeLabel = irsDecisionScopeLabels[event.scopeType] || event.scopeType;
     const itemLabel = irsScopeItemLabel(event.scopeType, event.scopeId);
     const isLatestApproved = latestApprovedByScope.get(`${event.scopeType}:${event.scopeId}`) === event.id;
-    const tags = [
-      isLatestApproved ? 'latest approved' : '',
-      event.resultingStatus === 'current_official' ? 'current official' : '',
-      event.resultingStatus === 'superseded' ? 'superseded' : '',
-      event.resultingStatus === 'pending_review' ? 'pending review' : ''
-    ].filter(Boolean).join(' · ');
-    meta.textContent = `${scopeLabel} · ${itemLabel}${tags ? ` · ${tags}` : ''}`;
+    const latestApprovedTag = isLatestApproved ? 'Latest Approved' : '';
+    meta.textContent = `${scopeLabel} · ${itemLabel}${latestApprovedTag ? ` · ${latestApprovedTag}` : ''}`;
 
     const rationale = document.createElement('p');
     rationale.className = 'irs-decision-rationale';

@@ -206,11 +206,11 @@ O app agora registra e navega decisões editoriais/operacionais por item:
 - escopos suportados:
   - asset
   - shot
-  - cena
-  - sequência
+  - scene
+  - sequence
   - briefing
   - canon entry
-  - referência visual
+  - visual reference
 - cada evento guarda:
   - tipo de decisão
   - timestamp
