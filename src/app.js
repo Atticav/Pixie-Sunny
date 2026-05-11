@@ -1,5 +1,6 @@
 import {
   createAsset,
+  createBeat,
   createBook,
   createCanonPromotion,
   createChapter,
@@ -11,12 +12,14 @@ import {
   createProject,
   createReferenceImage,
   createScene,
+  createShot,
   deleteEntity,
   CANON_PROMOTION_TYPES,
   IMAGE_GEN_PROVIDER_TYPES,
   IMAGE_GEN_TYPES,
   OUTPUT_REVIEW_STATUSES,
   REFERENCE_TYPES,
+  SHOT_STATUSES,
   UNASSIGNED_CHAPTER_ID
 } from './models.js';
 import { createStore, sanitizeState } from './store.js';
@@ -68,6 +71,43 @@ const refs = {
   videoSpec: $('videoSpec'),
   promptDocumentSelect: $('promptDocumentSelect'),
   promptDocumentPreview: $('promptDocumentPreview'),
+  shotFilterChapter: $('shotFilterChapter'),
+  shotFilterScene: $('shotFilterScene'),
+  shotFilterCharacter: $('shotFilterCharacter'),
+  shotFilterStatus: $('shotFilterStatus'),
+  shotFilterType: $('shotFilterType'),
+  shotBeatSelect: $('shotBeatSelect'),
+  beatTitleInput: $('beatTitleInput'),
+  beatSummaryInput: $('beatSummaryInput'),
+  shotTemplateSelect: $('shotTemplateSelect'),
+  shotLanguagePresetSelect: $('shotLanguagePresetSelect'),
+  shotSelect: $('shotSelect'),
+  shotTimeline: $('shotTimeline'),
+  shotTitleInput: $('shotTitleInput'),
+  shotStatusSelect: $('shotStatusSelect'),
+  shotTypeInput: $('shotTypeInput'),
+  shotAngleInput: $('shotAngleInput'),
+  shotCameraMovementInput: $('shotCameraMovementInput'),
+  shotFocusCharacterSelect: $('shotFocusCharacterSelect'),
+  shotDominantEmotionInput: $('shotDominantEmotionInput'),
+  shotEnvironmentInput: $('shotEnvironmentInput'),
+  shotNarrativeObjectiveInput: $('shotNarrativeObjectiveInput'),
+  shotPacingIntensityInput: $('shotPacingIntensityInput'),
+  shotVisualProgressionInput: $('shotVisualProgressionInput'),
+  shotNarrativeProgressionInput: $('shotNarrativeProgressionInput'),
+  shotDirectorNotes: $('shotDirectorNotes'),
+  shotPromptLinks: $('shotPromptLinks'),
+  shotOutputLinks: $('shotOutputLinks'),
+  shotVideoLinks: $('shotVideoLinks'),
+  shotReferenceLinks: $('shotReferenceLinks'),
+  shotCharacterLinks: $('shotCharacterLinks'),
+  shotContinuityReferenceLinks: $('shotContinuityReferenceLinks'),
+  shotContinuityKeep: $('shotContinuityKeep'),
+  shotContinuityVary: $('shotContinuityVary'),
+  shotContinuityRisks: $('shotContinuityRisks'),
+  shotContinuityPreview: $('shotContinuityPreview'),
+  shotProgressionPreview: $('shotProgressionPreview'),
+  shotComparisonPreview: $('shotComparisonPreview'),
   workspaceEnabled: $('workspaceEnabled'),
   workspaceMode: $('workspaceMode'),
   workspaceRootPath: $('workspaceRootPath'),
@@ -83,6 +123,80 @@ const refs = {
   workspacePreview: $('workspacePreview'),
   workspaceStatus: $('workspaceStatus')
 };
+
+const SHOT_TEMPLATES = [
+  {
+    id: 'wide-establishing',
+    label: 'Abertura / establishing',
+    defaults: {
+      shotType: 'plano geral',
+      angle: 'altura dos olhos com abertura espacial',
+      cameraMovement: 'estático ou drift lento',
+      narrativeObjective: 'estabelecer geografia, clima e escala da cena',
+      pacingIntensity: 'ritmo contemplativo',
+      visualProgression: 'abrir a sequência e situar o espectador',
+      narrativeProgression: 'introduzir contexto antes do conflito'
+    }
+  },
+  {
+    id: 'dialogue-intimate',
+    label: 'Diálogo íntimo',
+    defaults: {
+      shotType: 'plano médio / close',
+      angle: 'eye level íntimo',
+      cameraMovement: 'push-in suave',
+      narrativeObjective: 'capturar reação emocional e subtexto',
+      pacingIntensity: 'ritmo moderado com foco emocional',
+      visualProgression: 'aproximar a câmera do conflito interno',
+      narrativeProgression: 'aprofundar a decisão do personagem'
+    }
+  },
+  {
+    id: 'kinetic-transition',
+    label: 'Transição cinética',
+    defaults: {
+      shotType: 'plano sequência',
+      angle: 'ângulo dinâmico com deslocamento lateral',
+      cameraMovement: 'tracking lateral / pan contínuo',
+      narrativeObjective: 'ligar beats com energia e direção',
+      pacingIntensity: 'ritmo acelerando',
+      visualProgression: 'levar a sequência do estático ao movimento',
+      narrativeProgression: 'empurrar a cena para a próxima ação'
+    }
+  }
+];
+
+const SHOT_LANGUAGE_PRESETS = [
+  {
+    id: 'classical-continuity',
+    label: 'Continuidade clássica',
+    defaults: {
+      cameraMovement: 'movimentos discretos e motivados pela ação',
+      pacingIntensity: 'cadência limpa e legível',
+      directorNotes: 'Priorizar eixo claro, continuidade espacial e leitura editorial objetiva.'
+    }
+  },
+  {
+    id: 'heightened-emotion',
+    label: 'Emoção progressiva',
+    defaults: {
+      angle: 'aproximações graduais e eixo íntimo',
+      cameraMovement: 'push-in ou handheld controlado',
+      pacingIntensity: 'crescimento emocional progressivo',
+      directorNotes: 'Escalar emoção shot a shot sem perder fidelidade visual dos personagens.'
+    }
+  },
+  {
+    id: 'dynamic-action',
+    label: 'Ação controlada',
+    defaults: {
+      angle: 'ângulos energizados com contraste de escala',
+      cameraMovement: 'tracking com aceleração ou whip pan leve',
+      pacingIntensity: 'intensidade alta com leitura espacial preservada',
+      directorNotes: 'Manter clareza de direção e continuidade de eixo mesmo com energia alta.'
+    }
+  }
+];
 
 const parseTextList = (value, separator) =>
   (typeof value === 'string' ? value : '')
@@ -165,6 +279,10 @@ const currentLoreEntry = () => state.loreEntries.find((entry) => entry.id === se
 
 const currentScene = () => state.scenes.find((scene) => scene.id === selectedSceneId());
 
+const currentBeat = () => (state.beats || []).find((beat) => beat.id === refs.shotBeatSelect.value);
+
+const currentShot = () => (state.shots || []).find((shot) => shot.id === refs.shotSelect.value);
+
 const projectBooks = () => state.books.filter((book) => book.projectId === selectedProjectId());
 
 const projectChapters = () =>
@@ -185,7 +303,18 @@ const projectScenes = () =>
         scene.chapterId === selectedChapterId())
   );
 
+const projectScenesAll = () => state.scenes.filter((scene) => scene.projectId === selectedProjectId());
+
 const projectAssets = () => state.assets.filter((asset) => asset.projectId === selectedProjectId());
+
+const projectBeats = () => (state.beats || []).filter((beat) => beat.projectId === selectedProjectId());
+
+const projectShots = () => (state.shots || []).filter((shot) => shot.projectId === selectedProjectId());
+
+const projectGenerationOutputs = () =>
+  (state.generationJobs || [])
+    .filter((job) => job.projectId === selectedProjectId())
+    .flatMap((job) => (job.outputs || []).map((output) => ({ job, output })));
 
 const projectPromptDocuments = () =>
   state.promptDocuments.filter((promptDocument) => promptDocument.projectId === selectedProjectId());
@@ -315,6 +444,463 @@ const renderPromptEditor = () => {
   );
 };
 
+const renderOptionsWithBlank = (select, options, selectedId, blankLabel = 'Nenhum vínculo') => {
+  if (!select) return;
+  select.innerHTML = '';
+  const blankOption = document.createElement('option');
+  blankOption.value = '';
+  blankOption.textContent = blankLabel;
+  select.append(blankOption);
+  options.forEach((item) => {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.name || item.title;
+    if (selectedId && selectedId === item.id) option.selected = true;
+    select.append(option);
+  });
+  if (selectedId && options.some((item) => item.id === selectedId)) {
+    select.value = selectedId;
+  } else {
+    select.value = '';
+  }
+};
+
+const shotTemplateById = (id) => SHOT_TEMPLATES.find((template) => template.id === id) || null;
+
+const shotLanguagePresetById = (id) => SHOT_LANGUAGE_PRESETS.find((preset) => preset.id === id) || null;
+
+const applyShotTemplate = (shot, templateId) => {
+  const template = shotTemplateById(templateId);
+  if (!template) return shot;
+  return {
+    ...shot,
+    templateId: template.id,
+    shotType: template.defaults.shotType || shot.shotType,
+    angle: template.defaults.angle || shot.angle,
+    cameraMovement: template.defaults.cameraMovement || shot.cameraMovement,
+    narrativeObjective: template.defaults.narrativeObjective || shot.narrativeObjective,
+    pacingIntensity: template.defaults.pacingIntensity || shot.pacingIntensity,
+    visualProgression: template.defaults.visualProgression || shot.visualProgression,
+    narrativeProgression: template.defaults.narrativeProgression || shot.narrativeProgression
+  };
+};
+
+const applyShotLanguagePreset = (shot, presetId) => {
+  const preset = shotLanguagePresetById(presetId);
+  if (!preset) return shot;
+  return {
+    ...shot,
+    languagePresetId: preset.id,
+    angle: preset.defaults.angle || shot.angle,
+    cameraMovement: preset.defaults.cameraMovement || shot.cameraMovement,
+    pacingIntensity: preset.defaults.pacingIntensity || shot.pacingIntensity,
+    directorNotes: preset.defaults.directorNotes || shot.directorNotes
+  };
+};
+
+const shotOrderSorter = (a, b) =>
+  (a.order || 0) - (b.order || 0) || new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+
+const plannerVisibleScenes = () => {
+  const chapterId = refs.shotFilterChapter.value || '';
+  return projectScenesAll()
+    .filter((scene) => !chapterId || scene.chapterId === chapterId)
+    .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+};
+
+const plannerCurrentSceneId = () => refs.shotFilterScene.value || plannerVisibleScenes()[0]?.id || '';
+
+const plannerSceneBeats = (sceneId = plannerCurrentSceneId()) =>
+  projectBeats()
+    .filter((beat) => beat.sceneId === sceneId)
+    .sort(shotOrderSorter);
+
+const plannerSceneShots = (sceneId) =>
+  projectShots()
+    .filter((shot) => shot.sceneId === sceneId)
+    .sort(shotOrderSorter);
+
+const plannerFilteredShots = () => {
+  let result = projectShots();
+  const chapterId = refs.shotFilterChapter.value || '';
+  const sceneId = refs.shotFilterScene.value || '';
+  const characterId = refs.shotFilterCharacter.value || '';
+  const status = refs.shotFilterStatus.value || '';
+  const shotType = refs.shotFilterType.value || '';
+
+  if (chapterId) result = result.filter((shot) => shot.chapterId === chapterId);
+  if (sceneId) result = result.filter((shot) => shot.sceneId === sceneId);
+  if (characterId) {
+    result = result.filter(
+      (shot) => shot.focusCharacterId === characterId || (shot.linkedCharacterIds || []).includes(characterId)
+    );
+  }
+  if (status) result = result.filter((shot) => shot.status === status);
+  if (shotType) result = result.filter((shot) => shot.shotType === shotType);
+
+  return result.sort((a, b) => {
+    if (a.sceneId !== b.sceneId) {
+      const sceneA = state.scenes.find((scene) => scene.id === a.sceneId)?.title || '';
+      const sceneB = state.scenes.find((scene) => scene.id === b.sceneId)?.title || '';
+      return sceneA.localeCompare(sceneB, 'pt-BR');
+    }
+    return shotOrderSorter(a, b);
+  });
+};
+
+const plannerShotContext = (shot) => {
+  const scene = state.scenes.find((entry) => entry.id === shot.sceneId);
+  const chapter = state.chapters.find((entry) => entry.id === shot.chapterId);
+  const beat = (state.beats || []).find((entry) => entry.id === shot.beatId);
+  const focus = state.characters.find((entry) => entry.id === shot.focusCharacterId);
+  return {
+    scene,
+    chapter,
+    beat,
+    focus
+  };
+};
+
+const plannerSequenceReferenceNames = (ids) =>
+  (ids || [])
+    .map((id) => state.referenceImages.find((reference) => reference.id === id)?.name)
+    .filter(Boolean);
+
+const renderChecklist = (container, items, selectedIds, emptyText) => {
+  if (!container) return;
+  container.innerHTML = '';
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'sp-empty';
+    empty.textContent = emptyText;
+    container.append(empty);
+    return;
+  }
+
+  const selected = new Set(selectedIds || []);
+  items.forEach((item) => {
+    const label = document.createElement('label');
+    label.className = 'sp-checkbox-item';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = item.id;
+    checkbox.checked = selected.has(item.id);
+    const text = document.createElement('span');
+    const title = document.createElement('strong');
+    title.textContent = item.title;
+    text.append(title);
+    if (item.meta) {
+      const meta = document.createElement('small');
+      meta.textContent = item.meta;
+      text.append(meta);
+    }
+    if (item.detail) {
+      const detail = document.createElement('small');
+      detail.textContent = item.detail;
+      text.append(detail);
+    }
+    label.append(checkbox, text);
+    container.append(label);
+  });
+};
+
+const checkedValues = (container) =>
+  Array.from(container?.querySelectorAll('input[type="checkbox"]:checked') || []).map((input) => input.value);
+
+const renderShotPlanner = () => {
+  const chapterOptions = state.chapters
+    .filter((chapter) => chapter.projectId === selectedProjectId())
+    .map((chapter) => ({ ...chapter, name: chapter.title }));
+  renderOptionsWithBlank(refs.shotFilterChapter, chapterOptions, refs.shotFilterChapter.value, 'Todos os capítulos');
+
+  const visibleScenes = plannerVisibleScenes();
+  const selectedSceneId = visibleScenes.some((scene) => scene.id === refs.shotFilterScene.value)
+    ? refs.shotFilterScene.value
+    : '';
+  renderOptionsWithBlank(
+    refs.shotFilterScene,
+    visibleScenes.map((scene) => ({ ...scene, name: scene.title })),
+    selectedSceneId,
+    'Todas as cenas'
+  );
+
+  renderOptionsWithBlank(
+    refs.shotFilterCharacter,
+    projectCharacters().map((character) => ({ ...character, name: character.name })),
+    refs.shotFilterCharacter.value,
+    'Todos os personagens'
+  );
+  renderOptionsWithBlank(
+    refs.shotFilterStatus,
+    SHOT_STATUSES.map((status) => ({ id: status, name: status })),
+    refs.shotFilterStatus.value,
+    'Todos os status'
+  );
+  const shotTypes = Array.from(
+    new Set(
+      projectShots()
+        .map((shot) => shot.shotType)
+        .concat(SHOT_TEMPLATES.map((template) => template.defaults.shotType))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  renderOptionsWithBlank(
+    refs.shotFilterType,
+    shotTypes.map((type) => ({ id: type, name: type })),
+    refs.shotFilterType.value,
+    'Todos os planos'
+  );
+
+  renderOptions(
+    refs.shotTemplateSelect,
+    SHOT_TEMPLATES.map((template) => ({ id: template.id, name: template.label })),
+    refs.shotTemplateSelect.value || SHOT_TEMPLATES[0]?.id,
+    'Nenhum template'
+  );
+  renderOptions(
+    refs.shotLanguagePresetSelect,
+    SHOT_LANGUAGE_PRESETS.map((preset) => ({ id: preset.id, name: preset.label })),
+    refs.shotLanguagePresetSelect.value || SHOT_LANGUAGE_PRESETS[0]?.id,
+    'Nenhum preset'
+  );
+
+  const filteredShots = plannerFilteredShots();
+  renderOptions(
+    refs.shotSelect,
+    filteredShots.map((shot) => {
+      const context = plannerShotContext(shot);
+      const sceneLabel = context.scene?.title || 'Cena';
+      return {
+        id: shot.id,
+        name: `${sceneLabel} · ${shot.order + 1}. ${shot.title}`
+      };
+    }),
+    filteredShots.some((shot) => shot.id === refs.shotSelect.value) ? refs.shotSelect.value : filteredShots[0]?.id,
+    'Nenhum shot planejado'
+  );
+
+  const shot = currentShot();
+  const sceneIdForBeats = shot?.sceneId || plannerCurrentSceneId();
+  const beats = plannerSceneBeats(sceneIdForBeats);
+  renderOptionsWithBlank(
+    refs.shotBeatSelect,
+    beats.map((beat) => ({ id: beat.id, name: `${beat.order + 1}. ${beat.title}` })),
+    shot?.beatId && beats.some((beat) => beat.id === shot.beatId) ? shot.beatId : refs.shotBeatSelect.value,
+    'Sem beat'
+  );
+
+  const beat = currentBeat();
+  refs.beatTitleInput.value = beat?.title || '';
+  refs.beatSummaryInput.value = beat?.summary || '';
+  setDisabled(['saveBeatBtn', 'deleteBeatBtn'], !beat);
+
+  renderOptionsWithBlank(
+    refs.shotFocusCharacterSelect,
+    projectCharacters().map((character) => ({ ...character, name: character.name })),
+    shot?.focusCharacterId,
+    'Sem personagem focal'
+  );
+  renderOptions(
+    refs.shotStatusSelect,
+    SHOT_STATUSES.map((status) => ({ id: status, name: status })),
+    shot?.status || SHOT_STATUSES[0],
+    'Status'
+  );
+
+  refs.shotTitleInput.value = shot?.title || '';
+  refs.shotTypeInput.value = shot?.shotType || '';
+  refs.shotAngleInput.value = shot?.angle || '';
+  refs.shotCameraMovementInput.value = shot?.cameraMovement || '';
+  refs.shotDominantEmotionInput.value = shot?.dominantEmotion || '';
+  refs.shotEnvironmentInput.value = shot?.environment || '';
+  refs.shotNarrativeObjectiveInput.value = shot?.narrativeObjective || '';
+  refs.shotPacingIntensityInput.value = shot?.pacingIntensity || '';
+  refs.shotVisualProgressionInput.value = shot?.visualProgression || '';
+  refs.shotNarrativeProgressionInput.value = shot?.narrativeProgression || '';
+  refs.shotDirectorNotes.value = shot?.directorNotes || '';
+  refs.shotContinuityKeep.value = Array.isArray(shot?.continuityMustKeep) ? shot.continuityMustKeep.join('\n') : '';
+  refs.shotContinuityVary.value = Array.isArray(shot?.continuityMayVary) ? shot.continuityMayVary.join('\n') : '';
+  refs.shotContinuityRisks.value = Array.isArray(shot?.continuityRisks) ? shot.continuityRisks.join('\n') : '';
+
+  const promptItems = projectPromptDocuments().map((promptDocument) => ({
+    id: promptDocument.id,
+    title: promptDocument.title,
+    meta: `${promptDocument.promptMedium} · alvo ${promptDocument.targetType}`,
+    detail: `${promptDocument.isOfficial ? 'oficial' : 'em progresso'}${promptDocument.isFavorite ? ' · favorito' : ''}`
+  }));
+  const outputItems = projectGenerationOutputs()
+    .filter(({ output }) => output.reviewStatus !== 'rejected' && output.reviewStatus !== 'archived')
+    .map(({ output, job }) => ({
+      id: output.id,
+      title: output.fileName || `Output ${output.seed >= 0 ? `seed ${output.seed}` : output.id.slice(0, 8)}`,
+      meta: [
+        output.isCanonical ? 'canônico' : '',
+        output.isFavorite ? 'favorito' : '',
+        output.reviewStatus || '',
+        output.generationType || ''
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      detail: `${job.promptDocumentId ? 'prompt conectado' : 'sem prompt'}${output.sceneId ? ' · ligado a cena' : ''}`
+    }));
+  const videoItems = projectAssets()
+    .filter((asset) => asset.type.toLowerCase().includes('video'))
+    .map((asset) => ({
+      id: asset.id,
+      title: asset.name,
+      meta: asset.type,
+      detail: asset.path
+    }));
+  const referenceItems = state.referenceImages
+    .filter((reference) => reference.projectId === selectedProjectId())
+    .map((reference) => ({
+      id: reference.id,
+      title: reference.name,
+      meta: `${reference.isCanonical ? 'canônica' : 'referência'} · ${reference.type}`,
+      detail: `Preservar: ${reference.preserve || '—'} | Variar: ${reference.mayVary || '—'}`
+    }));
+  const characterItems = projectCharacters().map((character) => ({
+    id: character.id,
+    title: character.name,
+    meta: character.visualAesthetic || character.presence || 'personagem canônico',
+    detail: character.cinematicNotes || character.notes || 'sem notas adicionais'
+  }));
+  const continuityReferenceItems = referenceItems.filter((item) =>
+    state.referenceImages.find((reference) => reference.id === item.id)?.isCanonical
+  );
+
+  renderChecklist(refs.shotPromptLinks, promptItems, shot?.promptDocumentIds, 'Nenhum prompt estruturado disponível.');
+  renderChecklist(refs.shotOutputLinks, outputItems, shot?.generationOutputIds, 'Nenhuma imagem revisada disponível.');
+  renderChecklist(refs.shotVideoLinks, videoItems, shot?.videoAssetIds, 'Nenhum vídeo local vinculado ao projeto.');
+  renderChecklist(refs.shotReferenceLinks, referenceItems, shot?.referenceImageIds, 'Nenhuma referência visual encontrada.');
+  renderChecklist(refs.shotCharacterLinks, characterItems, shot?.linkedCharacterIds, 'Nenhum personagem disponível.');
+  renderChecklist(
+    refs.shotContinuityReferenceLinks,
+    continuityReferenceItems,
+    shot?.continuityReferenceIds,
+    'Nenhuma referência canônica marcada.'
+  );
+
+  refs.shotTimeline.innerHTML = '';
+  if (!filteredShots.length) {
+    refs.shotTimeline.innerHTML = '<div class="sp-empty">Nenhum shot corresponde ao filtro atual.</div>';
+  } else {
+    filteredShots.forEach((entry) => {
+      const context = plannerShotContext(entry);
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `sp-shot-item${entry.id === refs.shotSelect.value ? ' active' : ''}`;
+      const previous = plannerSceneShots(entry.sceneId).find((shotItem) => shotItem.order === entry.order - 1);
+      const missingContinuity = previous
+        ? (previous.continuityMustKeep || []).filter(
+            (rule) =>
+              !(entry.continuityMustKeep || []).includes(rule) && !(entry.continuityMayVary || []).includes(rule)
+          )
+        : [];
+      item.innerHTML = `
+        <strong>${entry.order + 1}. ${entry.title}</strong>
+        <span class="sp-shot-meta">${context.chapter?.title || 'Sem capítulo'} · ${context.scene?.title || 'Sem cena'}${context.beat ? ` · ${context.beat.title}` : ''}</span>
+        <span class="sp-shot-detail">[${entry.status}] ${entry.shotType || 'plano livre'} · foco ${context.focus?.name || 'aberto'} · ${entry.dominantEmotion || 'emoção livre'}</span>
+        <span class="sp-shot-detail">${missingContinuity.length ? `⚠ revisar continuidade: ${missingContinuity.join(', ')}` : entry.narrativeObjective || 'Sem objetivo narrativo registrado.'}</span>
+      `;
+      item.addEventListener('click', () => {
+        refs.shotFilterScene.value = entry.sceneId;
+        refs.shotSelect.value = entry.id;
+        refs.shotBeatSelect.value = entry.beatId || '';
+        renderShotPlanner();
+      });
+      refs.shotTimeline.append(item);
+    });
+  }
+
+  if (!shot) {
+    refs.shotContinuityPreview.textContent = 'Nenhum shot selecionado.';
+    refs.shotProgressionPreview.textContent = 'Nenhum shot planejado.';
+    refs.shotComparisonPreview.textContent = 'Selecione um shot para comparar com o anterior e o próximo.';
+    setDisabled(
+      ['saveShotBtn', 'deleteShotBtn', 'moveShotUpBtn', 'moveShotDownBtn', 'applyShotTemplateBtn', 'applyShotLanguagePresetBtn'],
+      true
+    );
+    return;
+  }
+
+  const sceneShots = plannerSceneShots(shot.sceneId);
+  const shotIndex = sceneShots.findIndex((entry) => entry.id === shot.id);
+  const previous = shotIndex > 0 ? sceneShots[shotIndex - 1] : null;
+  const next = shotIndex >= 0 && shotIndex < sceneShots.length - 1 ? sceneShots[shotIndex + 1] : null;
+  const context = plannerShotContext(shot);
+  const continuityReferences = plannerSequenceReferenceNames(shot.continuityReferenceIds);
+  const missingContinuity = previous
+    ? (previous.continuityMustKeep || []).filter(
+        (rule) => !(shot.continuityMustKeep || []).includes(rule) && !(shot.continuityMayVary || []).includes(rule)
+      )
+    : [];
+  refs.shotContinuityPreview.textContent = JSON.stringify(
+    {
+      shot: shot.title,
+      status: shot.status,
+      keep: shot.continuityMustKeep,
+      mayVary: shot.continuityMayVary,
+      risks: shot.continuityRisks,
+      canonicalReferences: continuityReferences,
+      continuityIndicator: missingContinuity.length
+        ? `Atenção: herdar de ${previous?.title || 'shot anterior'} -> ${missingContinuity.join(', ')}`
+        : 'Continuidade básica preservada para a sequência atual.'
+    },
+    null,
+    2
+  );
+  refs.shotComparisonPreview.textContent = JSON.stringify(
+    {
+      previous: previous
+        ? {
+            title: previous.title,
+            shotType: previous.shotType,
+            emotion: previous.dominantEmotion,
+            objective: previous.narrativeObjective
+          }
+        : null,
+      current: {
+        title: shot.title,
+        beat: context.beat?.title || '',
+        shotType: shot.shotType,
+        emotion: shot.dominantEmotion,
+        objective: shot.narrativeObjective,
+        visualProgression: shot.visualProgression,
+        narrativeProgression: shot.narrativeProgression
+      },
+      next: next
+        ? {
+            title: next.title,
+            shotType: next.shotType,
+            emotion: next.dominantEmotion,
+            objective: next.narrativeObjective
+          }
+        : null
+    },
+    null,
+    2
+  );
+  refs.shotProgressionPreview.textContent = [
+    `${context.chapter?.title || 'Sem capítulo'} → ${context.scene?.title || 'Sem cena'} (${sceneShots.length} shots)`,
+    ...sceneShots.map((entry, index) => {
+      const entryContext = plannerShotContext(entry);
+      const prev = index > 0 ? sceneShots[index - 1] : null;
+      const transition = prev
+        ? `transição: ${prev.shotType || 'plano'} / ${prev.dominantEmotion || 'emoção'} → ${entry.shotType || 'plano'} / ${entry.dominantEmotion || 'emoção'}`
+        : 'transição: abertura da sequência';
+      return `${index + 1}. [${entry.status}] ${entry.title}${entryContext.beat ? ` · beat ${entryContext.beat.title}` : ''}\n   ${entry.shotType || 'plano livre'} · ${entry.cameraMovement || 'movimento livre'} · foco ${entryContext.focus?.name || 'aberto'}\n   objetivo: ${entry.narrativeObjective || '—'}\n   progressão: ${entry.visualProgression || entry.narrativeProgression || transition}`;
+    })
+  ].join('\n\n');
+
+  setDisabled(
+    ['saveShotBtn', 'deleteShotBtn', 'applyShotTemplateBtn', 'applyShotLanguagePresetBtn'],
+    false
+  );
+  setDisabled(['moveShotUpBtn'], shotIndex <= 0);
+  setDisabled(['moveShotDownBtn'], shotIndex < 0 || shotIndex >= sceneShots.length - 1);
+};
+
 const renderWorkspaceSettings = () => {
   const workspace = workspaceSettings();
   const directories = workspace.directories || {};
@@ -374,11 +960,13 @@ const render = () => {
   renderLoreEditor();
   renderSceneEditor();
   renderPromptEditor();
+  renderShotPlanner();
   renderWorkspaceSettings();
   renderLore();
   renderAssets();
 
   setDisabled(['createBookBtn', 'createCharacterBtn', 'createLoreBtn', 'createSceneBtn', 'saveAssetBtn'], !selectedProjectId());
+  setDisabled(['createBeatBtn', 'createShotBtn'], !selectedProjectId() || !plannerCurrentSceneId());
   setDisabled(['openCanonStudioBtn'], !selectedCharacterId() || !selectedProjectId());
   setDisabled(
     ['openPromptStudioBtn', 'createPromptDocumentBtn', 'openPromptStudioFromCharacterBtn', 'openPromptStudioFromSceneBtn'],
@@ -693,6 +1281,172 @@ $('generateVideoSpecBtn').addEventListener('click', () => {
   refs.videoSpec.textContent = JSON.stringify(spec, null, 2);
 });
 
+const plannerReindexSceneShots = (sceneId) => {
+  plannerSceneShots(sceneId).forEach((shot, index) => {
+    shot.order = index;
+    shot.updatedAt = new Date().toISOString();
+  });
+};
+
+$('createBeatBtn').addEventListener('click', () => {
+  const title = $('newBeatTitle').value.trim();
+  const sceneId = plannerCurrentSceneId();
+  const scene = state.scenes.find((entry) => entry.id === sceneId);
+  if (!title || !selectedProjectId() || !scene) return;
+
+  const beat = createBeat({
+    projectId: selectedProjectId(),
+    chapterId: scene.chapterId || UNASSIGNED_CHAPTER_ID,
+    sceneId: scene.id,
+    title,
+    summary: $('newBeatSummary').value.trim(),
+    order: plannerSceneBeats(scene.id).length
+  });
+  if (!state.beats) state.beats = [];
+  state.beats.push(beat);
+  setValue('newBeatTitle', '');
+  setValue('newBeatSummary', '');
+  persist();
+  refs.shotFilterScene.value = scene.id;
+  refs.shotBeatSelect.value = beat.id;
+  renderShotPlanner();
+});
+
+$('saveBeatBtn').addEventListener('click', () => {
+  const beat = currentBeat();
+  if (!beat) return;
+  beat.title = refs.beatTitleInput.value.trim() || beat.title;
+  beat.summary = refs.beatSummaryInput.value.trim();
+  beat.updatedAt = new Date().toISOString();
+  persist();
+});
+
+$('deleteBeatBtn').addEventListener('click', () => {
+  const beat = currentBeat();
+  if (!beat || !window.confirm(`Excluir o beat "${beat.title}" e soltar os shots ligados a ele?`)) return;
+  state = deleteEntity(state, 'beat', beat.id);
+  persist();
+});
+
+$('createShotBtn').addEventListener('click', () => {
+  const title = $('newShotTitle').value.trim();
+  const beat = currentBeat();
+  const sceneId = beat?.sceneId || plannerCurrentSceneId();
+  const scene = state.scenes.find((entry) => entry.id === sceneId);
+  if (!title || !selectedProjectId() || !scene) return;
+
+  let shot = createShot({
+    projectId: selectedProjectId(),
+    chapterId: scene.chapterId || UNASSIGNED_CHAPTER_ID,
+    sceneId: scene.id,
+    beatId: beat?.id || '',
+    title,
+    order: plannerSceneShots(scene.id).length,
+    status: 'idea'
+  });
+  shot = applyShotTemplate(shot, refs.shotTemplateSelect.value);
+  shot = applyShotLanguagePreset(shot, refs.shotLanguagePresetSelect.value);
+  if (!state.shots) state.shots = [];
+  state.shots.push(shot);
+  setValue('newShotTitle', '');
+  persist();
+  refs.shotFilterScene.value = scene.id;
+  refs.shotSelect.value = shot.id;
+  refs.shotBeatSelect.value = shot.beatId || '';
+  renderShotPlanner();
+});
+
+$('applyShotTemplateBtn').addEventListener('click', () => {
+  const shot = currentShot();
+  if (!shot) return;
+  Object.assign(shot, applyShotTemplate(shot, refs.shotTemplateSelect.value), {
+    updatedAt: new Date().toISOString()
+  });
+  persist();
+});
+
+$('applyShotLanguagePresetBtn').addEventListener('click', () => {
+  const shot = currentShot();
+  if (!shot) return;
+  Object.assign(shot, applyShotLanguagePreset(shot, refs.shotLanguagePresetSelect.value), {
+    updatedAt: new Date().toISOString()
+  });
+  persist();
+});
+
+$('saveShotBtn').addEventListener('click', () => {
+  const shot = currentShot();
+  if (!shot) return;
+  const scene = state.scenes.find((entry) => entry.id === shot.sceneId);
+  shot.beatId = refs.shotBeatSelect.value || '';
+  shot.chapterId = scene?.chapterId || shot.chapterId || UNASSIGNED_CHAPTER_ID;
+  shot.title = refs.shotTitleInput.value.trim() || shot.title;
+  shot.status = refs.shotStatusSelect.value;
+  shot.shotType = refs.shotTypeInput.value.trim();
+  shot.angle = refs.shotAngleInput.value.trim();
+  shot.cameraMovement = refs.shotCameraMovementInput.value.trim();
+  shot.focusCharacterId = refs.shotFocusCharacterSelect.value || '';
+  shot.dominantEmotion = refs.shotDominantEmotionInput.value.trim();
+  shot.environment = refs.shotEnvironmentInput.value.trim();
+  shot.narrativeObjective = refs.shotNarrativeObjectiveInput.value.trim();
+  shot.pacingIntensity = refs.shotPacingIntensityInput.value.trim();
+  shot.visualProgression = refs.shotVisualProgressionInput.value.trim();
+  shot.narrativeProgression = refs.shotNarrativeProgressionInput.value.trim();
+  shot.directorNotes = refs.shotDirectorNotes.value.trim();
+  shot.promptDocumentIds = checkedValues(refs.shotPromptLinks);
+  shot.generationOutputIds = checkedValues(refs.shotOutputLinks);
+  shot.videoAssetIds = checkedValues(refs.shotVideoLinks);
+  shot.referenceImageIds = checkedValues(refs.shotReferenceLinks);
+  shot.linkedCharacterIds = checkedValues(refs.shotCharacterLinks);
+  shot.continuityReferenceIds = checkedValues(refs.shotContinuityReferenceLinks);
+  shot.continuityMustKeep = parseLines(refs.shotContinuityKeep.value);
+  shot.continuityMayVary = parseLines(refs.shotContinuityVary.value);
+  shot.continuityRisks = parseLines(refs.shotContinuityRisks.value);
+  shot.updatedAt = new Date().toISOString();
+  persist();
+});
+
+$('deleteShotBtn').addEventListener('click', () => {
+  const shot = currentShot();
+  if (!shot || !window.confirm(`Excluir o shot "${shot.title}"?`)) return;
+  const sceneId = shot.sceneId;
+  state = deleteEntity(state, 'shot', shot.id);
+  plannerReindexSceneShots(sceneId);
+  persist();
+});
+
+$('moveShotUpBtn').addEventListener('click', () => {
+  const shot = currentShot();
+  if (!shot) return;
+  const sceneShots = plannerSceneShots(shot.sceneId);
+  const index = sceneShots.findIndex((entry) => entry.id === shot.id);
+  if (index <= 0) return;
+  const previous = sceneShots[index - 1];
+  const currentOrder = shot.order;
+  shot.order = previous.order;
+  previous.order = currentOrder;
+  plannerReindexSceneShots(shot.sceneId);
+  persist();
+  refs.shotSelect.value = shot.id;
+  renderShotPlanner();
+});
+
+$('moveShotDownBtn').addEventListener('click', () => {
+  const shot = currentShot();
+  if (!shot) return;
+  const sceneShots = plannerSceneShots(shot.sceneId);
+  const index = sceneShots.findIndex((entry) => entry.id === shot.id);
+  if (index < 0 || index >= sceneShots.length - 1) return;
+  const next = sceneShots[index + 1];
+  const currentOrder = shot.order;
+  shot.order = next.order;
+  next.order = currentOrder;
+  plannerReindexSceneShots(shot.sceneId);
+  persist();
+  refs.shotSelect.value = shot.id;
+  renderShotPlanner();
+});
+
 $('exportDataBtn').addEventListener('click', async () => {
   const payload = JSON.stringify(state, null, 2);
   const filename = 'pixie-sunny-studio-backup.json';
@@ -754,6 +1508,20 @@ refs.chapterSelect.addEventListener('change', render);
 refs.characterSelect.addEventListener('change', render);
 refs.loreSelect.addEventListener('change', render);
 refs.sceneSelect.addEventListener('change', render);
+refs.shotFilterChapter.addEventListener('change', () => {
+  refs.shotFilterScene.value = '';
+  refs.shotBeatSelect.value = '';
+  renderShotPlanner();
+});
+refs.shotFilterScene.addEventListener('change', () => {
+  refs.shotBeatSelect.value = '';
+  renderShotPlanner();
+});
+refs.shotFilterCharacter.addEventListener('change', renderShotPlanner);
+refs.shotFilterStatus.addEventListener('change', renderShotPlanner);
+refs.shotFilterType.addEventListener('change', renderShotPlanner);
+refs.shotBeatSelect.addEventListener('change', renderShotPlanner);
+refs.shotSelect.addEventListener('change', renderShotPlanner);
 $('loreSearch').addEventListener('input', renderLore);
 
 // =========== Writer Studio ===========

@@ -27,6 +27,7 @@ python -m http.server 8080
   - capítulos
   - personagens (com traços canônicos + prompt mestre + negative prompt)
   - cenas
+  - beats e shots com status editorial
   - memória/lore
   - assets locais (imagem/vídeo/referências)
 - sugestão inicial de escrita baseada em capítulo + lore + personagens
@@ -37,6 +38,11 @@ python -m http.server 8080
 - saídas estruturadas: prompt mestre, negative prompt, versão curta/detalhada, prompt visual/cinematográfico
 - presets de estilo, preset cinematográfico e preset de lente/luz
 - histórico/versionamento local de prompts, duplicação, favorito/oficial e exportação `.txt`/`.json`
+- **Shot Planner** local-first com organização por capítulo → cena → beat → shot
+- camada de **continuidade visual** com campos de preservar/variar/riscos e referências canônicas da sequência
+- associação pragmática entre shot e prompts, outputs de imagem aprovados/canônicos, vídeos locais, referências visuais e personagens
+- filtros por personagem, cena, capítulo, status editorial e tipo de plano
+- progressão visual/narrativa da sequência e comparação contextual entre shot anterior/atual/próximo
 - exportação/importação de backup JSON
 - limpeza automática de dados órfãos ao importar backups ou remover entidades relacionadas
 
@@ -74,6 +80,7 @@ A aplicação agora inclui um shell de configuração local em **Mac Local Works
   - `settings/app-settings.json`
 - portabilidade: use **Exportar JSON** para gerar um backup e **Importar JSON** para restaurar em outro navegador ou máquina
 - integridade: imports inválidos são saneados e registros órfãos são descartados para manter a hierarquia projeto → livro → capítulo → cena consistente
+- planejamento visual também é persistido localmente no mesmo estado, em `beats` e `shots`, preservando ordem de cena, vínculos editoriais e continuidade
 - prompts estruturados ficam em `promptDocuments` no mesmo estado local-first, incluindo:
   - alvo (`character` ou `scene`)
   - modo (`image` ou `video`)
@@ -120,6 +127,42 @@ A aplicação agora inclui um shell de configuração local em **Mac Local Works
 - use **Exportar texto** para gerar um `.txt` pronto para workflows locais
 - use **Exportar JSON** para exportar o documento ativo com metadados e versão atual
 - a exportação global do app continua disponível via backup JSON na barra superior
+
+## Shot Planner + Continuidade Visual
+
+O app agora dá o passo de **assets isolados para sequência planejada**:
+
+- use o bloco **Shot Planner & Continuidade Visual** para navegar por capítulo, cena, personagem, status e tipo de plano
+- crie **beats** para estruturar a intenção dramática da cena e depois adicione **shots** em ordem editorial
+- cada shot registra:
+  - tipo de plano
+  - ângulo
+  - movimento de câmera
+  - personagem em foco
+  - emoção dominante
+  - ambiente
+  - objetivo narrativo
+  - ritmo/intensidade
+  - notas do diretor
+  - progressão visual e narrativa
+- vincule cada shot aos artefatos já existentes do pipeline local-first:
+  - `promptDocuments`
+  - outputs de imagem revisados/canônicos
+  - vídeos locais em `assets`
+  - referências visuais em `referenceImages`
+  - personagens canônicos
+- use os campos de continuidade para marcar:
+  - o que precisa permanecer igual
+  - o que pode variar
+  - riscos de quebra
+  - referências canônicas da sequência
+
+### Como isso conecta com o pipeline já existente
+
+- **Prompt Builder** segue sendo a origem dos prompts estruturados que podem ser ligados diretamente ao shot
+- **Image Review + Canon Promotion** fornece imagens aprovadas/canônicas para ancorar continuidade entre shots
+- **Image-to-Video / assets locais** podem ser associados a shots específicos para manter histórico audiovisual da sequência
+- tudo continua **local-first e Mac-first**, sem backend SaaS, reaproveitando o mesmo storage estruturado do projeto
 
 ## Estrutura do projeto
 
