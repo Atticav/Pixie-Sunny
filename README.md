@@ -227,6 +227,30 @@ O app agora registra e navega decisões editoriais/operacionais por item:
 - eventos de canon e referências conectam Story Bible, Character Canon, Reference Studio, Prompt/Briefing, Production Board e Consistency flows por escopos relacionados
 - tudo segue **local-first e Mac-first**, sem backend SaaS
 
+## Asset Version Lineage / Supersession Graph
+
+O app agora inclui uma camada estrutural de evolução de assets/outputs para visualizar cadeia de versões, supersessão e origem editorial:
+
+- modela e exibe relações de:
+  - `original`
+  - `derived / variant`
+  - `candidate`
+  - `approved version`
+  - `superseded version`
+  - `canon-promoted version`
+  - `deprecated / archived branch`
+- destaca `current official` e `source of truth` por projeto/fluxo de revisão
+- permite navegar predecessores e sucessores diretamente da aba de lineage para a revisão detalhada
+- aplica filtros por tipo de asset e status de versão para inspeção rápida
+
+### Onde usar no app
+
+- no **Image Review Studio**, nova aba **Lineage / Supersession** para navegar o grafo incremental de evolução
+- integração direta com **Approval & Decision History** (eventos `supersede`, `approve`, `promote_to_canon`)
+- integração com **Image Review + Canon Promotion** e **Reference Studio** via marcadores de canon e promoções
+- base pronta para timeline editorial, ancestry/diff viewer e governança visual mais forte em próximos PRs
+- arquitetura segue **local-first no MacBook**, sem backend SaaS
+
 ## Estrutura do projeto
 
 - `index.html`: interface inicial utilizável
@@ -235,6 +259,7 @@ O app agora registra e navega decisões editoriais/operacionais por item:
 - `src/store.js`: persistência local-first
 - `src/local-workspace.js`: camada de filesystem/storage local e convenções de diretório Mac-first
 - `src/assistant.js`: fluxos de escrita/memória, geração local de prompts, specs e presets
+- `src/asset-lineage.js`: construção local do grafo de lineage/supersession de versões de assets
 - `src/pipelines.js`: integração futura com geradores locais
 - `src/pipelines.md`: guia de extensão de pipeline
 - `tests/store.test.js`: testes focados em persistência e busca de lore

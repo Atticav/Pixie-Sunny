@@ -1089,6 +1089,7 @@
         <button class="irs-tab irs-tab-active" id="irsTabBtnReview">Revisão</button>
         <button class="irs-tab" id="irsTabBtnPromotions">Promoções Canônicas</button>
         <button class="irs-tab" id="irsTabBtnDecisions">Histórico de Decisões</button>
+        <button class="irs-tab" id="irsTabBtnLineage">Lineage / Supersession</button>
       </nav>
 
       <!-- Review Tab -->
@@ -1293,6 +1294,51 @@
 
           <div id="irsDecisionList" class="irs-decision-list">
             <p class="irs-hint">Nenhum evento de decisão registrado ainda.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lineage / Supersession Tab -->
+      <div id="irsTabLineage" class="irs-panel irs-hidden">
+        <div class="irs-promotions-list-area">
+          <div class="irs-promotions-header">
+            <h3 class="irs-promotions-section-title">Asset Version Lineage / Supersession Graph</h3>
+            <span id="irsLineageCount" style="font-size:0.78rem;color:var(--muted)"></span>
+          </div>
+
+          <div class="irs-decision-filters">
+            <label>Tipo de asset
+              <select id="irsLineageTypeFilter">
+                <option value="">Todos</option>
+                <option value="character">Personagem</option>
+                <option value="scene">Cena</option>
+                <option value="environment">Ambiente</option>
+                <option value="portrait">Retrato</option>
+                <option value="variation">Variação</option>
+              </select>
+            </label>
+            <label>Status de versão
+              <select id="irsLineageStatusFilter">
+                <option value="">Todos</option>
+                <option value="original">Original</option>
+                <option value="derived_variant">Derived / Variant</option>
+                <option value="candidate">Candidate</option>
+                <option value="approved_version">Approved version</option>
+                <option value="superseded_version">Superseded version</option>
+                <option value="canon_promoted_version">Canon-promoted version</option>
+                <option value="deprecated_archived_branch">Deprecated / archived branch</option>
+              </select>
+            </label>
+            <label class="irs-filter-check">
+              <input type="checkbox" id="irsLineageOfficialOnly" />
+              Apenas chain oficial/source of truth
+            </label>
+            <button id="irsLineageApplyBtn" class="irs-apply-btn">Aplicar</button>
+          </div>
+
+          <div id="irsLineageSummary" class="irs-lineage-summary"></div>
+          <div id="irsLineageList" class="irs-lineage-list">
+            <p class="irs-hint">Nenhum lineage disponível ainda. Gere e revise outputs para criar versões.</p>
           </div>
         </div>
       </div>
