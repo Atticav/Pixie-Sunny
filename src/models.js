@@ -60,13 +60,35 @@ export const createBook = ({ projectId, title, synopsis = '' }) => ({
   updatedAt: nowUtc()
 });
 
-export const createChapter = ({ projectId, bookId, title, summary = '', content = '' }) => ({
+export const CHAPTER_STATUSES = ['rascunho', 'revisão', 'finalizado'];
+
+export const createChapter = ({
+  projectId,
+  bookId,
+  title,
+  summary = '',
+  content = '',
+  status = 'rascunho',
+  notes = '',
+  goal = '',
+  conflict = '',
+  presentCharacters = [],
+  continuity = '',
+  wordGoal = 0
+}) => ({
   id: newId(),
   projectId,
   bookId,
   title,
   summary,
   content,
+  status,
+  notes,
+  goal,
+  conflict,
+  presentCharacters: stringList(presentCharacters),
+  continuity,
+  wordGoal: typeof wordGoal === 'number' && wordGoal >= 0 ? Math.floor(wordGoal) : 0,
   createdAt: nowUtc(),
   updatedAt: nowUtc()
 });
@@ -159,6 +181,7 @@ const normalizeChapter = (chapter) => {
   const value = recordValue(chapter);
   if (!value || !hasRequiredFields(value, ['id', 'projectId', 'bookId'])) return null;
   const createdAt = stringValue(value.createdAt) || nowUtc();
+  const rawStatus = stringValue(value.status);
   return {
     id: value.id,
     projectId: value.projectId,
@@ -166,6 +189,13 @@ const normalizeChapter = (chapter) => {
     title: stringValue(value.title, 'Capítulo sem título'),
     summary: stringValue(value.summary),
     content: stringValue(value.content),
+    status: CHAPTER_STATUSES.includes(rawStatus) ? rawStatus : 'rascunho',
+    notes: stringValue(value.notes),
+    goal: stringValue(value.goal),
+    conflict: stringValue(value.conflict),
+    presentCharacters: stringList(value.presentCharacters),
+    continuity: stringValue(value.continuity),
+    wordGoal: typeof value.wordGoal === 'number' && value.wordGoal >= 0 ? Math.floor(value.wordGoal) : 0,
     createdAt,
     updatedAt: stringValue(value.updatedAt) || createdAt
   };

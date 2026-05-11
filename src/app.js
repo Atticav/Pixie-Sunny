@@ -176,7 +176,7 @@ const renderChapterEditor = () => {
   setValue('chapterTitleInput', chapter?.title);
   setValue('chapterSummaryInput', chapter?.summary);
   refs.chapterContent.value = chapter?.content || '';
-  setDisabled(['saveChapterBtn', 'deleteChapterBtn', 'suggestTextBtn'], !chapter);
+  setDisabled(['saveChapterBtn', 'deleteChapterBtn', 'suggestTextBtn', 'openWriterStudioBtn'], !chapter);
 };
 
 const renderCharacterEditor = () => {
@@ -542,5 +542,268 @@ refs.characterSelect.addEventListener('change', render);
 refs.loreSelect.addEventListener('change', render);
 refs.sceneSelect.addEventListener('change', render);
 $('loreSearch').addEventListener('input', renderLore);
+
+// =========== Writer Studio ===========
+
+const AUTOSAVE_DELAY = 1500;
+let autoSaveTimer = null;
+let wsIsOpen = false;
+
+const wsRefs = {
+  overlay: $('writerStudio'),
+  closeBtn: $('wsCloseBtn'),
+  focusBtn: $('wsFocusBtn'),
+  body: $('wsBody'),
+  chapterTitle: $('wsChapterTitle'),
+  autosaveIndicator: $('wsAutosaveIndicator'),
+  statusSelect: $('wsStatusSelect'),
+  projectSelect: $('wsProjectSelect'),
+  bookSelect: $('wsBookSelect'),
+  chapterSelect: $('wsChapterSelect'),
+  summary: $('wsSummary'),
+  goal: $('wsGoal'),
+  conflict: $('wsConflict'),
+  presentCharacters: $('wsPresentCharacters'),
+  continuity: $('wsContinuity'),
+  wordGoal: $('wsWordGoal'),
+  notes: $('wsNotes'),
+  metaSaveBtn: $('wsMetaSaveBtn'),
+  content: $('wsContent'),
+  wordCountDisplay: $('wsWordCountDisplay'),
+  goalDisplay: $('wsGoalDisplay'),
+  progressFill: $('wsProgressFill'),
+  characterList: $('wsCharacterList'),
+  loreSearch: $('wsLoreSearch'),
+  loreList: $('wsLoreList'),
+  sceneList: $('wsSceneList'),
+  leftToggle: $('wsLeftToggle'),
+  rightToggle: $('wsRightToggle'),
+  sidebarLeft: $('wsSidebarLeft'),
+  sidebarRight: $('wsSidebarRight')
+};
+
+const countWords = (text) => {
+  if (!text || !text.trim()) return 0;
+  return text.trim().split(/\s+/).length;
+};
+
+const formatTime = () =>
+  new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+const wsSetAutosaveStatus = (status) => {
+  wsRefs.autosaveIndicator.className = `ws-autosave ${status}`;
+  wsRefs.autosaveIndicator.textContent =
+    status === 'saving' ? 'Salvando...' : `✓ Salvo às ${formatTime()}`;
+};
+
+const wsUpdateWordCount = () => {
+  const text = wsRefs.content.value;
+  const words = countWords(text);
+  const chars = text.length;
+  wsRefs.wordCountDisplay.textContent = `${words.toLocaleString('pt-BR')} palavras · ${chars.toLocaleString('pt-BR')} caracteres`;
+  const chapter = currentChapter();
+  const goal = chapter?.wordGoal || 0;
+  if (goal > 0) {
+    const percent = Math.min(100, Math.round((words / goal) * 100));
+    wsRefs.progressFill.style.width = `${percent}%`;
+    wsRefs.goalDisplay.textContent = `${percent}% da meta (${goal.toLocaleString('pt-BR')} palavras)`;
+  } else {
+    wsRefs.progressFill.style.width = '0%';
+    wsRefs.goalDisplay.textContent = '';
+  }
+};
+
+const wsRenderLoreContext = () => {
+  const query = wsRefs.loreSearch.value;
+  const entries = searchLore(projectLore(), query);
+  wsRefs.loreList.innerHTML = '';
+  if (entries.length) {
+    entries.forEach((entry) => {
+      const li = document.createElement('li');
+      const tags = entry.tags.length ? ` [${entry.tags.join(', ')}]` : '';
+      const preview = entry.content.length > 100 ? `${entry.content.slice(0, 100)}…` : entry.content;
+      li.innerHTML = `<strong>${entry.title}${tags}</strong>${preview}`;
+      wsRefs.loreList.append(li);
+    });
+  } else {
+    const li = document.createElement('li');
+    li.textContent = 'Nenhuma entrada encontrada.';
+    wsRefs.loreList.append(li);
+  }
+};
+
+const wsRenderContext = () => {
+  const characters = projectCharacters();
+  wsRefs.characterList.innerHTML = '';
+  if (characters.length) {
+    characters.forEach((char) => {
+      const li = document.createElement('li');
+      const note = char.notes ? (char.notes.length > 80 ? `${char.notes.slice(0, 80)}…` : char.notes) : '';
+      li.innerHTML = `<strong>${char.name}</strong>${note}`;
+      wsRefs.characterList.append(li);
+    });
+  } else {
+    const li = document.createElement('li');
+    li.textContent = 'Nenhum personagem cadastrado.';
+    wsRefs.characterList.append(li);
+  }
+
+  wsRenderLoreContext();
+
+  const scenes = projectScenes();
+  wsRefs.sceneList.innerHTML = '';
+  if (scenes.length) {
+    scenes.forEach((scene) => {
+      const li = document.createElement('li');
+      const loc = scene.location ? ` — ${scene.location}` : '';
+      li.innerHTML = `<strong>${scene.title}</strong>${loc}`;
+      wsRefs.sceneList.append(li);
+    });
+  } else {
+    const li = document.createElement('li');
+    li.textContent = 'Nenhuma cena neste capítulo.';
+    wsRefs.sceneList.append(li);
+  }
+};
+
+const wsPopulateNavigation = () => {
+  renderOptions(wsRefs.projectSelect, state.projects, selectedProjectId(), 'Nenhum projeto');
+  renderOptions(wsRefs.bookSelect, projectBooks(), selectedBookId(), 'Nenhum livro');
+  renderOptions(wsRefs.chapterSelect, projectChapters(), selectedChapterId(), 'Nenhum capítulo');
+};
+
+const wsRenderMeta = () => {
+  const chapter = currentChapter();
+  wsRefs.chapterTitle.textContent = chapter?.title || '—';
+  wsRefs.summary.value = chapter?.summary || '';
+  wsRefs.goal.value = chapter?.goal || '';
+  wsRefs.conflict.value = chapter?.conflict || '';
+  wsRefs.presentCharacters.value = Array.isArray(chapter?.presentCharacters)
+    ? chapter.presentCharacters.join(', ')
+    : '';
+  wsRefs.continuity.value = chapter?.continuity || '';
+  wsRefs.wordGoal.value = chapter?.wordGoal || '';
+  wsRefs.notes.value = chapter?.notes || '';
+  wsRefs.statusSelect.value = chapter?.status || 'rascunho';
+  wsRefs.content.value = chapter?.content || '';
+};
+
+const wsAutoSave = () => {
+  const chapter = currentChapter();
+  if (!chapter) return;
+  chapter.content = wsRefs.content.value;
+  chapter.updatedAt = new Date().toISOString();
+  state = store.save(state);
+  wsSetAutosaveStatus('saved');
+};
+
+const wsScheduleAutoSave = () => {
+  wsSetAutosaveStatus('saving');
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    wsAutoSave();
+    autoSaveTimer = null;
+  }, AUTOSAVE_DELAY);
+};
+
+const openWriterStudio = () => {
+  const chapter = currentChapter();
+  if (!chapter) return;
+  wsIsOpen = true;
+  wsPopulateNavigation();
+  wsRenderMeta();
+  wsUpdateWordCount();
+  wsRenderContext();
+  wsRefs.overlay.classList.remove('ws-hidden');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => wsRefs.content.focus(), 50);
+};
+
+const closeWriterStudio = () => {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+    wsAutoSave();
+  }
+  wsIsOpen = false;
+  wsRefs.overlay.classList.add('ws-hidden');
+  document.body.style.overflow = '';
+  render();
+};
+
+$('openWriterStudioBtn').addEventListener('click', openWriterStudio);
+
+wsRefs.closeBtn.addEventListener('click', closeWriterStudio);
+
+wsRefs.focusBtn.addEventListener('click', () => {
+  wsRefs.body.classList.toggle('focus-mode');
+  const isFocus = wsRefs.body.classList.contains('focus-mode');
+  wsRefs.focusBtn.textContent = isFocus ? '⊞' : '⊡';
+  wsRefs.focusBtn.title = isFocus ? 'Sair do modo foco' : 'Modo foco';
+});
+
+wsRefs.content.addEventListener('input', () => {
+  wsUpdateWordCount();
+  wsScheduleAutoSave();
+});
+
+wsRefs.statusSelect.addEventListener('change', () => {
+  const chapter = currentChapter();
+  if (!chapter) return;
+  chapter.status = wsRefs.statusSelect.value;
+  chapter.updatedAt = new Date().toISOString();
+  state = store.save(state);
+  wsSetAutosaveStatus('saved');
+});
+
+wsRefs.metaSaveBtn.addEventListener('click', () => {
+  const chapter = currentChapter();
+  if (!chapter) return;
+  chapter.summary = wsRefs.summary.value.trim();
+  chapter.goal = wsRefs.goal.value.trim();
+  chapter.conflict = wsRefs.conflict.value.trim();
+  chapter.presentCharacters = parseTags(wsRefs.presentCharacters.value);
+  chapter.continuity = wsRefs.continuity.value.trim();
+  chapter.wordGoal = parseInt(wsRefs.wordGoal.value, 10) || 0;
+  chapter.notes = wsRefs.notes.value.trim();
+  chapter.updatedAt = new Date().toISOString();
+  state = store.save(state);
+  wsSetAutosaveStatus('saved');
+  wsUpdateWordCount();
+});
+
+wsRefs.loreSearch.addEventListener('input', wsRenderLoreContext);
+
+wsRefs.projectSelect.addEventListener('change', () => {
+  refs.projectSelect.value = wsRefs.projectSelect.value;
+  renderOptions(wsRefs.bookSelect, projectBooks(), '', 'Nenhum livro');
+  refs.bookSelect.value = wsRefs.bookSelect.value;
+  renderOptions(wsRefs.chapterSelect, projectChapters(), '', 'Nenhum capítulo');
+  refs.chapterSelect.value = wsRefs.chapterSelect.value;
+  wsRenderMeta();
+  wsUpdateWordCount();
+  wsRenderContext();
+});
+
+wsRefs.bookSelect.addEventListener('change', () => {
+  refs.bookSelect.value = wsRefs.bookSelect.value;
+  renderOptions(wsRefs.chapterSelect, projectChapters(), '', 'Nenhum capítulo');
+  refs.chapterSelect.value = wsRefs.chapterSelect.value;
+  wsRenderMeta();
+  wsUpdateWordCount();
+  wsRenderContext();
+});
+
+wsRefs.chapterSelect.addEventListener('change', () => {
+  refs.chapterSelect.value = wsRefs.chapterSelect.value;
+  wsRenderMeta();
+  wsUpdateWordCount();
+  wsRenderContext();
+  wsSetAutosaveStatus('saved');
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && wsIsOpen) closeWriterStudio();
+});
 
 render();

@@ -67,6 +67,7 @@
           <div class="inline-actions">
             <button id="saveChapterBtn">Salvar capítulo</button>
             <button id="deleteChapterBtn">Excluir capítulo</button>
+            <button id="openWriterStudioBtn" class="open-studio-btn">✍ Estúdio de Escrita</button>
             <button id="suggestTextBtn">Sugestão de escrita</button>
           </div>
           <pre id="writingSuggestion"></pre>
@@ -158,6 +159,109 @@
         Extensões prontas: conectar runner local de imagem/vídeo em <code>src/pipelines.js</code>.
       </small>
     </footer>
+
+    <div id="writerStudio" class="ws-overlay ws-hidden" role="dialog" aria-label="Estúdio de Escrita">
+      <header class="ws-header">
+        <div class="ws-header-left">
+          <button id="wsCloseBtn" class="ws-back-btn">← Voltar</button>
+          <button id="wsFocusBtn" class="ws-icon-btn" title="Modo foco">⊡</button>
+        </div>
+        <div class="ws-header-center">
+          <span id="wsChapterTitle" class="ws-chapter-title">—</span>
+        </div>
+        <div class="ws-header-right">
+          <select id="wsStatusSelect" class="ws-status-select" title="Status do capítulo">
+            <option value="rascunho">✏ Rascunho</option>
+            <option value="revisão">🔍 Revisão</option>
+            <option value="finalizado">✓ Finalizado</option>
+          </select>
+          <span id="wsAutosaveIndicator" class="ws-autosave">✓ Salvo</span>
+        </div>
+      </header>
+
+      <div class="ws-body" id="wsBody">
+        <!-- Left sidebar: navigation + chapter meta -->
+        <aside class="ws-sidebar ws-sidebar-left" id="wsSidebarLeft">
+          <div class="ws-sidebar-inner">
+            <section class="ws-nav-section">
+              <h3 class="ws-section-title">Navegação</h3>
+              <label class="ws-label">Projeto
+                <select id="wsProjectSelect"></select>
+              </label>
+              <label class="ws-label">Livro
+                <select id="wsBookSelect"></select>
+              </label>
+              <label class="ws-label">Capítulo
+                <select id="wsChapterSelect"></select>
+              </label>
+            </section>
+
+            <section class="ws-meta-section">
+              <h3 class="ws-section-title">Metadados</h3>
+              <label class="ws-label">Resumo
+                <textarea id="wsSummary" rows="3" placeholder="Resumo do capítulo..."></textarea>
+              </label>
+              <label class="ws-label">Objetivo da cena
+                <textarea id="wsGoal" rows="2" placeholder="O que precisa acontecer?"></textarea>
+              </label>
+              <label class="ws-label">Conflito
+                <textarea id="wsConflict" rows="2" placeholder="Conflito principal..."></textarea>
+              </label>
+              <label class="ws-label">Personagens presentes
+                <input id="wsPresentCharacters" type="text" placeholder="Nomes, separados por vírgula" />
+              </label>
+              <label class="ws-label">Continuidade
+                <textarea id="wsContinuity" rows="2" placeholder="Conexão com capítulos anteriores/próximos..."></textarea>
+              </label>
+              <label class="ws-label">Meta de palavras
+                <input id="wsWordGoal" type="number" min="0" placeholder="0" />
+              </label>
+              <label class="ws-label">Notas do capítulo
+                <textarea id="wsNotes" rows="4" placeholder="Notas, ideias, lembretes..."></textarea>
+              </label>
+              <button id="wsMetaSaveBtn">Salvar metadados</button>
+            </section>
+          </div>
+          <button class="ws-sidebar-toggle" id="wsLeftToggle" title="Recolher painel">‹</button>
+        </aside>
+
+        <!-- Main writing editor -->
+        <main class="ws-editor-area">
+          <div class="ws-progress-bar">
+            <div class="ws-progress-fill" id="wsProgressFill"></div>
+          </div>
+          <textarea id="wsContent" class="ws-content-editor" placeholder="Escreva aqui...&#10;&#10;O texto é salvo automaticamente."></textarea>
+          <div class="ws-editor-footer">
+            <span id="wsWordCountDisplay">0 palavras · 0 caracteres</span>
+            <span id="wsGoalDisplay"></span>
+          </div>
+        </main>
+
+        <!-- Right sidebar: narrative context -->
+        <aside class="ws-sidebar ws-sidebar-right" id="wsSidebarRight">
+          <button class="ws-sidebar-toggle ws-right-toggle" id="wsRightToggle" title="Recolher painel">›</button>
+          <div class="ws-sidebar-inner">
+            <h3 class="ws-section-title">Contexto narrativo</h3>
+
+            <details open class="ws-context-section">
+              <summary>Personagens</summary>
+              <ul id="wsCharacterList" class="ws-context-list"></ul>
+            </details>
+
+            <details open class="ws-context-section">
+              <summary>Lore relevante</summary>
+              <input id="wsLoreSearch" class="ws-search-input" placeholder="Buscar lore..." />
+              <ul id="wsLoreList" class="ws-context-list"></ul>
+            </details>
+
+            <details class="ws-context-section">
+              <summary>Cenas deste capítulo</summary>
+              <ul id="wsSceneList" class="ws-context-list"></ul>
+            </details>
+          </div>
+        </aside>
+      </div>
+    </div>
 
     <script type="module" src="./src/app.js"></script>
   </body>
