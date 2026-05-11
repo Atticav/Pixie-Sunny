@@ -111,18 +111,23 @@ export const buildAssistivePlanningBundle = ({
       const sceneShots = shots.filter((shot) => shot.sceneId === scene.id);
       const scenePrompts = prompts.filter((prompt) => prompt.targetType === 'scene' && prompt.targetId === scene.id);
       const sceneOutputs = outputs.filter((output) => output.sceneId === scene.id);
+      const sceneCharacterIds = new Set(
+        sceneShots
+          .flatMap((shot) => [shot.focusCharacterId, ...safeArray(shot.linkedCharacterIds)])
+          .filter(Boolean)
+      );
       const sceneReferences = references.filter(
         (reference) =>
           reference.linkedEntityId === scene.id ||
-          reference.linkedEntityType === 'scene' ||
-          reference.type === 'scene' ||
-          reference.type === 'place'
+          (reference.linkedEntityType === 'scene' && !reference.linkedEntityId) ||
+          (sceneCharacterIds.size > 0 && sceneCharacterIds.has(reference.characterId))
       );
       const sceneBeats = beats.filter((beat) => beat.sceneId === scene.id);
       const unreviewed = sceneOutputs.filter(
         (output) => output.reviewStatus === 'unreviewed' || output.reviewStatus === 'candidate'
       );
       const canonical = sceneOutputs.filter((output) => output.isCanonical);
+      // score is 0-5 in this app; 1-2 is treated as low-fidelity canonical quality that needs attention.
       const lowScoreCanon = canonical.filter((output) => output.score > 0 && output.score <= 2);
       const conflictedCanon = canonical.filter(
         (output) => output.reviewStatus === 'rejected' || output.reviewStatus === 'archived'
@@ -137,6 +142,8 @@ export const buildAssistivePlanningBundle = ({
       const hasOutputs = sceneOutputs.length > 0;
       const hasCanonical = canonical.length > 0;
       const completeness = sceneCompleteness({ hasShots, hasPrompt, hasOutputs, hasCanonical });
+      // Heuristic weights tuned for practical ordering:
+      // 0.35 base scene importance, +0.09 per shot (editorial load), +0.08 per beat (narrative dependency breadth).
       const impact = Math.min(1, 0.35 + sceneShots.length * 0.09 + sceneBeats.length * 0.08);
       const inconsistencyRisk = Math.min(
         1,

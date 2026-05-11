@@ -1065,13 +1065,15 @@ const runAssistiveQuickAction = (action, card) => {
   }
 };
 
-refs.assistiveRecommendationList.addEventListener('click', (event) => {
-  const button = event.target.closest('button[data-action]');
-  if (!button) return;
-  const card = button.closest('.ap-card');
-  if (!card) return;
-  runAssistiveQuickAction(button.dataset.action, card);
-});
+if (refs.assistiveRecommendationList) {
+  refs.assistiveRecommendationList.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-action]');
+    if (!button) return;
+    const card = button.closest('.ap-card');
+    if (!card) return;
+    runAssistiveQuickAction(button.dataset.action, card);
+  });
+}
 
 const render = () => {
   renderOptions(refs.projectSelect, state.projects, selectedProjectId(), 'Crie seu primeiro projeto');
