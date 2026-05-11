@@ -74,6 +74,8 @@ const normalizeLocalWorkspaceSettings = (source) => {
 export const IMAGE_GEN_TYPES = ['character', 'scene', 'environment', 'portrait', 'variation'];
 export const IMAGE_GEN_STATUSES = ['pending', 'running', 'done', 'error'];
 export const IMAGE_GEN_PROVIDER_TYPES = ['mock', 'local-api'];
+export const OUTPUT_REVIEW_STATUSES = ['unreviewed', 'candidate', 'favorite', 'rejected', 'archived'];
+export const CANON_PROMOTION_TYPES = ['character', 'place', 'scene', 'aesthetic'];
 
 const baseImageGenSettings = () => ({
   type: 'mock',
@@ -139,6 +141,7 @@ export const emptyState = () => ({
   referenceImages: [],
   promptDocuments: [],
   generationJobs: [],
+  canonPromotions: [],
   settings: baseSettings()
 });
 
@@ -334,7 +337,11 @@ export const createGenerationOutput = ({
   localPath = '',
   fileName = '',
   generationType = 'character',
-  seed = -1
+  seed = -1,
+  reviewStatus = 'unreviewed',
+  isBestReference = false,
+  notes = '',
+  score = 0
 }) => ({
   id: newId(),
   projectId,
@@ -350,7 +357,33 @@ export const createGenerationOutput = ({
   seed,
   isFavorite: false,
   isCanonical: false,
+  reviewStatus: OUTPUT_REVIEW_STATUSES.includes(reviewStatus) ? reviewStatus : 'unreviewed',
+  isBestReference: Boolean(isBestReference),
+  notes: stringValue(notes),
+  score: typeof score === 'number' && score >= 0 && score <= 5 ? score : 0,
   createdAt: nowUtc()
+});
+
+export const createCanonPromotion = ({
+  projectId,
+  outputId,
+  jobId = '',
+  canonType,
+  targetId = '',
+  targetType = '',
+  reason = '',
+  notes = ''
+}) => ({
+  id: newId(),
+  projectId,
+  outputId,
+  jobId,
+  canonType: CANON_PROMOTION_TYPES.includes(canonType) ? canonType : 'character',
+  targetId: stringValue(targetId),
+  targetType: stringValue(targetType),
+  reason: stringValue(reason),
+  notes: stringValue(notes),
+  promotedAt: nowUtc()
 });
 
 export const createGenerationJob = ({
@@ -628,6 +661,7 @@ const normalizeAsset = (asset) => {
 const normalizeGenerationOutput = (output) => {
   const value = recordValue(output);
   if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
+  const rawReviewStatus = stringValue(value.reviewStatus);
   return {
     id: value.id,
     projectId: value.projectId,
@@ -645,6 +679,10 @@ const normalizeGenerationOutput = (output) => {
     seed: typeof value.seed === 'number' ? value.seed : -1,
     isFavorite: Boolean(value.isFavorite),
     isCanonical: Boolean(value.isCanonical),
+    reviewStatus: OUTPUT_REVIEW_STATUSES.includes(rawReviewStatus) ? rawReviewStatus : 'unreviewed',
+    isBestReference: Boolean(value.isBestReference),
+    notes: stringValue(value.notes),
+    score: typeof value.score === 'number' && value.score >= 0 && value.score <= 5 ? value.score : 0,
     createdAt: stringValue(value.createdAt) || nowUtc()
   };
 };
@@ -739,6 +777,24 @@ const normalizePromptDocument = (promptDocument) => {
   };
 };
 
+const normalizeCanonPromotion = (promotion) => {
+  const value = recordValue(promotion);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId', 'outputId'])) return null;
+  const rawCanonType = stringValue(value.canonType);
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    outputId: value.outputId,
+    jobId: stringValue(value.jobId),
+    canonType: CANON_PROMOTION_TYPES.includes(rawCanonType) ? rawCanonType : 'character',
+    targetId: stringValue(value.targetId),
+    targetType: stringValue(value.targetType),
+    reason: stringValue(value.reason),
+    notes: stringValue(value.notes),
+    promotedAt: stringValue(value.promotedAt) || nowUtc()
+  };
+};
+
 export const normalizeState = (raw) => {
   const value = recordValue(raw) || {};
   const settingsSource = recordValue(value.settings) || {};
@@ -787,6 +843,9 @@ export const normalizeState = (raw) => {
   const generationJobs = (Array.isArray(value.generationJobs) ? value.generationJobs : [])
     .map(normalizeGenerationJob)
     .filter((job) => job && projectIds.has(job.projectId));
+  const canonPromotions = (Array.isArray(value.canonPromotions) ? value.canonPromotions : [])
+    .map(normalizeCanonPromotion)
+    .filter((p) => p && projectIds.has(p.projectId));
 
   return {
     ...state,
@@ -800,6 +859,7 @@ export const normalizeState = (raw) => {
     referenceImages,
     promptDocuments,
     generationJobs,
+    canonPromotions,
     settings: {
       ...baseSettings(),
       ...settingsSource,
@@ -827,7 +887,8 @@ export const deleteEntity = (state, entityType, id) => {
       assets: current.assets.filter((asset) => asset.projectId !== id),
       referenceImages: current.referenceImages.filter((ref) => ref.projectId !== id),
       promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.projectId !== id),
-      generationJobs: current.generationJobs.filter((job) => job.projectId !== id)
+      generationJobs: current.generationJobs.filter((job) => job.projectId !== id),
+      canonPromotions: (current.canonPromotions || []).filter((p) => p.projectId !== id)
     });
   }
 
@@ -911,6 +972,13 @@ export const deleteEntity = (state, entityType, id) => {
 
   if (entityType === 'asset') {
     return { ...current, assets: current.assets.filter((asset) => asset.id !== id) };
+  }
+
+  if (entityType === 'canonPromotion') {
+    return {
+      ...current,
+      canonPromotions: (current.canonPromotions || []).filter((p) => p.id !== id)
+    };
   }
 
   return current;

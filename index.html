@@ -211,6 +211,7 @@
         <h2>Geração de Imagem Local</h2>
         <div class="stack">
           <button id="openImageGenStudioBtn" class="open-studio-btn">🖼 Abrir Estúdio de Geração</button>
+          <button id="openImageReviewStudioBtn" class="open-studio-btn">🔍 Revisão &amp; Canon de Imagens</button>
           <p class="storage-note">Gere imagens localmente no Mac usando prompts, personagens e referências do projeto. Requer Automatic1111 ou outro servidor local compatível com a API /sdapi/v1/txt2img, ou use o modo Mock para testar o workflow.</p>
         </div>
       </section>
@@ -801,6 +802,7 @@
                 <button id="igsDetailFavoriteBtn">☆ Favorito</button>
                 <button id="igsDetailCanonBtn">◇ Canônico</button>
                 <button id="igsDetailUseAsRefBtn" class="igs-primary-btn">📌 Usar como referência</button>
+                <button id="igsDetailReviewBtn" class="igs-primary-btn">🔍 Revisar</button>
                 <button id="igsDetailVariationBtn">🔁 Gerar variação</button>
                 <button id="igsDetailRegenerateBtn">🔂 Regenerar</button>
                 <button id="igsDetailDeleteBtn" class="igs-danger-btn">🗑 Remover</button>
@@ -896,6 +898,231 @@
               <p><strong>Dica para Mac:</strong> use <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui" target="_blank" rel="noopener noreferrer">stable-diffusion-webui</a> no Terminal com o script <code>webui.sh</code>. Na primeira execução, baixa as dependências automaticamente.</p>
             </div>
           </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- =========== Image Review Studio =========== -->
+    <div id="imageReviewStudio" class="irs-overlay irs-hidden" role="dialog" aria-label="Estúdio de Revisão de Imagens">
+      <header class="irs-header">
+        <div class="irs-header-left">
+          <button id="irsCloseBtn" class="irs-back-btn">← Voltar</button>
+        </div>
+        <div class="irs-header-center">
+          <span class="irs-title">🔍 Revisão de Imagens &amp; Canon</span>
+        </div>
+        <div class="irs-header-right">
+          <button id="irsOpenGenStudioBtn" class="irs-primary-btn">🖼 Gerar imagens</button>
+        </div>
+      </header>
+
+      <nav class="irs-tabs-nav">
+        <button class="irs-tab irs-tab-active" id="irsTabBtnReview">Revisão</button>
+        <button class="irs-tab" id="irsTabBtnPromotions">Promoções Canônicas</button>
+      </nav>
+
+      <!-- Review Tab -->
+      <div id="irsTabReview" class="irs-panel">
+        <div class="irs-body">
+
+          <!-- Filter sidebar -->
+          <aside class="irs-filter-sidebar">
+            <h3 class="irs-filter-title">Filtros</h3>
+
+            <label class="irs-filter-label">Personagem
+              <select id="irsFilterCharacter">
+                <option value="">Todos</option>
+              </select>
+            </label>
+
+            <label class="irs-filter-label">Cena
+              <select id="irsFilterScene">
+                <option value="">Todas</option>
+              </select>
+            </label>
+
+            <label class="irs-filter-label">Tipo
+              <select id="irsFilterType">
+                <option value="">Todos</option>
+                <option value="character">Personagem</option>
+                <option value="scene">Cena</option>
+                <option value="environment">Ambiente</option>
+                <option value="portrait">Retrato</option>
+                <option value="variation">Variação</option>
+              </select>
+            </label>
+
+            <label class="irs-filter-label">Status de revisão
+              <select id="irsFilterStatus">
+                <option value="">Todos</option>
+                <option value="unreviewed">Não revisado</option>
+                <option value="candidate">Candidato</option>
+                <option value="favorite">Favorito</option>
+                <option value="rejected">Rejeitado</option>
+                <option value="archived">Arquivado</option>
+              </select>
+            </label>
+
+            <label class="irs-filter-check">
+              <input type="checkbox" id="irsFilterFavorite" />
+              Apenas favoritos (★)
+            </label>
+
+            <label class="irs-filter-check">
+              <input type="checkbox" id="irsFilterCanon" />
+              Apenas canônicos
+            </label>
+
+            <label class="irs-filter-check">
+              <input type="checkbox" id="irsFilterBestRef" />
+              Apenas melhores referências
+            </label>
+
+            <label class="irs-filter-check">
+              <input type="checkbox" id="irsFilterWithImage" />
+              Apenas com imagem
+            </label>
+
+            <hr style="border-color:var(--line);margin:4px 0" />
+
+            <label class="irs-filter-label">Ordenar por
+              <select id="irsSortBy">
+                <option value="newest">Mais recente</option>
+                <option value="oldest">Mais antigo</option>
+                <option value="score-desc">Maior pontuação</option>
+                <option value="score-asc">Menor pontuação</option>
+                <option value="type">Tipo</option>
+              </select>
+            </label>
+
+            <button id="irsApplyFiltersBtn" class="irs-apply-btn">Aplicar filtros</button>
+            <p id="irsFilterCount" class="irs-filter-count"></p>
+          </aside>
+
+          <!-- Gallery area -->
+          <main class="irs-gallery-area">
+            <div class="irs-gallery-toolbar">
+              <label>
+                <span style="font-size:0.78rem;color:var(--muted)">Comparar:</span>
+                <span id="irsCompareHint" style="font-size:0.78rem;color:var(--muted);margin-left:4px">Shift+clique para selecionar 2 imagens</span>
+              </label>
+              <button id="irsClearCompareBtn" style="font-size:0.75rem;padding:3px 8px;display:none">✕ Limpar comparação</button>
+            </div>
+            <div id="irsCompareArea" class="igs-compare-area" style="display:none">
+              <p class="irs-hint">Selecione dois outputs com Shift+clique para comparar.</p>
+            </div>
+            <div id="irsGallery" class="irs-gallery">
+              <p class="irs-gallery-empty">Nenhum output encontrado. Gere imagens no Estúdio de Geração.</p>
+            </div>
+          </main>
+
+          <!-- Detail sidebar -->
+          <aside class="irs-detail-sidebar">
+            <div id="irsDetailPanel" class="irs-detail-panel irs-hidden">
+              <img id="irsDetailImg" class="irs-detail-img" src="" alt="Output selecionado" />
+              <p id="irsDetailMeta" class="irs-detail-meta"></p>
+
+              <h4 class="irs-detail-section-title">Status de revisão</h4>
+              <div class="irs-review-status-grid">
+                <button id="irsBtnCandidate" class="irs-status-btn-candidate">📋 Candidato</button>
+                <button id="irsBtnFavorite" class="irs-status-btn-fav">★ Favorito</button>
+                <button id="irsBtnReject" class="irs-status-btn-reject">✕ Rejeitar</button>
+                <button id="irsBtnArchive" class="irs-status-btn-archive">📦 Arquivar</button>
+              </div>
+
+              <h4 class="irs-detail-section-title">Pontuação (1–5)</h4>
+              <div class="irs-score-row">
+                <div class="irs-score-stars" id="irsScoreStars">
+                  <button class="irs-star-btn" data-star="1">★</button>
+                  <button class="irs-star-btn" data-star="2">★</button>
+                  <button class="irs-star-btn" data-star="3">★</button>
+                  <button class="irs-star-btn" data-star="4">★</button>
+                  <button class="irs-star-btn" data-star="5">★</button>
+                </div>
+                <span id="irsScoreLabel" style="font-size:0.75rem;color:var(--muted)"></span>
+              </div>
+
+              <h4 class="irs-detail-section-title">Notas editoriais</h4>
+              <textarea id="irsNotesInput" class="irs-notes-textarea" rows="3" placeholder="Observações, decisões editoriais…"></textarea>
+              <button id="irsSaveNotesBtn" style="font-size:0.78rem;padding:5px 10px">Salvar notas</button>
+
+              <h4 class="irs-detail-section-title">Ações canônicas</h4>
+              <div class="irs-detail-actions">
+                <button id="irsBtnMarkCanon" class="irs-status-btn-canon">◇ Canônico</button>
+                <button id="irsBtnBestRef" class="irs-status-btn-best">⭐ Melhor referência</button>
+                <button id="irsBtnPromoteCanon" class="irs-canon-btn">⬆ Promover ao canon</button>
+              </div>
+
+              <h4 class="irs-detail-section-title">Reutilizar</h4>
+              <div class="irs-detail-actions">
+                <button id="irsBtnUseAsRef" class="irs-primary-btn">📌 Usar como referência</button>
+                <button id="irsBtnOpenInIGS">🖼 Abrir no Gerador</button>
+              </div>
+
+              <div style="margin-top:6px">
+                <button id="irsDeleteOutputBtn" class="irs-danger-btn" style="width:100%">🗑 Remover output</button>
+              </div>
+            </div>
+            <p id="irsDetailEmpty" class="irs-detail-empty">Selecione uma imagem na galeria para ver detalhes e ações curatoriais.</p>
+          </aside>
+        </div>
+      </div>
+
+      <!-- Promotions Tab -->
+      <div id="irsTabPromotions" class="irs-panel irs-hidden">
+        <div class="irs-promotions-list-area">
+          <div class="irs-promotions-header">
+            <h3 class="irs-promotions-section-title">Histórico de Promoções Canônicas</h3>
+            <span id="irsPromotionsCount" style="font-size:0.78rem;color:var(--muted)"></span>
+          </div>
+          <div id="irsPromotionList" class="irs-promotion-list">
+            <p class="irs-hint">Nenhuma promoção canônica registrada ainda.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =========== Canon Promotion Modal =========== -->
+    <div id="irsCanonModal" class="irs-modal-overlay irs-hidden" role="dialog" aria-label="Promover ao Canon">
+      <div class="irs-modal">
+        <h3 class="irs-modal-title">⬆ Promover imagem ao Canon</h3>
+        <img id="irsModalImg" class="irs-modal-img" src="" alt="Imagem a ser promovida" />
+
+        <div class="irs-modal-field">
+          <label for="irsCanonType">Tipo de canon</label>
+          <select id="irsCanonType">
+            <option value="character">Personagem — define visualmente um personagem</option>
+            <option value="place">Lugar — define visualmente um local/ambiente</option>
+            <option value="scene">Cena — referência canônica para uma cena</option>
+            <option value="aesthetic">Estética geral — tom visual do projeto</option>
+          </select>
+        </div>
+
+        <div id="irsCanonTargetRow" class="irs-modal-field">
+          <label for="irsCanonTarget">Entidade alvo</label>
+          <select id="irsCanonTarget">
+            <option value="">— nenhuma —</option>
+          </select>
+        </div>
+
+        <div class="irs-modal-field">
+          <label for="irsCanonReason">Motivo da promoção</label>
+          <textarea id="irsCanonReason" rows="3" placeholder="Por que esta imagem deve ser canônica? O que ela define ou preserva?"></textarea>
+        </div>
+
+        <div class="irs-modal-field">
+          <label for="irsCanonNotes">Notas adicionais</label>
+          <textarea id="irsCanonNotes" rows="2" placeholder="Observações, restrições ou contexto extra…"></textarea>
+        </div>
+
+        <label class="irs-modal-check">
+          <input type="checkbox" id="irsCanonCreateRef" checked />
+          Também criar referência visual a partir desta imagem
+        </label>
+
+        <div class="irs-modal-actions">
+          <button id="irsCanonConfirmBtn" class="irs-canon-btn">✓ Confirmar promoção</button>
+          <button id="irsCanonCancelBtn">Cancelar</button>
         </div>
       </div>
     </div>

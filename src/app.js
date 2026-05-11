@@ -1,6 +1,7 @@
 import {
   createAsset,
   createBook,
+  createCanonPromotion,
   createChapter,
   createCharacter,
   createGenerationJob,
@@ -11,8 +12,10 @@ import {
   createReferenceImage,
   createScene,
   deleteEntity,
+  CANON_PROMOTION_TYPES,
   IMAGE_GEN_PROVIDER_TYPES,
   IMAGE_GEN_TYPES,
+  OUTPUT_REVIEW_STATUSES,
   REFERENCE_TYPES,
   UNASSIGNED_CHAPTER_ID
 } from './models.js';
@@ -2054,6 +2057,7 @@ const igsRefs = {
   detailFavoriteBtn: $('igsDetailFavoriteBtn'),
   detailCanonBtn: $('igsDetailCanonBtn'),
   detailUseAsRefBtn: $('igsDetailUseAsRefBtn'),
+  detailReviewBtn: $('igsDetailReviewBtn'),
   detailVariationBtn: $('igsDetailVariationBtn'),
   detailRegenerateBtn: $('igsDetailRegenerateBtn'),
   detailDeleteBtn: $('igsDetailDeleteBtn'),
@@ -2588,6 +2592,13 @@ igsRefs.detailDeleteBtn.addEventListener('click', () => {
   igsRenderCurrentJobGallery();
 });
 
+igsRefs.detailReviewBtn.addEventListener('click', () => {
+  const outputId = igsSelectedOutputId;
+  closeImageGenStudio();
+  openImageReviewStudio();
+  if (outputId) irsSelectOutput(outputId);
+});
+
 igsRefs.loadPromptBtn.addEventListener('click', () => {
   const promptDocument = state.promptDocuments.find(
     (pd) => pd.id === igsRefs.promptDocSelect.value
@@ -2659,6 +2670,869 @@ document.addEventListener('keydown', (event) => {
     (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.tagName === 'SELECT');
   if (isInput) return;
   closeImageGenStudio();
+});
+
+// =========== Image Review Studio ===========
+
+let irsIsOpen = false;
+let irsSelectedOutputId = null;
+let irsCompareIds = [];
+let irsCanonModalOutputId = null;
+
+const irsRefs = {
+  overlay: $('imageReviewStudio'),
+  closeBtn: $('irsCloseBtn'),
+  openGenStudioBtn: $('irsOpenGenStudioBtn'),
+  tabBtnReview: $('irsTabBtnReview'),
+  tabBtnPromotions: $('irsTabBtnPromotions'),
+  tabReview: $('irsTabReview'),
+  tabPromotions: $('irsTabPromotions'),
+  // Filters
+  filterCharacter: $('irsFilterCharacter'),
+  filterScene: $('irsFilterScene'),
+  filterType: $('irsFilterType'),
+  filterStatus: $('irsFilterStatus'),
+  filterFavorite: $('irsFilterFavorite'),
+  filterCanon: $('irsFilterCanon'),
+  filterBestRef: $('irsFilterBestRef'),
+  filterWithImage: $('irsFilterWithImage'),
+  sortBy: $('irsSortBy'),
+  applyFiltersBtn: $('irsApplyFiltersBtn'),
+  filterCount: $('irsFilterCount'),
+  // Gallery
+  gallery: $('irsGallery'),
+  compareArea: $('irsCompareArea'),
+  clearCompareBtn: $('irsClearCompareBtn'),
+  compareHint: $('irsCompareHint'),
+  // Detail panel
+  detailPanel: $('irsDetailPanel'),
+  detailEmpty: $('irsDetailEmpty'),
+  detailImg: $('irsDetailImg'),
+  detailMeta: $('irsDetailMeta'),
+  btnCandidate: $('irsBtnCandidate'),
+  btnFavorite: $('irsBtnFavorite'),
+  btnReject: $('irsBtnReject'),
+  btnArchive: $('irsBtnArchive'),
+  scoreStars: $('irsScoreStars'),
+  scoreLabel: $('irsScoreLabel'),
+  notesInput: $('irsNotesInput'),
+  saveNotesBtn: $('irsSaveNotesBtn'),
+  btnMarkCanon: $('irsBtnMarkCanon'),
+  btnBestRef: $('irsBtnBestRef'),
+  btnPromoteCanon: $('irsBtnPromoteCanon'),
+  btnUseAsRef: $('irsBtnUseAsRef'),
+  btnOpenInIGS: $('irsBtnOpenInIGS'),
+  deleteOutputBtn: $('irsDeleteOutputBtn'),
+  // Promotions
+  promotionList: $('irsPromotionList'),
+  promotionsCount: $('irsPromotionsCount'),
+  // Canon modal
+  canonModal: $('irsCanonModal'),
+  modalImg: $('irsModalImg'),
+  canonType: $('irsCanonType'),
+  canonTargetRow: $('irsCanonTargetRow'),
+  canonTarget: $('irsCanonTarget'),
+  canonReason: $('irsCanonReason'),
+  canonNotes: $('irsCanonNotes'),
+  canonCreateRef: $('irsCanonCreateRef'),
+  canonConfirmBtn: $('irsCanonConfirmBtn'),
+  canonCancelBtn: $('irsCanonCancelBtn')
+};
+
+// Helper: collect all outputs across all jobs for a project
+const irsAllOutputs = () => {
+  const projectId = selectedProjectId();
+  const outputs = [];
+  for (const job of (state.generationJobs || [])) {
+    if (job.projectId !== projectId) continue;
+    for (const output of (job.outputs || [])) {
+      outputs.push({ output, job });
+    }
+  }
+  return outputs;
+};
+
+const irsGetFilters = () => ({
+  characterId: irsRefs.filterCharacter.value,
+  sceneId: irsRefs.filterScene.value,
+  type: irsRefs.filterType.value,
+  status: irsRefs.filterStatus.value,
+  onlyFavorite: irsRefs.filterFavorite.checked,
+  onlyCanon: irsRefs.filterCanon.checked,
+  onlyBestRef: irsRefs.filterBestRef.checked,
+  onlyWithImage: irsRefs.filterWithImage.checked,
+  sortBy: irsRefs.sortBy.value
+});
+
+const irsApplyFiltersAndSort = (entries, filters) => {
+  let result = entries;
+  if (filters.characterId) result = result.filter(({ output }) => output.characterId === filters.characterId);
+  if (filters.sceneId) result = result.filter(({ output }) => output.sceneId === filters.sceneId);
+  if (filters.type) result = result.filter(({ output }) => output.generationType === filters.type);
+  if (filters.status) result = result.filter(({ output }) => output.reviewStatus === filters.status);
+  if (filters.onlyFavorite) result = result.filter(({ output }) => output.isFavorite);
+  if (filters.onlyCanon) result = result.filter(({ output }) => output.isCanonical);
+  if (filters.onlyBestRef) result = result.filter(({ output }) => output.isBestReference);
+  if (filters.onlyWithImage) result = result.filter(({ output }) => Boolean(output.dataUrl));
+
+  result = result.slice();
+  if (filters.sortBy === 'oldest') {
+    result.sort((a, b) => a.output.createdAt.localeCompare(b.output.createdAt));
+  } else if (filters.sortBy === 'score-desc') {
+    result.sort((a, b) => b.output.score - a.output.score);
+  } else if (filters.sortBy === 'score-asc') {
+    result.sort((a, b) => a.output.score - b.output.score);
+  } else if (filters.sortBy === 'type') {
+    result.sort((a, b) => a.output.generationType.localeCompare(b.output.generationType));
+  } else {
+    result.sort((a, b) => b.output.createdAt.localeCompare(a.output.createdAt));
+  }
+  return result;
+};
+
+const irsPopulateFilterSelectors = () => {
+  const projectId = selectedProjectId();
+  const characters = (state.characters || []).filter((c) => c.projectId === projectId);
+  const scenes = (state.scenes || []).filter((s) => s.projectId === projectId);
+
+  const prevChar = irsRefs.filterCharacter.value;
+  const prevScene = irsRefs.filterScene.value;
+
+  irsRefs.filterCharacter.innerHTML = '<option value="">Todos</option>';
+  characters.forEach((c) => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    if (c.id === prevChar) opt.selected = true;
+    irsRefs.filterCharacter.append(opt);
+  });
+
+  irsRefs.filterScene.innerHTML = '<option value="">Todas</option>';
+  scenes.forEach((s) => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.title;
+    if (s.id === prevScene) opt.selected = true;
+    irsRefs.filterScene.append(opt);
+  });
+};
+
+const irsStatusBadgeText = (output) => {
+  const badges = [];
+  if (output.isFavorite) badges.push('★');
+  if (output.isCanonical) badges.push('C');
+  if (output.isBestReference) badges.push('⭐');
+  if (output.reviewStatus === 'rejected') badges.push('✕');
+  if (output.reviewStatus === 'archived') badges.push('📦');
+  if (output.reviewStatus === 'candidate') badges.push('📋');
+  return badges;
+};
+
+const irsRenderGallery = () => {
+  const filters = irsGetFilters();
+  const all = irsAllOutputs();
+  const filtered = irsApplyFiltersAndSort(all, filters);
+
+  irsRefs.filterCount.textContent = `${filtered.length} / ${all.length} outputs`;
+  irsRefs.gallery.innerHTML = '';
+
+  if (!filtered.length) {
+    const empty = document.createElement('p');
+    empty.className = 'irs-gallery-empty';
+    empty.textContent = all.length
+      ? 'Nenhum output corresponde aos filtros aplicados.'
+      : 'Nenhum output encontrado. Gere imagens no Estúdio de Geração.';
+    irsRefs.gallery.append(empty);
+    return;
+  }
+
+  filtered.forEach(({ output }) => {
+    const thumb = document.createElement('div');
+    const isSelected = irsSelectedOutputId === output.id;
+    const isCompareA = irsCompareIds[0] === output.id;
+    const isCompareB = irsCompareIds[1] === output.id;
+    let cls = 'irs-output-thumb';
+    if (isSelected) cls += ' irs-selected';
+    if (isCompareA) cls += ' irs-compare-a';
+    if (isCompareB) cls += ' irs-compare-b';
+    thumb.className = cls;
+    thumb.dataset.outputId = output.id;
+
+    if (output.dataUrl) {
+      const img = document.createElement('img');
+      img.src = output.dataUrl;
+      img.alt = 'Output';
+      thumb.append(img);
+    } else {
+      const ph = document.createElement('div');
+      ph.className = 'irs-output-thumb-placeholder';
+      ph.textContent = '🖼';
+      thumb.append(ph);
+    }
+
+    // badges
+    const badges = irsStatusBadgeText(output);
+    if (badges.length) {
+      const badgesEl = document.createElement('div');
+      badgesEl.className = 'irs-thumb-badges';
+      if (output.isFavorite) {
+        const b = document.createElement('span');
+        b.className = 'irs-badge irs-badge-fav';
+        b.textContent = '★';
+        badgesEl.append(b);
+      }
+      if (output.isCanonical) {
+        const b = document.createElement('span');
+        b.className = 'irs-badge irs-badge-canon';
+        b.textContent = 'C';
+        badgesEl.append(b);
+      }
+      if (output.isBestReference) {
+        const b = document.createElement('span');
+        b.className = 'irs-badge irs-badge-best';
+        b.textContent = '⭐';
+        badgesEl.append(b);
+      }
+      if (output.reviewStatus === 'rejected') {
+        const b = document.createElement('span');
+        b.className = 'irs-badge irs-badge-rejected';
+        b.textContent = '✕';
+        badgesEl.append(b);
+      } else if (output.reviewStatus === 'archived') {
+        const b = document.createElement('span');
+        b.className = 'irs-badge irs-badge-archived';
+        b.textContent = '📦';
+        badgesEl.append(b);
+      } else if (output.reviewStatus === 'candidate') {
+        const b = document.createElement('span');
+        b.className = 'irs-badge irs-badge-candidate';
+        b.textContent = '📋';
+        badgesEl.append(b);
+      }
+      thumb.append(badgesEl);
+    }
+
+    if (output.score > 0) {
+      const scoreEl = document.createElement('div');
+      scoreEl.className = 'irs-thumb-score';
+      scoreEl.textContent = '★'.repeat(output.score);
+      thumb.append(scoreEl);
+    }
+
+    thumb.addEventListener('click', (event) => {
+      if (event.shiftKey) {
+        irsHandleCompareClick(output.id);
+      } else {
+        irsSelectOutput(output.id);
+      }
+    });
+
+    irsRefs.gallery.append(thumb);
+  });
+};
+
+const irsHandleCompareClick = (outputId) => {
+  if (irsCompareIds.includes(outputId)) {
+    irsCompareIds = irsCompareIds.filter((id) => id !== outputId);
+  } else if (irsCompareIds.length < 2) {
+    irsCompareIds = [...irsCompareIds, outputId];
+  } else {
+    irsCompareIds = [irsCompareIds[1], outputId];
+  }
+  irsRenderGallery();
+  irsRenderCompare();
+};
+
+const irsRenderCompare = () => {
+  if (!irsCompareIds.length) {
+    irsRefs.compareArea.style.display = 'none';
+    irsRefs.clearCompareBtn.style.display = 'none';
+    return;
+  }
+  irsRefs.compareArea.style.display = 'flex';
+  irsRefs.clearCompareBtn.style.display = '';
+  irsRefs.compareArea.innerHTML = '';
+  irsCompareIds.forEach((id, idx) => {
+    const found = irsFindOutput(id);
+    if (!found) return;
+    const { output } = found;
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:4px;min-width:0';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:0.7rem;color:var(--muted);font-weight:700;text-transform:uppercase';
+    label.textContent = idx === 0 ? 'A' : 'B';
+    wrapper.append(label);
+    if (output.dataUrl) {
+      const img = document.createElement('img');
+      img.src = output.dataUrl;
+      img.alt = `Output ${idx + 1}`;
+      img.title = `seed: ${output.seed}`;
+      img.style.cssText = 'width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:#111722';
+      wrapper.append(img);
+    }
+    const meta = document.createElement('div');
+    meta.style.cssText = 'font-size:0.68rem;color:var(--muted)';
+    meta.textContent = [
+      output.generationType,
+      output.score > 0 ? '★'.repeat(output.score) : '',
+      output.isFavorite ? 'fav' : '',
+      output.isCanonical ? 'canon' : ''
+    ].filter(Boolean).join(' · ');
+    wrapper.append(meta);
+    irsRefs.compareArea.append(wrapper);
+  });
+  if (!irsRefs.compareArea.children.length) {
+    irsRefs.compareArea.innerHTML = '<p class="irs-hint">Outputs não encontrados para comparação.</p>';
+  }
+};
+
+const irsFindOutput = (outputId) => {
+  for (const job of (state.generationJobs || [])) {
+    const output = (job.outputs || []).find((o) => o.id === outputId);
+    if (output) return { job, output };
+  }
+  return null;
+};
+
+const irsRenderStars = (score) => {
+  const stars = irsRefs.scoreStars.querySelectorAll('.irs-star-btn');
+  stars.forEach((btn) => {
+    const val = parseInt(btn.dataset.star, 10);
+    btn.classList.toggle('filled', val <= score);
+  });
+  irsRefs.scoreLabel.textContent = score > 0 ? `${score}/5` : 'Sem pontuação';
+};
+
+const irsUpdateStatusButtonStates = (output) => {
+  irsRefs.btnCandidate.classList.toggle('irs-status-btn-active', output.reviewStatus === 'candidate');
+  irsRefs.btnFavorite.classList.toggle('active', output.isFavorite);
+  irsRefs.btnFavorite.classList.toggle('irs-status-btn-fav', true);
+  irsRefs.btnReject.classList.toggle('active', output.reviewStatus === 'rejected');
+  irsRefs.btnReject.classList.toggle('irs-status-btn-reject', true);
+  irsRefs.btnArchive.classList.toggle('active', output.reviewStatus === 'archived');
+  irsRefs.btnArchive.classList.toggle('irs-status-btn-archive', true);
+  irsRefs.btnMarkCanon.classList.toggle('active', output.isCanonical);
+  irsRefs.btnMarkCanon.classList.toggle('irs-status-btn-canon', true);
+  irsRefs.btnBestRef.classList.toggle('active', output.isBestReference);
+  irsRefs.btnBestRef.classList.toggle('irs-status-btn-best', true);
+  irsRefs.btnMarkCanon.textContent = output.isCanonical ? '✓ Canônico' : '◇ Canônico';
+  irsRefs.btnBestRef.textContent = output.isBestReference ? '⭐ Melhor ref.' : '⭐ Melhor ref.?';
+};
+
+const irsSelectOutput = (outputId) => {
+  irsSelectedOutputId = outputId;
+  irsRenderGallery();
+
+  const found = irsFindOutput(outputId);
+  if (!found) {
+    irsRefs.detailPanel.classList.add('irs-hidden');
+    irsRefs.detailEmpty.style.display = '';
+    return;
+  }
+
+  const { output, job } = found;
+  irsRefs.detailEmpty.style.display = 'none';
+  irsRefs.detailPanel.classList.remove('irs-hidden');
+
+  irsRefs.detailImg.src = output.dataUrl || '';
+  irsRefs.detailImg.style.display = output.dataUrl ? 'block' : 'none';
+
+  const characterName = output.characterId
+    ? (state.characters || []).find((c) => c.id === output.characterId)?.name || output.characterId
+    : '';
+  const sceneName = output.sceneId
+    ? (state.scenes || []).find((s) => s.id === output.sceneId)?.title || output.sceneId
+    : '';
+
+  irsRefs.detailMeta.textContent = [
+    `Tipo: ${output.generationType}`,
+    characterName ? `Personagem: ${characterName}` : '',
+    sceneName ? `Cena: ${sceneName}` : '',
+    `Seed: ${output.seed >= 0 ? output.seed : 'aleatório'}`,
+    output.fileName ? `Arquivo: ${output.fileName}` : '',
+    `Job: ${job.id.substring(0, 8)}`,
+    `${new Date(output.createdAt).toLocaleString('pt-BR')}`
+  ].filter(Boolean).join('\n');
+
+  irsUpdateStatusButtonStates(output);
+  irsRenderStars(output.score || 0);
+  irsRefs.notesInput.value = output.notes || '';
+};
+
+const irsUpdateOutput = (outputId, updater) => {
+  for (const job of (state.generationJobs || [])) {
+    const output = (job.outputs || []).find((o) => o.id === outputId);
+    if (output) {
+      updater(output);
+      break;
+    }
+  }
+  state = store.save(state);
+};
+
+const irsRefreshDetail = () => {
+  if (irsSelectedOutputId) irsSelectOutput(irsSelectedOutputId);
+  irsRenderGallery();
+};
+
+// Status action handlers
+irsRefs.btnCandidate.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found) return;
+  const newStatus = found.output.reviewStatus === 'candidate' ? 'unreviewed' : 'candidate';
+  irsUpdateOutput(irsSelectedOutputId, (o) => { o.reviewStatus = newStatus; });
+  irsRefreshDetail();
+});
+
+irsRefs.btnFavorite.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found) return;
+  irsUpdateOutput(irsSelectedOutputId, (o) => {
+    o.isFavorite = !o.isFavorite;
+    if (o.isFavorite) o.reviewStatus = 'favorite';
+    else if (o.reviewStatus === 'favorite') o.reviewStatus = 'unreviewed';
+  });
+  irsRefreshDetail();
+});
+
+irsRefs.btnReject.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found) return;
+  const newStatus = found.output.reviewStatus === 'rejected' ? 'unreviewed' : 'rejected';
+  irsUpdateOutput(irsSelectedOutputId, (o) => {
+    o.reviewStatus = newStatus;
+    if (newStatus === 'rejected') o.isFavorite = false;
+  });
+  irsRefreshDetail();
+});
+
+irsRefs.btnArchive.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found) return;
+  const newStatus = found.output.reviewStatus === 'archived' ? 'unreviewed' : 'archived';
+  irsUpdateOutput(irsSelectedOutputId, (o) => { o.reviewStatus = newStatus; });
+  irsRefreshDetail();
+});
+
+// Star scoring
+irsRefs.scoreStars.querySelectorAll('.irs-star-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const val = parseInt(btn.dataset.star, 10);
+    const found = irsFindOutput(irsSelectedOutputId);
+    if (!found) return;
+    const newScore = found.output.score === val ? 0 : val;
+    irsUpdateOutput(irsSelectedOutputId, (o) => { o.score = newScore; });
+    irsRenderStars(newScore);
+    irsRenderGallery();
+  });
+  btn.addEventListener('mouseenter', () => {
+    const val = parseInt(btn.dataset.star, 10);
+    irsRefs.scoreStars.querySelectorAll('.irs-star-btn').forEach((s) => {
+      s.classList.toggle('filled', parseInt(s.dataset.star, 10) <= val);
+    });
+  });
+  btn.addEventListener('mouseleave', () => {
+    const found = irsFindOutput(irsSelectedOutputId);
+    irsRenderStars(found ? found.output.score || 0 : 0);
+  });
+});
+
+irsRefs.saveNotesBtn.addEventListener('click', () => {
+  if (!irsSelectedOutputId) return;
+  irsUpdateOutput(irsSelectedOutputId, (o) => { o.notes = irsRefs.notesInput.value.trim(); });
+  irsRefs.saveNotesBtn.textContent = '✓ Salvo';
+  setTimeout(() => { irsRefs.saveNotesBtn.textContent = 'Salvar notas'; }, 1800);
+});
+
+irsRefs.btnMarkCanon.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found) return;
+  irsUpdateOutput(irsSelectedOutputId, (o) => { o.isCanonical = !o.isCanonical; });
+  irsRefreshDetail();
+});
+
+irsRefs.btnBestRef.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found) return;
+  irsUpdateOutput(irsSelectedOutputId, (o) => { o.isBestReference = !o.isBestReference; });
+  irsRefreshDetail();
+});
+
+// Canon promotion flow
+const irsOpenCanonModal = (outputId) => {
+  const found = irsFindOutput(outputId);
+  if (!found) return;
+  const { output } = found;
+  irsCanonModalOutputId = outputId;
+  irsRefs.modalImg.src = output.dataUrl || '';
+  irsRefs.modalImg.style.display = output.dataUrl ? 'block' : 'none';
+  irsRefs.canonReason.value = '';
+  irsRefs.canonNotes.value = output.notes || '';
+  irsRefs.canonCreateRef.checked = true;
+  irsPopulateCanonTargetSelect(irsRefs.canonType.value);
+  irsRefs.canonModal.classList.remove('irs-hidden');
+};
+
+const irsPopulateCanonTargetSelect = (canonType) => {
+  const projectId = selectedProjectId();
+  irsRefs.canonTarget.innerHTML = '<option value="">— nenhuma —</option>';
+  if (canonType === 'character') {
+    (state.characters || []).filter((c) => c.projectId === projectId).forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      irsRefs.canonTarget.append(opt);
+    });
+    irsRefs.canonTargetRow.style.display = '';
+  } else if (canonType === 'scene') {
+    (state.scenes || []).filter((s) => s.projectId === projectId).forEach((s) => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.title;
+      irsRefs.canonTarget.append(opt);
+    });
+    irsRefs.canonTargetRow.style.display = '';
+  } else if (canonType === 'place') {
+    (state.loreEntries || []).filter((e) => e.projectId === projectId).forEach((e) => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.title;
+      irsRefs.canonTarget.append(opt);
+    });
+    irsRefs.canonTargetRow.style.display = '';
+  } else {
+    irsRefs.canonTargetRow.style.display = 'none';
+  }
+
+  // Pre-select based on output's linked entity
+  const found = irsFindOutput(irsCanonModalOutputId);
+  if (found) {
+    const { output } = found;
+    if (canonType === 'character' && output.characterId) {
+      irsRefs.canonTarget.value = output.characterId;
+    } else if (canonType === 'scene' && output.sceneId) {
+      irsRefs.canonTarget.value = output.sceneId;
+    }
+  }
+};
+
+irsRefs.canonType.addEventListener('change', () => {
+  irsPopulateCanonTargetSelect(irsRefs.canonType.value);
+});
+
+irsRefs.btnPromoteCanon.addEventListener('click', () => {
+  if (!irsSelectedOutputId) return;
+  irsOpenCanonModal(irsSelectedOutputId);
+});
+
+irsRefs.canonCancelBtn.addEventListener('click', () => {
+  irsRefs.canonModal.classList.add('irs-hidden');
+  irsCanonModalOutputId = null;
+});
+
+irsRefs.canonConfirmBtn.addEventListener('click', () => {
+  if (!irsCanonModalOutputId) return;
+  const found = irsFindOutput(irsCanonModalOutputId);
+  if (!found) return;
+  const { output, job } = found;
+
+  const canonType = irsRefs.canonType.value;
+  const targetId = irsRefs.canonTarget.value;
+  const targetType = canonType === 'character' ? 'character' : canonType === 'scene' ? 'scene' : canonType === 'place' ? 'lore' : '';
+  const reason = irsRefs.canonReason.value.trim();
+  const notes = irsRefs.canonNotes.value.trim();
+
+  if (!reason) {
+    alert('Por favor, preencha o motivo da promoção.');
+    return;
+  }
+
+  // Mark output as canonical
+  irsUpdateOutput(irsCanonModalOutputId, (o) => {
+    o.isCanonical = true;
+    o.reviewStatus = OUTPUT_REVIEW_STATUSES.includes(o.reviewStatus) ? o.reviewStatus : 'unreviewed';
+  });
+
+  // Create canon promotion record
+  const promotion = createCanonPromotion({
+    projectId: selectedProjectId(),
+    outputId: irsCanonModalOutputId,
+    jobId: job.id,
+    canonType,
+    targetId,
+    targetType,
+    reason,
+    notes
+  });
+  if (!state.canonPromotions) state.canonPromotions = [];
+  state.canonPromotions.push(promotion);
+
+  // Optionally create reference image
+  if (irsRefs.canonCreateRef.checked && output.dataUrl) {
+    const targetName = (() => {
+      if (canonType === 'character') {
+        return (state.characters || []).find((c) => c.id === targetId)?.name || '';
+      } else if (canonType === 'scene') {
+        return (state.scenes || []).find((s) => s.id === targetId)?.title || '';
+      } else if (canonType === 'place') {
+        return (state.loreEntries || []).find((e) => e.id === targetId)?.title || '';
+      }
+      return '';
+    })();
+    const refName = `Canon ${canonType}${targetName ? ` · ${targetName}` : ''} · ${new Date().toLocaleDateString('pt-BR')}`;
+    const ref = createReferenceImage({
+      projectId: selectedProjectId(),
+      characterId: canonType === 'character' ? targetId : '',
+      name: refName,
+      type: canonType === 'aesthetic' ? 'aesthetic' : canonType,
+      dataUrl: output.dataUrl,
+      fileName: output.fileName || 'canon.png',
+      isCanonical: true,
+      linkedEntityId: targetId || job.id,
+      linkedEntityType: targetType || 'job',
+      preserve: `Promovido ao canon: ${reason}`,
+      notes: notes || `Canon promotion via Image Review Studio · job ${job.id.substring(0, 8)}`
+    });
+    if (!state.referenceImages) state.referenceImages = [];
+    state.referenceImages.push(ref);
+  }
+
+  state = store.save(state);
+  irsRefs.canonModal.classList.add('irs-hidden');
+  irsCanonModalOutputId = null;
+  irsRefreshDetail();
+  irsRenderPromotionsList();
+
+  // Switch to promotions tab to show result
+  irsSwitchTab('promotions');
+});
+
+// Use as reference
+irsRefs.btnUseAsRef.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found || !found.output.dataUrl) {
+    alert('Output sem imagem disponível para usar como referência.');
+    return;
+  }
+  const { output, job } = found;
+  const characterId = output.characterId || '';
+  const ref = createReferenceImage({
+    projectId: selectedProjectId(),
+    characterId,
+    name: `Ref · ${output.generationType} · seed ${output.seed >= 0 ? output.seed : 'rand'}`,
+    type: output.generationType === 'character' || output.generationType === 'portrait' ? 'character' : 'scene',
+    dataUrl: output.dataUrl,
+    fileName: output.fileName || 'generated.png',
+    isCanonical: output.isCanonical,
+    linkedEntityId: characterId || output.sceneId || job.id,
+    linkedEntityType: characterId ? 'character' : output.sceneId ? 'scene' : 'job',
+    notes: `Criado pelo Estúdio de Revisão · job ${job.id.substring(0, 8)}`
+  });
+  if (!state.referenceImages) state.referenceImages = [];
+  state.referenceImages.push(ref);
+  state = store.save(state);
+  alert(`Referência "${ref.name}" criada com sucesso.`);
+});
+
+// Open in generation studio
+irsRefs.btnOpenInIGS.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found) return;
+  const { output } = found;
+  closeImageReviewStudio();
+  openImageGenStudio();
+  igsRefs.prompt.value = output.prompt || '';
+  if (output.params) {
+    if (output.params.resolution) igsRefs.resolution.value = output.params.resolution;
+    if (output.params.steps) igsRefs.steps.value = output.params.steps;
+    if (output.params.cfgScale) igsRefs.cfgScale.value = output.params.cfgScale;
+    if (output.params.sampler) igsRefs.sampler.value = output.params.sampler;
+  }
+  igsRefs.seed.value = (typeof output.seed === 'number' && output.seed >= 0) ? output.seed : -1;
+});
+
+irsRefs.deleteOutputBtn.addEventListener('click', () => {
+  if (!irsSelectedOutputId || !window.confirm('Remover este output permanentemente?')) return;
+  state = deleteEntity(state, 'generationOutput', irsSelectedOutputId);
+  state = store.save(state);
+  irsSelectedOutputId = null;
+  irsRefs.detailPanel.classList.add('irs-hidden');
+  irsRefs.detailEmpty.style.display = '';
+  irsRenderGallery();
+});
+
+// Promotions list rendering
+const irsRenderPromotionsList = () => {
+  const projectId = selectedProjectId();
+  const promotions = ((state.canonPromotions || []).filter((p) => p.projectId === projectId))
+    .slice().reverse();
+
+  irsRefs.promotionsCount.textContent = `${promotions.length} promoção(ões)`;
+  irsRefs.promotionList.innerHTML = '';
+
+  if (!promotions.length) {
+    irsRefs.promotionList.innerHTML = '<p class="irs-hint">Nenhuma promoção canônica registrada ainda. Promova uma imagem clicando em "⬆ Promover ao canon" na aba Revisão.</p>';
+    return;
+  }
+
+  promotions.forEach((promotion) => {
+    const found = irsFindOutput(promotion.outputId);
+    const output = found ? found.output : null;
+
+    const item = document.createElement('div');
+    item.className = 'irs-promotion-item';
+
+    // Thumbnail
+    const thumbEl = document.createElement('div');
+    thumbEl.className = 'irs-promotion-thumb';
+    if (output && output.dataUrl) {
+      const img = document.createElement('img');
+      img.src = output.dataUrl;
+      img.alt = 'Canon';
+      thumbEl.append(img);
+    } else {
+      thumbEl.style.cssText += ';display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:var(--muted)';
+      thumbEl.textContent = '🖼';
+    }
+
+    // Info
+    const info = document.createElement('div');
+    info.className = 'irs-promotion-info';
+
+    const canonTypeEl = document.createElement('span');
+    canonTypeEl.className = `irs-promotion-canon-type irs-canon-type-${promotion.canonType}`;
+    const typeLabels = { character: 'Personagem', place: 'Lugar', scene: 'Cena', aesthetic: 'Estética' };
+    canonTypeEl.textContent = typeLabels[promotion.canonType] || promotion.canonType;
+
+    const targetEl = document.createElement('div');
+    targetEl.className = 'irs-promotion-target';
+    let targetName = '';
+    if (promotion.canonType === 'character' && promotion.targetId) {
+      targetName = (state.characters || []).find((c) => c.id === promotion.targetId)?.name || promotion.targetId;
+    } else if (promotion.canonType === 'scene' && promotion.targetId) {
+      targetName = (state.scenes || []).find((s) => s.id === promotion.targetId)?.title || promotion.targetId;
+    } else if (promotion.canonType === 'place' && promotion.targetId) {
+      targetName = (state.loreEntries || []).find((e) => e.id === promotion.targetId)?.title || promotion.targetId;
+    }
+    targetEl.textContent = targetName || '—';
+
+    const reasonEl = document.createElement('div');
+    reasonEl.className = 'irs-promotion-reason';
+    reasonEl.textContent = promotion.reason || 'Sem motivo registrado.';
+
+    const dateEl = document.createElement('div');
+    dateEl.className = 'irs-promotion-date';
+    dateEl.textContent = new Date(promotion.promotedAt).toLocaleString('pt-BR');
+
+    if (promotion.notes) {
+      const notesEl = document.createElement('div');
+      notesEl.style.cssText = 'font-size:0.73rem;color:var(--muted);font-style:italic';
+      notesEl.textContent = promotion.notes;
+      info.append(canonTypeEl, targetEl, reasonEl, notesEl, dateEl);
+    } else {
+      info.append(canonTypeEl, targetEl, reasonEl, dateEl);
+    }
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'irs-promotion-actions';
+
+    if (output) {
+      const viewBtn = document.createElement('button');
+      viewBtn.textContent = '👁 Ver';
+      viewBtn.addEventListener('click', () => {
+        irsSwitchTab('review');
+        irsSelectOutput(promotion.outputId);
+      });
+      actions.append(viewBtn);
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'irs-danger-btn';
+    delBtn.textContent = '🗑';
+    delBtn.title = 'Remover promoção';
+    delBtn.addEventListener('click', () => {
+      if (!window.confirm('Remover este registro de promoção canônica?')) return;
+      state = deleteEntity(state, 'canonPromotion', promotion.id);
+      state = store.save(state);
+      irsRenderPromotionsList();
+    });
+    actions.append(delBtn);
+
+    item.append(thumbEl, info, actions);
+    irsRefs.promotionList.append(item);
+  });
+};
+
+// Tab switching
+const irsSwitchTab = (tab) => {
+  const isReview = tab === 'review';
+  irsRefs.tabReview.classList.toggle('irs-hidden', !isReview);
+  irsRefs.tabPromotions.classList.toggle('irs-hidden', isReview);
+  irsRefs.tabBtnReview.classList.toggle('irs-tab-active', isReview);
+  irsRefs.tabBtnPromotions.classList.toggle('irs-tab-active', !isReview);
+
+  if (!isReview) irsRenderPromotionsList();
+};
+
+irsRefs.tabBtnReview.addEventListener('click', () => irsSwitchTab('review'));
+irsRefs.tabBtnPromotions.addEventListener('click', () => irsSwitchTab('promotions'));
+
+irsRefs.applyFiltersBtn.addEventListener('click', () => {
+  irsRenderGallery();
+});
+
+irsRefs.clearCompareBtn.addEventListener('click', () => {
+  irsCompareIds = [];
+  irsRenderGallery();
+  irsRenderCompare();
+});
+
+// Open / close
+const openImageReviewStudio = () => {
+  if (!selectedProjectId()) return;
+  irsIsOpen = true;
+  irsSelectedOutputId = null;
+  irsCompareIds = [];
+  irsCanonModalOutputId = null;
+  irsPopulateFilterSelectors();
+  irsSwitchTab('review');
+  irsRenderGallery();
+  irsRefs.detailPanel.classList.add('irs-hidden');
+  irsRefs.detailEmpty.style.display = '';
+  irsRefs.overlay.classList.remove('irs-hidden');
+  document.body.style.overflow = 'hidden';
+};
+
+const closeImageReviewStudio = () => {
+  irsIsOpen = false;
+  irsRefs.canonModal.classList.add('irs-hidden');
+  irsRefs.overlay.classList.add('irs-hidden');
+  document.body.style.overflow = '';
+  render();
+};
+
+irsRefs.closeBtn.addEventListener('click', closeImageReviewStudio);
+
+irsRefs.openGenStudioBtn.addEventListener('click', () => {
+  closeImageReviewStudio();
+  openImageGenStudio();
+});
+
+$('openImageReviewStudioBtn').addEventListener('click', openImageReviewStudio);
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  if (irsRefs.canonModal && !irsRefs.canonModal.classList.contains('irs-hidden')) {
+    irsRefs.canonModal.classList.add('irs-hidden');
+    irsCanonModalOutputId = null;
+    return;
+  }
+  if (!irsIsOpen) return;
+  const active = document.activeElement;
+  const isInput = active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.tagName === 'SELECT');
+  if (isInput) return;
+  closeImageReviewStudio();
 });
 
 render();
