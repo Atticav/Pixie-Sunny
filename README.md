@@ -250,6 +250,43 @@ O app agora inclui uma camada estrutural de evolução de assets/outputs para vi
 - base pronta para timeline editorial, ancestry/diff viewer e governança visual mais forte em próximos PRs
 - arquitetura segue **local-first no MacBook**, sem backend SaaS
 
+## Diff Viewer / Context Compare Workspace
+
+O app agora inclui um workspace de comparação pragmático para inspecionar mudanças reais entre versões conectadas do pipeline:
+
+- modos de diff:
+  - **side-by-side** para leitura comparativa direta de versão A vs B
+  - **inline** para inspeção linha a linha em texto relevante
+- tipos suportados na comparação:
+  - canon entries (personagens e universe memory/lore)
+  - briefings e versões de prompt
+  - prompts de geração (output prompt + notas)
+  - cenas
+  - shots
+  - assets metadata (outputs, referências e assets locais)
+  - sinais editoriais/readiness (status de revisão, canon, contexto e prontidão)
+- conexões de versão sugeridas automaticamente por fluxos já existentes:
+  - **Approval & Decision History Layer**
+  - **Asset Version Lineage / Supersession Graph**
+  - **canon promotion**
+  - **refresh / rewrite** de versões de prompt
+
+### Como encaixa no pipeline geral
+
+- roda dentro do **Image Review Studio** (aba **Diff Viewer / Context Compare**), local-first no MacBook
+- conecta inspeção de diff com:
+  - Decision History
+  - Lineage / Supersession
+  - Prompt Grounding / Context Assembly
+  - Story Bible / Universe Memory
+  - Character Canon Studio
+  - Reference Studio
+  - Scene Briefing Generator / Director Pack
+  - Production Board
+  - Assistive Planning (impacto/readiness)
+- fornece highlights semânticos e quick links para revisar/aprofundar as ações no fluxo
+- mantém a base pronta para próximos PRs de review editorial avançado, merge guidance e governança contextual mais forte
+
 ## Estrutura do projeto
 
 - `index.html`: interface inicial utilizável

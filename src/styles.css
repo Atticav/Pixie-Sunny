@@ -2337,6 +2337,117 @@ details[open].ws-context-section summary::before { content: '▾ '; }
   padding: 4px 8px;
 }
 
+.irs-context-highlights {
+  margin: 8px 0 10px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.irs-context-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.irs-context-actions button {
+  font-size: 0.74rem;
+  padding: 4px 8px;
+}
+
+.irs-context-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.irs-context-section {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel), black 8%);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.irs-context-section-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.irs-context-meta-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.73rem;
+}
+
+.irs-context-meta-table th,
+.irs-context-meta-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 5px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.irs-context-meta-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.irs-context-inline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.irs-context-inline li {
+  font-size: 0.72rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  white-space: pre-wrap;
+  padding: 4px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line), transparent 20%);
+}
+
+.irs-context-inline li:last-child { border-bottom: none; }
+.irs-context-inline li.is-added { background: color-mix(in srgb, #2f7a5f, transparent 72%); color: #c8ffe9; }
+.irs-context-inline li.is-removed { background: color-mix(in srgb, #7a2f2f, transparent 72%); color: #ffd6d6; }
+.irs-context-inline li.is-equal { color: var(--muted); }
+
+.irs-context-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.irs-context-side pre {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel), black 10%);
+  padding: 8px;
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  color: var(--muted);
+}
+
+.irs-context-source {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 /* Compare area in review */
 .irs-compare-bar {
   display: flex;

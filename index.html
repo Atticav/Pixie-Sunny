@@ -1090,6 +1090,7 @@
         <button class="irs-tab" id="irsTabBtnPromotions">Promoções Canônicas</button>
         <button class="irs-tab" id="irsTabBtnDecisions">Histórico de Decisões</button>
         <button class="irs-tab" id="irsTabBtnLineage">Lineage / Supersession</button>
+        <button class="irs-tab" id="irsTabBtnCompare">Diff Viewer / Context Compare</button>
       </nav>
 
       <!-- Review Tab -->
@@ -1339,6 +1340,57 @@
           <div id="irsLineageSummary" class="irs-lineage-summary"></div>
           <div id="irsLineageList" class="irs-lineage-list">
             <p class="irs-hint">Nenhum lineage disponível ainda. Gere e revise outputs para criar versões.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diff Viewer / Context Compare Tab -->
+      <div id="irsTabCompare" class="irs-panel irs-hidden">
+        <div class="irs-promotions-list-area">
+          <div class="irs-promotions-header">
+            <h3 class="irs-promotions-section-title">Diff Viewer / Context Compare Workspace</h3>
+            <span id="irsCompareCatalogCount" style="font-size:0.78rem;color:var(--muted)"></span>
+          </div>
+
+          <div class="irs-decision-filters">
+            <label>Conexão sugerida
+              <select id="irsCompareConnectionFilter">
+                <option value="">Seleção manual</option>
+              </select>
+            </label>
+            <label>Versão A
+              <select id="irsCompareEntityA">
+                <option value="">Selecione item A</option>
+              </select>
+            </label>
+            <label>Versão B
+              <select id="irsCompareEntityB">
+                <option value="">Selecione item B</option>
+              </select>
+            </label>
+            <label>Modo
+              <select id="irsCompareMode">
+                <option value="side-by-side">Side-by-side</option>
+                <option value="inline">Inline</option>
+              </select>
+            </label>
+            <button id="irsCompareApplyBtn" class="irs-apply-btn">Comparar</button>
+          </div>
+
+          <div id="irsContextSummary" class="irs-lineage-summary">Selecione duas versões para comparar contexto e mudanças.</div>
+          <ul id="irsContextHighlights" class="irs-context-highlights">
+            <li>As mudanças de texto e metadata aparecerão aqui.</li>
+          </ul>
+          <div class="irs-context-actions">
+            <button id="irsCompareOpenA">Abrir A</button>
+            <button id="irsCompareOpenB">Abrir B</button>
+            <button id="irsCompareOpenDecisions">Histórico de decisões</button>
+            <button id="irsCompareOpenLineage">Lineage</button>
+            <button id="irsCompareOpenAssistive">Impacto / Readiness</button>
+          </div>
+
+          <div id="irsContextDiff" class="irs-context-diff">
+            <p class="irs-hint">A comparação ficará disponível aqui depois de selecionar duas versões.</p>
           </div>
         </div>
       </div>
