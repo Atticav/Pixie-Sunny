@@ -128,8 +128,7 @@ A aplicação agora inclui um shell de configuração local em **Mac Local Works
 - `src/models.js`: modelos de dados
 - `src/store.js`: persistência local-first
 - `src/local-workspace.js`: camada de filesystem/storage local e convenções de diretório Mac-first
-- `src/assistant.js`: fluxos iniciais de escrita/memória/specs
-- `src/assistant.js`: geração local de prompts, specs e presets
+- `src/assistant.js`: fluxos de escrita/memória, geração local de prompts, specs e presets
 - `src/pipelines.js`: integração futura com geradores locais
 - `src/pipelines.md`: guia de extensão de pipeline
 - `tests/store.test.js`: testes focados em persistência e busca de lore

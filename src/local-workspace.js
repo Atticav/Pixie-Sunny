@@ -1,4 +1,5 @@
 const textEncoder = new TextEncoder();
+const DEFAULT_WORKSPACE_ROOT = 'MacBook/PixieSunnyStudio';
 
 const joinPath = (...parts) =>
   parts
@@ -16,6 +17,15 @@ const extensionFromMime = (mimeType = '') => {
   return mimeType.split('/')[1] || 'bin';
 };
 
+const sanitizeSegment = (value, fallback) => {
+  const cleaned = String(value || '')
+    .toLowerCase()
+    .replace(/[^\w-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return cleaned || fallback;
+};
+
 const ensureDirectoryPath = async (rootHandle, path) => {
   let current = rootHandle;
   const segments = joinPath(path).split('/').filter(Boolean);
@@ -28,7 +38,7 @@ const ensureDirectoryPath = async (rootHandle, path) => {
 const writeTextFile = async (rootHandle, path, content) => {
   const segments = joinPath(path).split('/').filter(Boolean);
   const fileName = segments.pop();
-  if (!fileName) throw new Error('Caminho de arquivo inválido.');
+  if (!fileName) throw new Error('Nome do arquivo não pode estar vazio.');
   const directory = await ensureDirectoryPath(rootHandle, segments.join('/'));
   const fileHandle = await directory.getFileHandle(fileName, { create: true });
   const writable = await fileHandle.createWritable();
@@ -41,13 +51,15 @@ const rootDirectory = async () => {
   return navigator.storage.getDirectory();
 };
 
-export const localWorkspaceSupported = () =>
-  typeof navigator !== 'undefined' && typeof navigator.storage?.getDirectory === 'function';
+export const localWorkspaceSupported = () => {
+  if (typeof navigator === 'undefined' || !navigator.storage) return false;
+  return typeof navigator.storage.getDirectory === 'function';
+};
 
 export const localWorkspaceSummary = (settings) => {
   const workspace = settings?.localWorkspace || {};
   const dirs = workspace.directories || {};
-  const rootPath = workspace.rootPath || '~/Library/Application Support/PixieSunnyStudio';
+  const rootPath = workspace.rootPath || DEFAULT_WORKSPACE_ROOT;
   return {
     rootPath,
     projectsPath: joinPath(rootPath, dirs.projects || 'projects'),
@@ -125,16 +137,20 @@ export const saveReferenceFileToWorkspace = async ({ settings, projectId, refere
   const root = await rootDirectory();
   if (!root || !projectId || !referenceId || !blob) return '';
   const extension = extensionFromMime(blob.type);
-  const safeName = fileName ? fileName.replace(/[^\w.-]+/g, '-').toLowerCase() : `reference.${extension}`;
+  const baseName = fileName ? String(fileName).replace(/\.[^/.]+$/, '') : 'reference';
+  const safeName = `${sanitizeSegment(baseName, 'reference')}.${sanitizeSegment(extension, 'bin')}`;
+  const safeProjectId = sanitizeSegment(projectId, 'project');
+  const safeReferenceId = sanitizeSegment(referenceId, 'reference');
   const directory = await ensureDirectoryPath(
     root,
-    joinPath(workspace.directories?.references || 'references', projectId)
+    joinPath(workspace.directories?.references || 'references', safeProjectId)
   );
-  const fileHandle = await directory.getFileHandle(`${referenceId}-${safeName}`, { create: true });
+  const finalName = `${safeReferenceId}-${safeName}`;
+  const fileHandle = await directory.getFileHandle(finalName, { create: true });
   const writable = await fileHandle.createWritable();
   await writable.write(blob);
   await writable.close();
-  return joinPath(workspace.directories?.references || 'references', projectId, `${referenceId}-${safeName}`);
+  return joinPath(workspace.directories?.references || 'references', safeProjectId, finalName);
 };
 
 export const saveExportToWorkspace = async ({ settings, filename, content }) => {

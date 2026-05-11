@@ -87,6 +87,11 @@ const parseLines = (value) => parseTextList(value, '\n');
 const parseTags = (value) => parseTextList(value, ',');
 
 const sanitizeFilename = (value) => (value || 'prompt').replace(/[^\w-]+/g, '-').toLowerCase();
+const sanitizeFileName = (value, fallback = 'file') =>
+  (value || fallback)
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '') || fallback;
 
 const selectedProjectId = () => refs.projectSelect.value;
 
@@ -320,7 +325,7 @@ const renderWorkspaceSettings = () => {
   refs.workspaceSaveRefs.checked = Boolean(preferences.saveReferenceFilesToWorkspace);
   refs.workspaceSaveExports.checked = Boolean(preferences.saveExportsToWorkspace);
   refs.workspaceSupport.textContent = localWorkspaceSupported()
-    ? 'OPFS disponível neste runtime (modo local filesystem ativo).'
+    ? 'OPFS disponível neste runtime (filesystem local ativo). `rootPath` é um rótulo lógico de organização.'
     : 'OPFS indisponível neste runtime (fallback para localStorage/browser).';
   refs.workspacePreview.textContent = JSON.stringify(summary, null, 2);
 };
@@ -379,6 +384,7 @@ const persist = () => {
   if (project) {
     mirrorProjectStateToWorkspace(state.settings, project, state).catch((error) => {
       console.warn('Falha ao espelhar projeto no workspace local:', error);
+      setWorkspaceStatus(`Falha ao espelhar projeto automaticamente: ${error?.message || 'erro desconhecido'}`);
     });
   }
   render();
@@ -1294,7 +1300,7 @@ csRefs.refFileInput.addEventListener('change', (event) => {
     return;
   }
   csPendingFileBlob = file;
-  csPendingFileName = file.name || '';
+  csPendingFileName = sanitizeFileName(file.name, 'reference');
   const reader = new FileReader();
   reader.onload = (e) => {
     csPendingFileDataUrl = e.target.result;
@@ -1307,7 +1313,7 @@ csRefs.addRefBtn.addEventListener('click', async () => {
   const name = csRefs.refName.value.trim();
   const character = csCurrentCharacter();
   if (!name || !character) return;
-  const reference = createReferenceImage({
+  const referenceDraft = createReferenceImage({
     projectId: selectedProjectId(),
     characterId: character.id,
     name,
@@ -1319,12 +1325,13 @@ csRefs.addRefBtn.addEventListener('click', async () => {
     mayVary: csRefs.refMayVary.value.trim(),
     notes: csRefs.refNotes.value.trim()
   });
+  let localPath = '';
   if (csPendingFileBlob) {
     try {
-      reference.localPath = await saveReferenceFileToWorkspace({
+      localPath = await saveReferenceFileToWorkspace({
         settings: state.settings,
         projectId: selectedProjectId(),
-        referenceId: reference.id,
+        referenceId: referenceDraft.id,
         blob: csPendingFileBlob,
         fileName: csPendingFileName
       });
@@ -1332,6 +1339,7 @@ csRefs.addRefBtn.addEventListener('click', async () => {
       console.warn('Falha ao salvar referência no workspace local:', error);
     }
   }
+  const reference = { ...referenceDraft, localPath };
 
   state.referenceImages.push(reference);
   state = store.save(state);

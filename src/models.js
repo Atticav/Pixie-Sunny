@@ -19,7 +19,7 @@ const hasRequiredFields = (value, fields) => fields.every((field) => stringValue
 const baseLocalWorkspaceSettings = () => ({
   mode: 'opfs',
   enabled: true,
-  rootPath: '~/Library/Application Support/PixieSunnyStudio',
+  rootPath: 'MacBook/PixieSunnyStudio',
   directories: {
     projects: 'projects',
     references: 'references',
