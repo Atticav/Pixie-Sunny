@@ -3,6 +3,7 @@ import {
   createBeat,
   createBook,
   createCanonPromotion,
+  createDecisionEvent,
   createChapter,
   createCharacter,
   createGenerationJob,
@@ -15,6 +16,9 @@ import {
   createShot,
   deleteEntity,
   CANON_PROMOTION_TYPES,
+  DECISION_RESULT_STATUSES,
+  DECISION_SCOPE_TYPES,
+  DECISION_TYPES,
   IMAGE_GEN_PROVIDER_TYPES,
   IMAGE_GEN_TYPES,
   OUTPUT_REVIEW_STATUSES,
@@ -3607,8 +3611,10 @@ const irsRefs = {
   openGenStudioBtn: $('irsOpenGenStudioBtn'),
   tabBtnReview: $('irsTabBtnReview'),
   tabBtnPromotions: $('irsTabBtnPromotions'),
+  tabBtnDecisions: $('irsTabBtnDecisions'),
   tabReview: $('irsTabReview'),
   tabPromotions: $('irsTabPromotions'),
+  tabDecisions: $('irsTabDecisions'),
   // Filters
   filterCharacter: $('irsFilterCharacter'),
   filterScene: $('irsFilterScene'),
@@ -3648,6 +3654,14 @@ const irsRefs = {
   // Promotions
   promotionList: $('irsPromotionList'),
   promotionsCount: $('irsPromotionsCount'),
+  // Decisions
+  decisionScopeFilter: $('irsDecisionScopeFilter'),
+  decisionStatusFilter: $('irsDecisionStatusFilter'),
+  decisionOnlyLatestApproved: $('irsDecisionOnlyLatestApproved'),
+  decisionItemFilter: $('irsDecisionItemFilter'),
+  decisionApplyBtn: $('irsDecisionApplyBtn'),
+  decisionCount: $('irsDecisionCount'),
+  decisionList: $('irsDecisionList'),
   // Canon modal
   canonModal: $('irsCanonModal'),
   modalImg: $('irsModalImg'),
@@ -3658,7 +3672,10 @@ const irsRefs = {
   canonNotes: $('irsCanonNotes'),
   canonCreateRef: $('irsCanonCreateRef'),
   canonConfirmBtn: $('irsCanonConfirmBtn'),
-  canonCancelBtn: $('irsCanonCancelBtn')
+  canonCancelBtn: $('irsCanonCancelBtn'),
+  btnSendRevision: $('irsBtnSendRevision'),
+  supersedeTarget: $('irsSupersedeTarget'),
+  btnSupersede: $('irsBtnSupersede')
 };
 
 // Helper: collect all outputs across all jobs for a project
@@ -3672,6 +3689,110 @@ const irsAllOutputs = () => {
     }
   }
   return outputs;
+};
+
+const irsDecisionTypeLabels = {
+  approve: 'Approve',
+  reject: 'Reject',
+  promote_to_canon: 'Promote to canon',
+  supersede: 'Supersede',
+  send_back_for_revision: 'Send back for revision',
+  archive_deprecate: 'Archive / deprecate'
+};
+
+const irsDecisionScopeLabels = {
+  asset: 'Asset',
+  shot: 'Shot',
+  scene: 'Cena',
+  sequence: 'Sequência',
+  briefing: 'Briefing',
+  canon_entry: 'Canon entry',
+  reference_visual: 'Referência visual'
+};
+
+const irsDecisionStatusLabels = {
+  pending_review: 'Pending review',
+  approved: 'Latest approved',
+  rejected: 'Rejected',
+  current_official: 'Current official',
+  superseded: 'Superseded',
+  needs_revision: 'Needs revision',
+  archived_deprecated: 'Archived/deprecated'
+};
+
+const irsDecisionStatusClass = (status) => {
+  if (status === 'approved') return 'irs-decision-status-approved';
+  if (status === 'current_official') return 'irs-decision-status-official';
+  if (status === 'rejected') return 'irs-decision-status-rejected';
+  if (status === 'superseded') return 'irs-decision-status-superseded';
+  if (status === 'needs_revision') return 'irs-decision-status-needs-revision';
+  if (status === 'pending_review') return 'irs-decision-status-pending';
+  return 'irs-decision-status-archived';
+};
+
+const irsAllDecisionEvents = () => {
+  const projectId = selectedProjectId();
+  return (state.decisionHistory || []).filter((event) => event.projectId === projectId);
+};
+
+const irsFindPrimaryShotForOutput = (outputId) =>
+  (state.shots || []).find((shot) => shot.projectId === selectedProjectId() && (shot.generationOutputIds || []).includes(outputId)) || null;
+
+const irsBuildScopeTargetsForOutput = ({ output, job }) => {
+  const targets = [{ scopeType: 'asset', scopeId: output.id }];
+  if (output.sceneId) targets.push({ scopeType: 'scene', scopeId: output.sceneId });
+  const shot = irsFindPrimaryShotForOutput(output.id);
+  if (shot) {
+    targets.push({ scopeType: 'shot', scopeId: shot.id });
+    if (shot.beatId) targets.push({ scopeType: 'sequence', scopeId: shot.beatId });
+  }
+  const briefingId = job.promptDocumentId || '';
+  if (briefingId) targets.push({ scopeType: 'briefing', scopeId: briefingId });
+  const unique = new Map();
+  targets.forEach((target) => {
+    if (!target.scopeType || !target.scopeId) return;
+    unique.set(`${target.scopeType}:${target.scopeId}`, target);
+  });
+  return [...unique.values()];
+};
+
+const irsRecordDecision = ({
+  output,
+  job,
+  decisionType,
+  resultingStatus,
+  rationale = '',
+  notes = '',
+  relatedItemType = '',
+  relatedItemId = '',
+  extraScopes = []
+}) => {
+  if (!output || !job || !DECISION_TYPES.includes(decisionType) || !DECISION_RESULT_STATUSES.includes(resultingStatus)) return;
+  if (!state.decisionHistory) state.decisionHistory = [];
+  const baseScopes = irsBuildScopeTargetsForOutput({ output, job });
+  const fullScopes = [...baseScopes, ...(Array.isArray(extraScopes) ? extraScopes : [])].filter(
+    ({ scopeType, scopeId }) => DECISION_SCOPE_TYPES.includes(scopeType) && scopeId
+  );
+  const dedupedScopes = new Map();
+  fullScopes.forEach((scope) => dedupedScopes.set(`${scope.scopeType}:${scope.scopeId}`, scope));
+  dedupedScopes.forEach(({ scopeType, scopeId }) => {
+    state.decisionHistory.push(
+      createDecisionEvent({
+        projectId: selectedProjectId(),
+        decisionType,
+        scopeType,
+        scopeId,
+        targetType: 'generationOutput',
+        targetId: output.id,
+        relatedItemType,
+        relatedItemId,
+        rationale,
+        notes,
+        resultingStatus
+      })
+    );
+  });
+  state = store.save(state);
 };
 
 const irsGetFilters = () => ({
@@ -3916,6 +4037,53 @@ const irsFindOutput = (outputId) => {
   return null;
 };
 
+const irsScopeItemLabel = (scopeType, scopeId) => {
+  if (!scopeId) return '—';
+  if (scopeType === 'asset') {
+    const found = irsFindOutput(scopeId);
+    const output = found?.output;
+    if (!output) return `Output ${scopeId.substring(0, 8)}`;
+    return output.fileName || `Output ${output.seed >= 0 ? `seed ${output.seed}` : scopeId.substring(0, 8)}`;
+  }
+  if (scopeType === 'shot') {
+    return (state.shots || []).find((shot) => shot.id === scopeId)?.title || `Shot ${scopeId.substring(0, 8)}`;
+  }
+  if (scopeType === 'scene') {
+    return (state.scenes || []).find((scene) => scene.id === scopeId)?.title || `Cena ${scopeId.substring(0, 8)}`;
+  }
+  if (scopeType === 'sequence') {
+    return (state.beats || []).find((beat) => beat.id === scopeId)?.title || `Sequência ${scopeId.substring(0, 8)}`;
+  }
+  if (scopeType === 'briefing') {
+    return (state.promptDocuments || []).find((doc) => doc.id === scopeId)?.title || `Briefing ${scopeId.substring(0, 8)}`;
+  }
+  if (scopeType === 'canon_entry') {
+    const characterName = (state.characters || []).find((character) => character.id === scopeId)?.name;
+    if (characterName) return `Character canon · ${characterName}`;
+    const sceneTitle = (state.scenes || []).find((scene) => scene.id === scopeId)?.title;
+    if (sceneTitle) return `Scene canon · ${sceneTitle}`;
+    const loreTitle = (state.loreEntries || []).find((entry) => entry.id === scopeId)?.title;
+    if (loreTitle) return `Universe canon · ${loreTitle}`;
+    return `Canon entry ${scopeId.substring(0, 8)}`;
+  }
+  if (scopeType === 'reference_visual') {
+    return (state.referenceImages || []).find((reference) => reference.id === scopeId)?.name || `Ref ${scopeId.substring(0, 8)}`;
+  }
+  return scopeId;
+};
+
+const irsPopulateSupersedeTargets = () => {
+  const currentId = irsSelectedOutputId || '';
+  const all = irsAllOutputs().map(({ output }) => output).filter((output) => output.id !== currentId);
+  irsRefs.supersedeTarget.innerHTML = '<option value="">— escolher substituto —</option>';
+  all.forEach((output) => {
+    const option = document.createElement('option');
+    option.value = output.id;
+    option.textContent = `${output.fileName || output.id.substring(0, 8)} · ${output.generationType} · ${new Date(output.createdAt).toLocaleDateString('pt-BR')}`;
+    irsRefs.supersedeTarget.append(option);
+  });
+};
+
 const irsRenderStars = (score) => {
   const stars = irsRefs.scoreStars.querySelectorAll('.irs-star-btn');
   stars.forEach((btn) => {
@@ -3979,6 +4147,7 @@ const irsSelectOutput = (outputId) => {
   irsUpdateStatusButtonStates(output);
   irsRenderStars(output.score || 0);
   irsRefs.notesInput.value = output.notes || '';
+  irsPopulateSupersedeTargets();
 };
 
 const irsUpdateOutput = (outputId, updater) => {
@@ -4003,16 +4172,34 @@ irsRefs.btnCandidate.addEventListener('click', () => {
   if (!found) return;
   const newStatus = found.output.reviewStatus === 'candidate' ? 'unreviewed' : 'candidate';
   irsUpdateOutput(irsSelectedOutputId, (o) => { o.reviewStatus = newStatus; });
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: 'send_back_for_revision',
+    resultingStatus: newStatus === 'candidate' ? 'needs_revision' : 'pending_review',
+    rationale: newStatus === 'candidate' ? 'Output enviado de volta para revisão.' : 'Output voltou para fila de revisão.',
+    notes: found.output.notes || ''
+  });
   irsRefreshDetail();
 });
 
 irsRefs.btnFavorite.addEventListener('click', () => {
   const found = irsFindOutput(irsSelectedOutputId);
   if (!found) return;
+  let approved = false;
   irsUpdateOutput(irsSelectedOutputId, (o) => {
     o.isFavorite = !o.isFavorite;
     if (o.isFavorite) o.reviewStatus = 'favorite';
     else if (o.reviewStatus === 'favorite') o.reviewStatus = 'unreviewed';
+    approved = o.isFavorite;
+  });
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: approved ? 'approve' : 'send_back_for_revision',
+    resultingStatus: approved ? 'approved' : 'pending_review',
+    rationale: approved ? 'Output aprovado como favorito editorial.' : 'Output removido dos favoritos e voltou para revisão.',
+    notes: found.output.notes || ''
   });
   irsRefreshDetail();
 });
@@ -4025,6 +4212,14 @@ irsRefs.btnReject.addEventListener('click', () => {
     o.reviewStatus = newStatus;
     if (newStatus === 'rejected') o.isFavorite = false;
   });
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: 'reject',
+    resultingStatus: newStatus === 'rejected' ? 'rejected' : 'pending_review',
+    rationale: newStatus === 'rejected' ? 'Output rejeitado na curadoria editorial.' : 'Rejeição removida; output voltou para revisão.',
+    notes: found.output.notes || ''
+  });
   irsRefreshDetail();
 });
 
@@ -4033,6 +4228,14 @@ irsRefs.btnArchive.addEventListener('click', () => {
   if (!found) return;
   const newStatus = found.output.reviewStatus === 'archived' ? 'unreviewed' : 'archived';
   irsUpdateOutput(irsSelectedOutputId, (o) => { o.reviewStatus = newStatus; });
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: 'archive_deprecate',
+    resultingStatus: newStatus === 'archived' ? 'archived_deprecated' : 'pending_review',
+    rationale: newStatus === 'archived' ? 'Output arquivado/depreciado.' : 'Output desarquivado para revisão.',
+    notes: found.output.notes || ''
+  });
   irsRefreshDetail();
 });
 
@@ -4069,7 +4272,20 @@ irsRefs.saveNotesBtn.addEventListener('click', () => {
 irsRefs.btnMarkCanon.addEventListener('click', () => {
   const found = irsFindOutput(irsSelectedOutputId);
   if (!found) return;
-  irsUpdateOutput(irsSelectedOutputId, (o) => { o.isCanonical = !o.isCanonical; });
+  let nowCanonical = false;
+  irsUpdateOutput(irsSelectedOutputId, (o) => {
+    o.isCanonical = !o.isCanonical;
+    nowCanonical = o.isCanonical;
+  });
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: nowCanonical ? 'promote_to_canon' : 'send_back_for_revision',
+    resultingStatus: nowCanonical ? 'current_official' : 'pending_review',
+    rationale: nowCanonical ? 'Output marcado como canônico.' : 'Output removido do estado canônico.',
+    notes: found.output.notes || '',
+    extraScopes: nowCanonical ? [{ scopeType: 'canon_entry', scopeId: found.output.sceneId || found.output.characterId || found.output.id }] : []
+  });
   irsRefreshDetail();
 });
 
@@ -4077,6 +4293,79 @@ irsRefs.btnBestRef.addEventListener('click', () => {
   const found = irsFindOutput(irsSelectedOutputId);
   if (!found) return;
   irsUpdateOutput(irsSelectedOutputId, (o) => { o.isBestReference = !o.isBestReference; });
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: found.output.isBestReference ? 'approve' : 'send_back_for_revision',
+    resultingStatus: found.output.isBestReference ? 'approved' : 'pending_review',
+    rationale: found.output.isBestReference
+      ? 'Output marcado como melhor referência visual.'
+      : 'Output removido da seleção de melhor referência.',
+    notes: found.output.notes || ''
+  });
+  irsRefreshDetail();
+});
+
+irsRefs.btnSendRevision.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found) return;
+  irsUpdateOutput(irsSelectedOutputId, (o) => {
+    o.reviewStatus = 'candidate';
+    o.isFavorite = false;
+  });
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: 'send_back_for_revision',
+    resultingStatus: 'needs_revision',
+    rationale: 'Output devolvido para revisão editorial.',
+    notes: found.output.notes || ''
+  });
+  irsRefreshDetail();
+});
+
+irsRefs.btnSupersede.addEventListener('click', () => {
+  const found = irsFindOutput(irsSelectedOutputId);
+  if (!found) return;
+  const replacementId = irsRefs.supersedeTarget.value;
+  if (!replacementId) {
+    alert('Selecione um output substituto para registrar supersessão.');
+    return;
+  }
+  const replacementFound = irsFindOutput(replacementId);
+  if (!replacementFound) {
+    alert('Output substituto não encontrado.');
+    return;
+  }
+  irsUpdateOutput(irsSelectedOutputId, (o) => {
+    o.reviewStatus = 'archived';
+    o.isCanonical = false;
+  });
+  irsUpdateOutput(replacementId, (o) => {
+    o.reviewStatus = o.reviewStatus === 'rejected' ? 'candidate' : o.reviewStatus;
+    o.isCanonical = true;
+  });
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: 'supersede',
+    resultingStatus: 'superseded',
+    relatedItemType: 'generationOutput',
+    relatedItemId: replacementId,
+    rationale: 'Output supersedido por substituto definido na revisão.',
+    notes: found.output.notes || '',
+    extraScopes: [{ scopeType: 'asset', scopeId: replacementId }]
+  });
+  irsRecordDecision({
+    output: replacementFound.output,
+    job: replacementFound.job,
+    decisionType: 'promote_to_canon',
+    resultingStatus: 'current_official',
+    relatedItemType: 'generationOutput',
+    relatedItemId: irsSelectedOutputId,
+    rationale: 'Output promovido como substituto oficial.',
+    notes: replacementFound.output.notes || ''
+  });
   irsRefreshDetail();
 });
 
@@ -4188,6 +4477,7 @@ irsRefs.canonConfirmBtn.addEventListener('click', () => {
   });
   if (!state.canonPromotions) state.canonPromotions = [];
   state.canonPromotions.push(promotion);
+  const promotionScopes = [{ scopeType: 'canon_entry', scopeId: targetId || promotion.id }];
 
   // Optionally create reference image
   if (irsRefs.canonCreateRef.checked && output.dataUrl) {
@@ -4217,9 +4507,19 @@ irsRefs.canonConfirmBtn.addEventListener('click', () => {
     });
     if (!state.referenceImages) state.referenceImages = [];
     state.referenceImages.push(ref);
+    promotionScopes.push({ scopeType: 'reference_visual', scopeId: ref.id });
   }
 
   state = store.save(state);
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: 'promote_to_canon',
+    resultingStatus: 'current_official',
+    rationale: reason,
+    notes,
+    extraScopes: promotionScopes
+  });
   irsRefs.canonModal.classList.add('irs-hidden');
   irsCanonModalOutputId = null;
   irsRefreshDetail();
@@ -4253,6 +4553,15 @@ irsRefs.btnUseAsRef.addEventListener('click', () => {
   if (!state.referenceImages) state.referenceImages = [];
   state.referenceImages.push(ref);
   state = store.save(state);
+  irsRecordDecision({
+    output: found.output,
+    job: found.job,
+    decisionType: 'approve',
+    resultingStatus: found.output.isCanonical ? 'current_official' : 'approved',
+    rationale: 'Output reutilizado como referência visual.',
+    notes: found.output.notes || '',
+    extraScopes: [{ scopeType: 'reference_visual', scopeId: ref.id }]
+  });
   alert(`Referência "${ref.name}" criada com sucesso.`);
 });
 
@@ -4386,22 +4695,141 @@ const irsRenderPromotionsList = () => {
   });
 };
 
+const irsPopulateDecisionItemFilter = () => {
+  const previous = irsRefs.decisionItemFilter.value;
+  const catalog = new Map();
+  (irsAllDecisionEvents() || []).forEach((event) => {
+    const key = `${event.scopeType}:${event.scopeId}`;
+    if (!catalog.has(key)) {
+      catalog.set(key, {
+        key,
+        scopeType: event.scopeType,
+        scopeId: event.scopeId,
+        label: `${irsDecisionScopeLabels[event.scopeType] || event.scopeType} · ${irsScopeItemLabel(event.scopeType, event.scopeId)}`
+      });
+    }
+  });
+  irsRefs.decisionItemFilter.innerHTML = '<option value="">Todos os itens</option>';
+  [...catalog.values()]
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .forEach((entry) => {
+      const option = document.createElement('option');
+      option.value = entry.key;
+      option.textContent = entry.label;
+      if (entry.key === previous) option.selected = true;
+      irsRefs.decisionItemFilter.append(option);
+    });
+};
+
+const irsFilteredDecisionEvents = () => {
+  const scopeFilter = irsRefs.decisionScopeFilter.value;
+  const statusFilter = irsRefs.decisionStatusFilter.value;
+  const itemFilter = irsRefs.decisionItemFilter.value;
+  const onlyLatestApproved = irsRefs.decisionOnlyLatestApproved.checked;
+  const all = irsAllDecisionEvents().slice().sort((a, b) => b.happenedAt.localeCompare(a.happenedAt));
+  const latestApprovedByScope = new Map();
+  all.forEach((event) => {
+    if (event.resultingStatus !== 'approved' && event.resultingStatus !== 'current_official') return;
+    const key = `${event.scopeType}:${event.scopeId}`;
+    if (!latestApprovedByScope.has(key)) latestApprovedByScope.set(key, event.id);
+  });
+
+  let filtered = all;
+  if (scopeFilter) filtered = filtered.filter((event) => event.scopeType === scopeFilter);
+  if (statusFilter) filtered = filtered.filter((event) => event.resultingStatus === statusFilter);
+  if (itemFilter) filtered = filtered.filter((event) => `${event.scopeType}:${event.scopeId}` === itemFilter);
+  if (onlyLatestApproved) {
+    filtered = filtered.filter((event) => latestApprovedByScope.get(`${event.scopeType}:${event.scopeId}`) === event.id);
+  }
+  return { filtered, allCount: all.length, latestApprovedByScope };
+};
+
+const irsRenderDecisionHistory = () => {
+  irsPopulateDecisionItemFilter();
+  const { filtered, allCount, latestApprovedByScope } = irsFilteredDecisionEvents();
+  irsRefs.decisionCount.textContent = `${filtered.length} / ${allCount} decisão(ões)`;
+  irsRefs.decisionList.innerHTML = '';
+  if (!filtered.length) {
+    irsRefs.decisionList.innerHTML = '<p class="irs-hint">Nenhum evento de decisão encontrado para os filtros atuais.</p>';
+    return;
+  }
+
+  filtered.forEach((event) => {
+    const row = document.createElement('article');
+    row.className = 'irs-decision-item';
+
+    const header = document.createElement('div');
+    header.className = 'irs-decision-header';
+
+    const type = document.createElement('span');
+    type.className = 'irs-decision-type';
+    type.textContent = irsDecisionTypeLabels[event.decisionType] || event.decisionType;
+
+    const status = document.createElement('span');
+    status.className = `irs-decision-status ${irsDecisionStatusClass(event.resultingStatus)}`;
+    status.textContent = irsDecisionStatusLabels[event.resultingStatus] || event.resultingStatus;
+
+    header.append(type, status);
+
+    const meta = document.createElement('p');
+    meta.className = 'irs-decision-meta';
+    const scopeLabel = irsDecisionScopeLabels[event.scopeType] || event.scopeType;
+    const itemLabel = irsScopeItemLabel(event.scopeType, event.scopeId);
+    const isLatestApproved = latestApprovedByScope.get(`${event.scopeType}:${event.scopeId}`) === event.id;
+    const tags = [
+      isLatestApproved ? 'latest approved' : '',
+      event.resultingStatus === 'current_official' ? 'current official' : '',
+      event.resultingStatus === 'superseded' ? 'superseded' : '',
+      event.resultingStatus === 'pending_review' ? 'pending review' : ''
+    ].filter(Boolean).join(' · ');
+    meta.textContent = `${scopeLabel} · ${itemLabel}${tags ? ` · ${tags}` : ''}`;
+
+    const rationale = document.createElement('p');
+    rationale.className = 'irs-decision-rationale';
+    rationale.textContent = event.rationale || 'Sem rationale registrado.';
+
+    const relation = document.createElement('p');
+    relation.className = 'irs-decision-related';
+    relation.textContent = event.relatedItemId
+      ? `Relacionado/substituto: ${event.relatedItemType || 'item'} · ${event.relatedItemId}`
+      : '';
+
+    const timestamp = document.createElement('div');
+    timestamp.className = 'irs-decision-time';
+    timestamp.textContent = new Date(event.happenedAt).toLocaleString('pt-BR');
+
+    row.append(header, meta, rationale);
+    if (relation.textContent) row.append(relation);
+    row.append(timestamp);
+    irsRefs.decisionList.append(row);
+  });
+};
+
 // Tab switching
 const irsSwitchTab = (tab) => {
   const isReview = tab === 'review';
+  const isPromotions = tab === 'promotions';
   irsRefs.tabReview.classList.toggle('irs-hidden', !isReview);
-  irsRefs.tabPromotions.classList.toggle('irs-hidden', isReview);
+  irsRefs.tabPromotions.classList.toggle('irs-hidden', !isPromotions);
+  irsRefs.tabDecisions.classList.toggle('irs-hidden', tab !== 'decisions');
   irsRefs.tabBtnReview.classList.toggle('irs-tab-active', isReview);
-  irsRefs.tabBtnPromotions.classList.toggle('irs-tab-active', !isReview);
+  irsRefs.tabBtnPromotions.classList.toggle('irs-tab-active', isPromotions);
+  irsRefs.tabBtnDecisions.classList.toggle('irs-tab-active', tab === 'decisions');
 
-  if (!isReview) irsRenderPromotionsList();
+  if (isPromotions) irsRenderPromotionsList();
+  if (tab === 'decisions') irsRenderDecisionHistory();
 };
 
 irsRefs.tabBtnReview.addEventListener('click', () => irsSwitchTab('review'));
 irsRefs.tabBtnPromotions.addEventListener('click', () => irsSwitchTab('promotions'));
+irsRefs.tabBtnDecisions.addEventListener('click', () => irsSwitchTab('decisions'));
 
 irsRefs.applyFiltersBtn.addEventListener('click', () => {
   irsRenderGallery();
+});
+
+irsRefs.decisionApplyBtn.addEventListener('click', () => {
+  irsRenderDecisionHistory();
 });
 
 irsRefs.clearCompareBtn.addEventListener('click', () => {
@@ -4409,6 +4837,29 @@ irsRefs.clearCompareBtn.addEventListener('click', () => {
   irsRenderGallery();
   irsRenderCompare();
 });
+
+const irsPopulateDecisionFilters = () => {
+  const previousScope = irsRefs.decisionScopeFilter.value;
+  const previousStatus = irsRefs.decisionStatusFilter.value;
+
+  irsRefs.decisionScopeFilter.innerHTML = '<option value="">Todos os escopos</option>';
+  DECISION_SCOPE_TYPES.forEach((scopeType) => {
+    const option = document.createElement('option');
+    option.value = scopeType;
+    option.textContent = irsDecisionScopeLabels[scopeType] || scopeType;
+    if (scopeType === previousScope) option.selected = true;
+    irsRefs.decisionScopeFilter.append(option);
+  });
+
+  irsRefs.decisionStatusFilter.innerHTML = '<option value="">Todos os status</option>';
+  DECISION_RESULT_STATUSES.forEach((status) => {
+    const option = document.createElement('option');
+    option.value = status;
+    option.textContent = irsDecisionStatusLabels[status] || status;
+    if (status === previousStatus) option.selected = true;
+    irsRefs.decisionStatusFilter.append(option);
+  });
+};
 
 // Open / close
 const openImageReviewStudio = () => {
@@ -4418,6 +4869,7 @@ const openImageReviewStudio = () => {
   irsCompareIds = [];
   irsCanonModalOutputId = null;
   irsPopulateFilterSelectors();
+  irsPopulateDecisionFilters();
   irsSwitchTab('review');
   irsRenderGallery();
   irsRefs.detailPanel.classList.add('irs-hidden');

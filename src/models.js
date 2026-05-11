@@ -80,6 +80,24 @@ export const IMAGE_GEN_PROVIDER_TYPES = ['mock', 'local-api'];
 export const OUTPUT_REVIEW_STATUSES = ['unreviewed', 'candidate', 'favorite', 'rejected', 'archived'];
 export const CANON_PROMOTION_TYPES = ['character', 'place', 'scene', 'aesthetic'];
 export const SHOT_STATUSES = ['idea', 'planned', 'generated', 'approved', 'canonical', 'needs redo'];
+export const DECISION_TYPES = [
+  'approve',
+  'reject',
+  'promote_to_canon',
+  'supersede',
+  'send_back_for_revision',
+  'archive_deprecate'
+];
+export const DECISION_SCOPE_TYPES = ['asset', 'shot', 'scene', 'sequence', 'briefing', 'canon_entry', 'reference_visual'];
+export const DECISION_RESULT_STATUSES = [
+  'pending_review',
+  'approved',
+  'rejected',
+  'current_official',
+  'superseded',
+  'needs_revision',
+  'archived_deprecated'
+];
 
 const baseImageGenSettings = () => ({
   type: 'mock',
@@ -148,6 +166,7 @@ export const emptyState = () => ({
   promptDocuments: [],
   generationJobs: [],
   canonPromotions: [],
+  decisionHistory: [],
   settings: baseSettings()
 });
 
@@ -474,6 +493,35 @@ export const createCanonPromotion = ({
   reason: stringValue(reason),
   notes: stringValue(notes),
   promotedAt: nowUtc()
+});
+
+export const createDecisionEvent = ({
+  projectId,
+  decisionType,
+  scopeType,
+  scopeId,
+  targetType = 'generationOutput',
+  targetId = '',
+  relatedItemType = '',
+  relatedItemId = '',
+  rationale = '',
+  notes = '',
+  resultingStatus = 'pending_review',
+  happenedAt = nowUtc()
+}) => ({
+  id: newId(),
+  projectId,
+  decisionType: DECISION_TYPES.includes(decisionType) ? decisionType : 'approve',
+  scopeType: DECISION_SCOPE_TYPES.includes(scopeType) ? scopeType : 'asset',
+  scopeId: stringValue(scopeId),
+  targetType: stringValue(targetType, 'generationOutput'),
+  targetId: stringValue(targetId),
+  relatedItemType: stringValue(relatedItemType),
+  relatedItemId: stringValue(relatedItemId),
+  rationale: stringValue(rationale),
+  notes: stringValue(notes),
+  resultingStatus: DECISION_RESULT_STATUSES.includes(resultingStatus) ? resultingStatus : 'pending_review',
+  happenedAt: stringValue(happenedAt) || nowUtc()
 });
 
 export const createGenerationJob = ({
@@ -943,6 +991,28 @@ const normalizeCanonPromotion = (promotion) => {
   };
 };
 
+const normalizeDecisionEvent = (event) => {
+  const value = recordValue(event);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId', 'decisionType', 'scopeType', 'scopeId'])) return null;
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    decisionType: DECISION_TYPES.includes(stringValue(value.decisionType)) ? stringValue(value.decisionType) : 'approve',
+    scopeType: DECISION_SCOPE_TYPES.includes(stringValue(value.scopeType)) ? stringValue(value.scopeType) : 'asset',
+    scopeId: stringValue(value.scopeId),
+    targetType: stringValue(value.targetType, 'generationOutput'),
+    targetId: stringValue(value.targetId),
+    relatedItemType: stringValue(value.relatedItemType),
+    relatedItemId: stringValue(value.relatedItemId),
+    rationale: stringValue(value.rationale),
+    notes: stringValue(value.notes),
+    resultingStatus: DECISION_RESULT_STATUSES.includes(stringValue(value.resultingStatus))
+      ? stringValue(value.resultingStatus)
+      : 'pending_review',
+    happenedAt: stringValue(value.happenedAt) || nowUtc()
+  };
+};
+
 export const normalizeState = (raw) => {
   const value = recordValue(raw) || {};
   const settingsSource = recordValue(value.settings) || {};
@@ -995,6 +1065,9 @@ export const normalizeState = (raw) => {
   const canonPromotions = (Array.isArray(value.canonPromotions) ? value.canonPromotions : [])
     .map(normalizeCanonPromotion)
     .filter((p) => p && projectIds.has(p.projectId));
+  const decisionHistory = (Array.isArray(value.decisionHistory) ? value.decisionHistory : [])
+    .map(normalizeDecisionEvent)
+    .filter((event) => event && projectIds.has(event.projectId));
   const beats = (Array.isArray(value.beats) ? value.beats : [])
     .map(normalizeBeat)
     .filter(
@@ -1051,6 +1124,7 @@ export const normalizeState = (raw) => {
     promptDocuments,
     generationJobs,
     canonPromotions,
+    decisionHistory,
     settings: {
       ...baseSettings(),
       ...settingsSource,
@@ -1081,7 +1155,8 @@ export const deleteEntity = (state, entityType, id) => {
       referenceImages: current.referenceImages.filter((ref) => ref.projectId !== id),
       promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.projectId !== id),
       generationJobs: current.generationJobs.filter((job) => job.projectId !== id),
-      canonPromotions: (current.canonPromotions || []).filter((p) => p.projectId !== id)
+      canonPromotions: (current.canonPromotions || []).filter((p) => p.projectId !== id),
+      decisionHistory: (current.decisionHistory || []).filter((event) => event.projectId !== id)
     });
   }
 
@@ -1109,7 +1184,10 @@ export const deleteEntity = (state, entityType, id) => {
       shots: (current.shots || []).map((shot) => ({
         ...shot,
         generationOutputIds: shot.generationOutputIds.filter((outputId) => outputId !== id)
-      }))
+      })),
+      decisionHistory: (current.decisionHistory || []).filter(
+        (event) => event.targetId !== id && event.relatedItemId !== id && event.scopeId !== id
+      )
     };
   }
 
@@ -1137,6 +1215,9 @@ export const deleteEntity = (state, entityType, id) => {
       scenes: current.scenes.filter((scene) => scene.id !== id),
       beats: (current.beats || []).filter((beat) => beat.sceneId !== id),
       shots: (current.shots || []).filter((shot) => shot.sceneId !== id),
+      decisionHistory: (current.decisionHistory || []).filter(
+        (event) => !(event.scopeType === 'scene' && event.scopeId === id)
+      ),
       promptDocuments: current.promptDocuments.filter(
         (promptDocument) => !(promptDocument.targetType === 'scene' && promptDocument.targetId === id)
       )
@@ -1158,6 +1239,9 @@ export const deleteEntity = (state, entityType, id) => {
     return normalizeState({
       ...current,
       referenceImages: current.referenceImages.filter((ref) => ref.id !== id),
+      decisionHistory: (current.decisionHistory || []).filter(
+        (event) => event.scopeId !== id && event.relatedItemId !== id
+      ),
       promptDocuments: current.promptDocuments.map((promptDocument) => ({
         ...promptDocument,
         referenceIds: promptDocument.referenceIds.filter((referenceId) => referenceId !== id)
@@ -1168,7 +1252,10 @@ export const deleteEntity = (state, entityType, id) => {
   if (entityType === 'promptDocument') {
     return normalizeState({
       ...current,
-      promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.id !== id)
+      promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.id !== id),
+      decisionHistory: (current.decisionHistory || []).filter(
+        (event) => !(event.scopeType === 'briefing' && event.scopeId === id)
+      )
     });
   }
 
@@ -1176,6 +1263,9 @@ export const deleteEntity = (state, entityType, id) => {
     return normalizeState({
       ...current,
       beats: (current.beats || []).filter((beat) => beat.id !== id),
+      decisionHistory: (current.decisionHistory || []).filter(
+        (event) => !(event.scopeType === 'sequence' && event.scopeId === id)
+      ),
       shots: (current.shots || []).map((shot) => ({
         ...shot,
         beatId: shot.beatId === id ? '' : shot.beatId
@@ -1186,7 +1276,10 @@ export const deleteEntity = (state, entityType, id) => {
   if (entityType === 'shot') {
     return {
       ...current,
-      shots: (current.shots || []).filter((shot) => shot.id !== id)
+      shots: (current.shots || []).filter((shot) => shot.id !== id),
+      decisionHistory: (current.decisionHistory || []).filter(
+        (event) => !(event.scopeType === 'shot' && event.scopeId === id)
+      )
     };
   }
 
