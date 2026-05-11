@@ -43,6 +43,11 @@ import { buildAssetLineageGraph } from './asset-lineage.js';
 import { buildAssistivePlanningBundle } from './assistive-planning.js';
 import { buildDiffSummary, buildLineDiff, buildMetadataDiff, buildSemanticHighlights } from './context-compare.js';
 import {
+  applyReviewInboxFiltersAndSort,
+  buildReviewInboxItems,
+  groupReviewInboxItems
+} from './review-inbox.js';
+import {
   initializeLocalWorkspace,
   localWorkspaceSupported,
   localWorkspaceSummary,
@@ -132,7 +137,27 @@ const refs = {
   assistiveScopeType: $('assistiveScopeType'),
   assistiveScopeValue: $('assistiveScopeValue'),
   assistiveSummary: $('assistiveSummary'),
-  assistiveRecommendationList: $('assistiveRecommendationList')
+  assistiveRecommendationList: $('assistiveRecommendationList'),
+  reviewInboxTypeFilter: $('reviewInboxTypeFilter'),
+  reviewInboxPriorityFilter: $('reviewInboxPriorityFilter'),
+  reviewInboxRiskFilter: $('reviewInboxRiskFilter'),
+  reviewInboxStatusFilter: $('reviewInboxStatusFilter'),
+  reviewInboxEntityFilter: $('reviewInboxEntityFilter'),
+  reviewInboxChapterFilter: $('reviewInboxChapterFilter'),
+  reviewInboxSceneFilter: $('reviewInboxSceneFilter'),
+  reviewInboxSortBy: $('reviewInboxSortBy'),
+  reviewInboxGroupBy: $('reviewInboxGroupBy'),
+  reviewInboxSearch: $('reviewInboxSearch'),
+  reviewInboxSavedViewSelect: $('reviewInboxSavedViewSelect'),
+  reviewInboxSavedViewName: $('reviewInboxSavedViewName'),
+  reviewInboxSaveViewBtn: $('reviewInboxSaveViewBtn'),
+  reviewInboxDeleteViewBtn: $('reviewInboxDeleteViewBtn'),
+  reviewInboxApplyBtn: $('reviewInboxApplyBtn'),
+  reviewInboxSummary: $('reviewInboxSummary'),
+  reviewInboxList: $('reviewInboxList'),
+  reviewInboxSelectAll: $('reviewInboxSelectAll'),
+  reviewInboxBatchAction: $('reviewInboxBatchAction'),
+  reviewInboxRunBatchBtn: $('reviewInboxRunBatchBtn')
 };
 
 const SHOT_TEMPLATES = [
@@ -1081,6 +1106,313 @@ if (refs.assistiveRecommendationList) {
   });
 }
 
+let reviewInboxItems = [];
+let reviewInboxSelectedItemIds = new Set();
+
+const reviewInboxFilters = () => ({
+  type: refs.reviewInboxTypeFilter?.value || '',
+  priority: refs.reviewInboxPriorityFilter?.value || '',
+  risk: refs.reviewInboxRiskFilter?.value || '',
+  status: refs.reviewInboxStatusFilter?.value || '',
+  entity: refs.reviewInboxEntityFilter?.value || '',
+  chapterId: refs.reviewInboxChapterFilter?.value || '',
+  sceneId: refs.reviewInboxSceneFilter?.value || '',
+  sortBy: refs.reviewInboxSortBy?.value || 'priority',
+  groupBy: refs.reviewInboxGroupBy?.value || 'type',
+  query: refs.reviewInboxSearch?.value || ''
+});
+
+const reviewInboxSavedViews = () =>
+  Array.isArray(state.settings?.reviewInbox?.savedViews) ? state.settings.reviewInbox.savedViews : [];
+
+const reviewInboxApplyFiltersToUi = (filters = {}) => {
+  if (!refs.reviewInboxTypeFilter) return;
+  refs.reviewInboxTypeFilter.value = filters.type || '';
+  refs.reviewInboxPriorityFilter.value = filters.priority || '';
+  refs.reviewInboxRiskFilter.value = filters.risk || '';
+  refs.reviewInboxStatusFilter.value = filters.status || '';
+  refs.reviewInboxEntityFilter.value = filters.entity || '';
+  refs.reviewInboxChapterFilter.value = filters.chapterId || '';
+  refs.reviewInboxSceneFilter.value = filters.sceneId || '';
+  refs.reviewInboxSortBy.value = filters.sortBy || 'priority';
+  refs.reviewInboxGroupBy.value = filters.groupBy || 'type';
+  refs.reviewInboxSearch.value = filters.query || '';
+};
+
+const reviewInboxRenderSavedViews = () => {
+  if (!refs.reviewInboxSavedViewSelect) return;
+  const previous = refs.reviewInboxSavedViewSelect.value;
+  refs.reviewInboxSavedViewSelect.innerHTML = '<option value="">Views salvas</option>';
+  reviewInboxSavedViews().forEach((view) => {
+    const option = document.createElement('option');
+    option.value = view.id;
+    option.textContent = view.name;
+    if (view.id === previous) option.selected = true;
+    refs.reviewInboxSavedViewSelect.append(option);
+  });
+};
+
+const reviewInboxEnsureSettings = () => {
+  if (!state.settings) state.settings = {};
+  if (!state.settings.reviewInbox || typeof state.settings.reviewInbox !== 'object') {
+    state.settings.reviewInbox = { savedViews: [] };
+  }
+  if (!Array.isArray(state.settings.reviewInbox.savedViews)) state.settings.reviewInbox.savedViews = [];
+};
+
+const reviewInboxFindOutput = (outputId) => {
+  for (const job of (state.generationJobs || [])) {
+    const output = (job.outputs || []).find((entry) => entry.id === outputId);
+    if (output) return { job, output };
+  }
+  return null;
+};
+
+const reviewInboxFocusItemContext = (item, { openReview = false } = {}) => {
+  if (!item) return;
+  if (item.chapterId) refs.chapterSelect.value = item.chapterId;
+  if (item.sceneId) refs.sceneSelect.value = item.sceneId;
+  if (item.sequenceId) refs.shotBeatSelect.value = item.sequenceId;
+  render();
+
+  if (openReview && item.outputId) {
+    openImageReviewStudio();
+    irsSelectOutput(item.outputId);
+    return;
+  }
+
+  if (item.entity === 'shot' || item.sequenceId) {
+    if (item.sceneId) refs.shotFilterScene.value = item.sceneId;
+    if (item.chapterId) refs.shotFilterChapter.value = item.chapterId;
+    if (item.sequenceId) refs.shotBeatSelect.value = item.sequenceId;
+    renderShotPlanner();
+    document.querySelector('.sp-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+
+  if (item.sceneId || item.chapterId) {
+    document.querySelector('.ap-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
+const reviewInboxApplyOutputDecision = (item, action) => {
+  const outputId = item.outputId || item.entityId;
+  const found = reviewInboxFindOutput(outputId);
+  if (!found) return;
+  const { output, job } = found;
+  if (action === 'approve') {
+    output.isFavorite = true;
+    output.reviewStatus = 'favorite';
+    irsRecordDecision({
+      output,
+      job,
+      decisionType: 'approve',
+      resultingStatus: output.isCanonical ? 'current_official' : 'approved',
+      rationale: 'Aprovado via Review Inbox / Triage Workspace.',
+      notes: output.notes || ''
+    });
+  } else if (action === 'reject') {
+    output.isFavorite = false;
+    output.isCanonical = false;
+    output.reviewStatus = 'rejected';
+    irsRecordDecision({
+      output,
+      job,
+      decisionType: 'reject',
+      resultingStatus: 'rejected',
+      rationale: 'Rejeitado via Review Inbox / Triage Workspace.',
+      notes: output.notes || ''
+    });
+  } else if (action === 'defer') {
+    output.reviewStatus = 'candidate';
+    irsRecordDecision({
+      output,
+      job,
+      decisionType: 'send_back_for_revision',
+      resultingStatus: 'needs_revision',
+      rationale: 'Decisão adiada/deferida na inbox; item volta para triagem.',
+      notes: output.notes || ''
+    });
+  } else if (action === 'mark-refresh') {
+    output.reviewStatus = 'candidate';
+    output.notes = `${output.notes ? `${output.notes}\n` : ''}[refresh] marcado na review inbox em ${new Date().toLocaleString('pt-BR')}`;
+    irsRecordDecision({
+      output,
+      job,
+      decisionType: 'send_back_for_revision',
+      resultingStatus: 'needs_revision',
+      rationale: 'Output marcado para refresh na inbox.',
+      notes: output.notes || ''
+    });
+  }
+};
+
+const reviewInboxRunQuickAction = (action, item) => {
+  if (!item) return;
+  if (['approve', 'reject', 'defer', 'mark-refresh'].includes(action)) {
+    reviewInboxApplyOutputDecision(item, action);
+    persist();
+    return;
+  }
+  if (action === 'open-diff') {
+    const compareIds = item.compareOutputIds || [];
+    openImageReviewStudio();
+    irsSwitchTab('review');
+    if (compareIds.length >= 2) {
+      irsCompareIds = compareIds.slice(0, 2);
+      irsRenderGallery();
+      irsRenderCompare();
+      irsSelectOutput(compareIds[0]);
+    } else if (item.outputId) {
+      irsSelectOutput(item.outputId);
+    }
+    return;
+  }
+  if (action === 'open-lineage') {
+    openImageReviewStudio();
+    irsSwitchTab('lineage');
+    return;
+  }
+  if (action === 'open-source-entity') {
+    reviewInboxFocusItemContext(item, { openReview: item.entity === 'asset' || Boolean(item.outputId) });
+    return;
+  }
+  if (action === 'navigate-related-context') {
+    reviewInboxFocusItemContext(item, { openReview: false });
+  }
+};
+
+const reviewInboxRow = (item, index) => {
+  const row = document.createElement('article');
+  row.className = `ri-item ri-priority-${item.priority} ri-risk-${item.risk}`;
+  row.dataset.itemId = item.id;
+  row.dataset.index = String(index);
+  row.tabIndex = 0;
+
+  const selected = reviewInboxSelectedItemIds.has(item.id);
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = selected;
+  checkbox.dataset.itemId = item.id;
+  checkbox.className = 'ri-item-check';
+
+  const body = document.createElement('div');
+  body.className = 'ri-item-body';
+
+  const head = document.createElement('div');
+  head.className = 'ri-item-head';
+  const title = document.createElement('strong');
+  title.textContent = item.title;
+  const chips = document.createElement('span');
+  chips.className = 'ri-item-chips';
+  chips.textContent = `${item.type} · ${item.priority} · risco ${item.risk} · ${item.status}`;
+  head.append(title, chips);
+
+  const reason = document.createElement('p');
+  reason.className = 'ri-item-reason';
+  reason.textContent = `Por que está na inbox: ${item.reason}`;
+
+  const meta = document.createElement('p');
+  meta.className = 'ri-item-meta';
+  meta.textContent = `${item.source} · ${new Date(item.createdAt).toLocaleString('pt-BR')}`;
+
+  const actions = document.createElement('div');
+  actions.className = 'ri-item-actions';
+  const actionDefs = [
+    { id: 'approve', label: 'approve' },
+    { id: 'reject', label: 'reject' },
+    { id: 'defer', label: 'defer' },
+    { id: 'mark-refresh', label: 'mark for refresh' },
+    { id: 'open-diff', label: 'open diff' },
+    { id: 'open-lineage', label: 'open lineage' },
+    { id: 'open-source-entity', label: 'open source entity' },
+    { id: 'navigate-related-context', label: 'navigate context' }
+  ];
+  actionDefs.forEach((action) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.action = action.id;
+    btn.dataset.itemId = item.id;
+    btn.textContent = action.label;
+    actions.append(btn);
+  });
+  if (!(item.entity === 'asset' || item.outputId)) {
+    actions.querySelector('button[data-action="approve"]')?.setAttribute('disabled', 'disabled');
+    actions.querySelector('button[data-action="reject"]')?.setAttribute('disabled', 'disabled');
+    actions.querySelector('button[data-action="defer"]')?.setAttribute('disabled', 'disabled');
+    actions.querySelector('button[data-action="mark-refresh"]')?.setAttribute('disabled', 'disabled');
+  }
+
+  body.append(head, reason, meta, actions);
+  row.append(checkbox, body);
+  return row;
+};
+
+const renderReviewInbox = () => {
+  if (!refs.reviewInboxList || !refs.reviewInboxSummary) return;
+  const projectId = selectedProjectId();
+  if (!projectId) {
+    refs.reviewInboxSummary.textContent = 'Selecione um projeto para ativar a Review Inbox.';
+    refs.reviewInboxList.innerHTML = '<div class="ri-empty">Sem projeto selecionado.</div>';
+    return;
+  }
+  reviewInboxEnsureSettings();
+  reviewInboxRenderSavedViews();
+  const assistiveBundle = buildAssistivePlanningBundle({
+    state,
+    projectId,
+    scopeType: 'project',
+    scopeValue: ''
+  });
+  reviewInboxItems = buildReviewInboxItems({
+    state,
+    projectId,
+    assistiveBundle
+  });
+
+  renderOptionsWithBlank(
+    refs.reviewInboxChapterFilter,
+    state.chapters.filter((chapter) => chapter.projectId === projectId).map((chapter) => ({ ...chapter, name: chapter.title })),
+    refs.reviewInboxChapterFilter.value,
+    'Todos os capítulos'
+  );
+  renderOptionsWithBlank(
+    refs.reviewInboxSceneFilter,
+    state.scenes.filter((scene) => scene.projectId === projectId).map((scene) => ({ ...scene, name: scene.title })),
+    refs.reviewInboxSceneFilter.value,
+    'Todas as cenas'
+  );
+
+  const filters = reviewInboxFilters();
+  const filtered = applyReviewInboxFiltersAndSort(reviewInboxItems, filters);
+  const groups = groupReviewInboxItems(filtered, filters.groupBy || 'type');
+
+  refs.reviewInboxSummary.textContent = `${filtered.length}/${reviewInboxItems.length} itens acionáveis · MacBook local-first · sem backend SaaS`;
+  refs.reviewInboxList.innerHTML = '';
+  reviewInboxSelectedItemIds = new Set([...reviewInboxSelectedItemIds].filter((id) => filtered.some((item) => item.id === id)));
+  refs.reviewInboxSelectAll.checked = filtered.length > 0 && filtered.every((item) => reviewInboxSelectedItemIds.has(item.id));
+
+  if (!filtered.length) {
+    refs.reviewInboxList.innerHTML = '<div class="ri-empty">Inbox sem itens para os filtros atuais.</div>';
+    return;
+  }
+
+  let rowIndex = 0;
+  groups.forEach((group) => {
+    const section = document.createElement('section');
+    section.className = 'ri-group';
+    const header = document.createElement('h4');
+    header.className = 'ri-group-title';
+    header.textContent = `${group.label} (${group.items.length})`;
+    section.append(header);
+    group.items.forEach((item) => {
+      section.append(reviewInboxRow(item, rowIndex));
+      rowIndex += 1;
+    });
+    refs.reviewInboxList.append(section);
+  });
+};
+
 const render = () => {
   renderOptions(refs.projectSelect, state.projects, selectedProjectId(), 'Crie seu primeiro projeto');
 
@@ -1120,6 +1452,7 @@ const render = () => {
   renderShotPlanner();
   renderWorkspaceSettings();
   renderAssistivePlanning();
+  renderReviewInbox();
   renderLore();
   renderAssets();
 
@@ -1683,6 +2016,102 @@ refs.shotSelect.addEventListener('change', renderShotPlanner);
 $('loreSearch').addEventListener('input', renderLore);
 refs.assistiveScopeType.addEventListener('change', render);
 refs.assistiveScopeValue.addEventListener('change', render);
+
+[
+  refs.reviewInboxTypeFilter,
+  refs.reviewInboxPriorityFilter,
+  refs.reviewInboxRiskFilter,
+  refs.reviewInboxStatusFilter,
+  refs.reviewInboxEntityFilter,
+  refs.reviewInboxChapterFilter,
+  refs.reviewInboxSceneFilter,
+  refs.reviewInboxSortBy,
+  refs.reviewInboxGroupBy
+].forEach((control) => {
+  control?.addEventListener('change', renderReviewInbox);
+});
+refs.reviewInboxSearch?.addEventListener('input', renderReviewInbox);
+refs.reviewInboxApplyBtn?.addEventListener('click', renderReviewInbox);
+refs.reviewInboxSelectAll?.addEventListener('change', () => {
+  const filtered = applyReviewInboxFiltersAndSort(reviewInboxItems, reviewInboxFilters());
+  if (refs.reviewInboxSelectAll.checked) {
+    filtered.forEach((item) => reviewInboxSelectedItemIds.add(item.id));
+  } else {
+    filtered.forEach((item) => reviewInboxSelectedItemIds.delete(item.id));
+  }
+  renderReviewInbox();
+});
+refs.reviewInboxSaveViewBtn?.addEventListener('click', () => {
+  const name = refs.reviewInboxSavedViewName.value.trim();
+  if (!name) return;
+  reviewInboxEnsureSettings();
+  const filters = reviewInboxFilters();
+  state.settings.reviewInbox.savedViews = reviewInboxSavedViews().filter((view) => view.name !== name);
+  state.settings.reviewInbox.savedViews.push({ id: newClientId(), name, filters });
+  refs.reviewInboxSavedViewName.value = '';
+  persist();
+});
+refs.reviewInboxDeleteViewBtn?.addEventListener('click', () => {
+  const id = refs.reviewInboxSavedViewSelect.value;
+  if (!id) return;
+  reviewInboxEnsureSettings();
+  state.settings.reviewInbox.savedViews = reviewInboxSavedViews().filter((view) => view.id !== id);
+  persist();
+});
+refs.reviewInboxSavedViewSelect?.addEventListener('change', () => {
+  const selected = reviewInboxSavedViews().find((view) => view.id === refs.reviewInboxSavedViewSelect.value);
+  if (!selected) return;
+  reviewInboxApplyFiltersToUi(selected.filters || {});
+  renderReviewInbox();
+});
+refs.reviewInboxRunBatchBtn?.addEventListener('click', () => {
+  const action = refs.reviewInboxBatchAction.value;
+  if (!action) return;
+  const selectedItems = reviewInboxItems.filter((item) => reviewInboxSelectedItemIds.has(item.id));
+  selectedItems.forEach((item) => reviewInboxRunQuickAction(action, item));
+  if (!selectedItems.length) return;
+  reviewInboxSelectedItemIds = new Set();
+  renderReviewInbox();
+});
+refs.reviewInboxList?.addEventListener('click', (event) => {
+  const actionBtn = event.target.closest('button[data-action][data-item-id]');
+  if (actionBtn) {
+    const item = reviewInboxItems.find((entry) => entry.id === actionBtn.dataset.itemId);
+    reviewInboxRunQuickAction(actionBtn.dataset.action, item);
+    return;
+  }
+  const checkbox = event.target.closest('input.ri-item-check[data-item-id]');
+  if (checkbox) {
+    if (checkbox.checked) reviewInboxSelectedItemIds.add(checkbox.dataset.itemId);
+    else reviewInboxSelectedItemIds.delete(checkbox.dataset.itemId);
+    renderReviewInbox();
+  }
+});
+refs.reviewInboxList?.addEventListener('keydown', (event) => {
+  const row = event.target.closest('.ri-item');
+  if (!row) return;
+  const rows = Array.from(refs.reviewInboxList.querySelectorAll('.ri-item'));
+  const index = parseInt(row.dataset.index || '0', 10);
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    rows[Math.min(index + 1, rows.length - 1)]?.focus();
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    rows[Math.max(index - 1, 0)]?.focus();
+  } else if (event.key === ' ') {
+    event.preventDefault();
+    const itemId = row.dataset.itemId;
+    if (!itemId) return;
+    if (reviewInboxSelectedItemIds.has(itemId)) reviewInboxSelectedItemIds.delete(itemId);
+    else reviewInboxSelectedItemIds.add(itemId);
+    renderReviewInbox();
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    const itemId = row.dataset.itemId;
+    const item = reviewInboxItems.find((entry) => entry.id === itemId);
+    reviewInboxRunQuickAction('navigate-related-context', item);
+  }
+});
 
 // =========== Writer Studio ===========
 

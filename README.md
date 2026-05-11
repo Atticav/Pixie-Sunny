@@ -192,6 +192,29 @@ O app agora conecta todas as camadas em um copiloto operacional:
 - usa **Story/Lore + referências** para reduzir risco de inconsistência antes de avançar
 - tudo permanece **local-first no MacBook**, sem backend SaaS
 
+## Review Inbox / Triage Workspace
+
+O app agora inclui uma camada operacional de revisão humana para centralizar sinais críticos dispersos:
+
+- consolida em uma inbox única itens que pedem atenção humana (review, risco, bloqueio, stale/refresh, follow-up editorial)
+- integra sinais do:
+  - **Production Readiness Dashboard / Assistive Planning**
+  - **Consistency Checker** (riscos e bloqueios em shots)
+  - **Diff Viewer / Context Compare Workspace** (candidatos para comparação)
+  - **Asset Version Lineage / Supersession Graph**
+  - **Approval & Decision History Layer / Editorial Timeline**
+  - **Change Impact / Dependency Refresh**
+  - **Local Automation Rules Engine / Batch Queue**
+- oferece triagem com:
+  - filtros por tipo, prioridade, risco, status, entidade, capítulo e cena
+  - ordenação e agrupamento
+  - explicação explícita do porquê o item está na inbox
+  - quick actions: approve, reject, defer, mark for refresh, open diff, open lineage, open source entity, navigate context
+  - ações em lote para reduzir custo operacional de revisão
+  - saved views/filtros salvos para rotinas recorrentes de operação editorial
+  - navegação por teclado (setas, espaço para seleção, enter para abrir contexto)
+- arquitetura segue **local-first no MacBook**, sem backend SaaS
+
 ## Approval & Decision History Layer
 
 O app agora registra e navega decisões editoriais/operacionais por item:
