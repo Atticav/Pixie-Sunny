@@ -75,7 +75,7 @@ const joinSentence = (values, fallback = '') => {
   return safeValues.length ? safeValues.join('; ') : fallback;
 };
 
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const findPreset = (collection, id, fallbackId) =>
   collection.find((item) => item.id === id) ||
@@ -83,6 +83,7 @@ const findPreset = (collection, id, fallbackId) =>
   collection[0];
 
 const describeReference = (reference) => {
+  if (!reference) return 'referência inválida';
   const bits = [line(reference?.name) || 'referência sem nome'];
   if (reference.type) bits.push(`tipo ${reference.type}`);
   if (reference.preserve) bits.push(`preservar ${reference.preserve}`);

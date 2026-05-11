@@ -30,7 +30,10 @@ const store = createStore();
 let state = store.load();
 
 const $ = (id) => document.getElementById(id);
-const newClientId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.floor(Math.random() * 1e6)}`);
+const newClientId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.floor(Math.random() * 1e9)}-${Math.floor(Math.random() * 1e6)}`;
 
 const refs = {
   projectSelect: $('projectSelect'),
