@@ -35,6 +35,7 @@ import {
   searchLore,
   suggestNextParagraph
 } from './assistant.js';
+import { buildAssistivePlanningBundle } from './assistive-planning.js';
 import {
   initializeLocalWorkspace,
   localWorkspaceSupported,
@@ -121,7 +122,11 @@ const refs = {
   workspaceSaveExports: $('workspaceSaveExports'),
   workspaceSupport: $('workspaceSupport'),
   workspacePreview: $('workspacePreview'),
-  workspaceStatus: $('workspaceStatus')
+  workspaceStatus: $('workspaceStatus'),
+  assistiveScopeType: $('assistiveScopeType'),
+  assistiveScopeValue: $('assistiveScopeValue'),
+  assistiveSummary: $('assistiveSummary'),
+  assistiveRecommendationList: $('assistiveRecommendationList')
 };
 
 const SHOT_TEMPLATES = [
@@ -228,6 +233,7 @@ const selectedLoreId = () => refs.loreSelect.value;
 const selectedSceneId = () => refs.sceneSelect.value;
 
 const workspaceSettings = () => state.settings?.localWorkspace || {};
+const assistiveScopeType = () => refs.assistiveScopeType?.value || 'project';
 
 const setWorkspaceStatus = (message) => {
   if (refs.workspaceStatus) refs.workspaceStatus.textContent = message;
@@ -929,6 +935,146 @@ const renderWorkspaceSettings = () => {
   refs.workspacePreview.textContent = JSON.stringify(summary, null, 2);
 };
 
+const renderAssistivePlanning = () => {
+  if (!refs.assistiveRecommendationList || !refs.assistiveSummary || !refs.assistiveScopeValue) return;
+
+  const projectId = selectedProjectId();
+  const scopeType = assistiveScopeType();
+  const chapterOptions = state.chapters
+    .filter((chapter) => chapter.projectId === projectId)
+    .map((chapter) => ({ id: chapter.id, name: chapter.title }));
+  const sequenceOptions = (state.beats || [])
+    .filter((beat) => beat.projectId === projectId)
+    .map((beat) => {
+      const sceneLabel = state.scenes.find((scene) => scene.id === beat.sceneId)?.title || 'Cena';
+      return { id: beat.id, name: `${sceneLabel} · ${beat.title}` };
+    });
+  const sceneOptions = state.scenes
+    .filter((scene) => scene.projectId === projectId)
+    .map((scene) => ({ id: scene.id, name: scene.title }));
+  const optionsByScope = {
+    chapter: chapterOptions,
+    sequence: sequenceOptions,
+    scene: sceneOptions
+  };
+
+  renderOptionsWithBlank(
+    refs.assistiveScopeValue,
+    optionsByScope[scopeType] || [],
+    refs.assistiveScopeValue.value,
+    scopeType === 'project' ? 'Projeto inteiro' : 'Todos'
+  );
+  if (scopeType === 'project') refs.assistiveScopeValue.value = '';
+
+  const bundle = buildAssistivePlanningBundle({
+    state,
+    projectId,
+    scopeType,
+    scopeValue: refs.assistiveScopeValue.value
+  });
+
+  refs.assistiveSummary.textContent = JSON.stringify(
+    {
+      escopo: scopeType,
+      total: bundle.summary.total,
+      blocked: bundle.summary.blocked,
+      readyToGenerate: bundle.summary.readyToGenerate,
+      readyToReview: bundle.summary.readyToReview
+    },
+    null,
+    2
+  );
+
+  refs.assistiveRecommendationList.innerHTML = '';
+  if (!bundle.recommendations.length) {
+    refs.assistiveRecommendationList.innerHTML =
+      '<div class="ap-empty">Nenhuma recomendação para o escopo atual. Continue com o pipeline local no MacBook.</div>';
+    return;
+  }
+
+  bundle.recommendations.forEach((entry) => {
+    const card = document.createElement('article');
+    card.className = `ap-card ap-status-${entry.status}`;
+    card.dataset.sceneId = entry.sceneId || '';
+    card.dataset.chapterId = entry.chapterId || '';
+    card.dataset.sequenceId = entry.sequenceId || '';
+
+    const header = document.createElement('header');
+    header.className = 'ap-card-header';
+    const type = document.createElement('strong');
+    type.textContent = `${entry.rank}. ${entry.type}`;
+    const priority = document.createElement('span');
+    priority.className = 'ap-priority';
+    priority.textContent = `prioridade ${entry.priorityLabel} (${entry.priorityScore})`;
+    header.append(type, priority);
+
+    const title = document.createElement('p');
+    title.className = 'ap-card-title';
+    title.textContent = entry.title;
+
+    const description = document.createElement('p');
+    description.className = 'ap-card-description';
+    description.textContent = entry.description;
+
+    const footer = document.createElement('div');
+    footer.className = 'ap-card-footer';
+    const status = document.createElement('span');
+    status.className = 'ap-status-pill';
+    status.textContent = entry.status;
+    footer.append(status);
+    if (entry.quickAction) {
+      const actionBtn = document.createElement('button');
+      actionBtn.dataset.action = entry.quickAction.id;
+      actionBtn.textContent = entry.quickAction.label;
+      footer.append(actionBtn);
+    }
+    card.append(header, title, description, footer);
+    refs.assistiveRecommendationList.append(card);
+  });
+};
+
+const runAssistiveQuickAction = (action, card) => {
+  const sceneId = card.dataset.sceneId || '';
+  const chapterId = card.dataset.chapterId || '';
+  const sequenceId = card.dataset.sequenceId || '';
+
+  if (chapterId) refs.chapterSelect.value = chapterId;
+  if (sceneId) refs.sceneSelect.value = sceneId;
+
+  if (action === 'open-shot-planner') {
+    refs.shotFilterChapter.value = chapterId;
+    refs.shotFilterScene.value = sceneId;
+    refs.shotBeatSelect.value = sequenceId;
+    render();
+    document.querySelector('.sp-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (action === 'open-prompt-builder') {
+    render();
+    psOpenStudio('scene');
+    return;
+  }
+  if (action === 'open-image-gen') {
+    render();
+    openImageGenStudio();
+    return;
+  }
+  if (action === 'open-image-review') {
+    render();
+    openImageReviewStudio();
+  }
+};
+
+if (refs.assistiveRecommendationList) {
+  refs.assistiveRecommendationList.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-action]');
+    if (!button) return;
+    const card = button.closest('.ap-card');
+    if (!card) return;
+    runAssistiveQuickAction(button.dataset.action, card);
+  });
+}
+
 const render = () => {
   renderOptions(refs.projectSelect, state.projects, selectedProjectId(), 'Crie seu primeiro projeto');
 
@@ -967,6 +1113,7 @@ const render = () => {
   renderPromptEditor();
   renderShotPlanner();
   renderWorkspaceSettings();
+  renderAssistivePlanning();
   renderLore();
   renderAssets();
 
@@ -1528,6 +1675,8 @@ refs.shotFilterType.addEventListener('change', renderShotPlanner);
 refs.shotBeatSelect.addEventListener('change', renderShotPlanner);
 refs.shotSelect.addEventListener('change', renderShotPlanner);
 $('loreSearch').addEventListener('input', renderLore);
+refs.assistiveScopeType.addEventListener('change', render);
+refs.assistiveScopeValue.addEventListener('change', render);
 
 // =========== Writer Studio ===========
 

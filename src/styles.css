@@ -256,6 +256,92 @@ select:disabled {
   }
 }
 
+/* =========== Assistive Planning =========== */
+.ap-section {
+  grid-column: 1 / -1;
+}
+
+.ap-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.ap-controls {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.ap-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ap-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #111722;
+  display: grid;
+  gap: 6px;
+}
+
+.ap-card-header,
+.ap-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ap-priority,
+.ap-status-pill {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.ap-card-title {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.ap-card-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.ap-status-blocked {
+  border-color: #7a2a2a;
+}
+
+.ap-status-ready-to-review {
+  border-color: #6b5a26;
+}
+
+.ap-status-ready-to-generate {
+  border-color: #2a5c46;
+}
+
+.ap-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+@media (max-width: 1080px) {
+  .ap-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* =========== Writer Studio =========== */
 .ws-overlay {
   position: fixed;

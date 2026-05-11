@@ -43,6 +43,15 @@ python -m http.server 8080
 - associação pragmática entre shot e prompts, outputs de imagem aprovados/canônicos, vídeos locais, referências visuais e personagens
 - filtros por personagem, cena, capítulo, status editorial e tipo de plano
 - progressão visual/narrativa da sequência e comparação contextual entre shot anterior/atual/próximo
+- camada de **Assistive Planning / Creative Orchestration** com recomendações automáticas:
+  - next best action
+  - missing dependency
+  - review required
+  - canon conflict to resolve
+  - recommended asset to generate
+  - scene not production-ready
+- priorização pragmática por bloqueio, impacto, completude e risco de inconsistência
+- visualização por projeto, capítulo, sequência e cena com quick actions para abrir os estúdios certos do pipeline
 - exportação/importação de backup JSON
 - limpeza automática de dados órfãos ao importar backups ou remover entidades relacionadas
 
@@ -163,6 +172,25 @@ O app agora dá o passo de **assets isolados para sequência planejada**:
 - **Image Review + Canon Promotion** fornece imagens aprovadas/canônicas para ancorar continuidade entre shots
 - **Image-to-Video / assets locais** podem ser associados a shots específicos para manter histórico audiovisual da sequência
 - tudo continua **local-first e Mac-first**, sem backend SaaS, reaproveitando o mesmo storage estruturado do projeto
+
+## Assistive Planning / Creative Orchestration Layer
+
+O app agora conecta todas as camadas em um copiloto operacional:
+
+- recomenda próximos passos práticos com base no estado real do pipeline
+- detecta dependências faltantes e bloqueios de produção por cena
+- prioriza revisão canônica quando há outputs aguardando triagem
+- sinaliza conflitos canônicos e riscos de continuidade
+- sugere assets para gerar quando prompt grounding já está pronto
+- indica explicitamente quando a cena ainda não está production-ready
+
+### Como encaixa no pipeline atual
+
+- usa **Shot Planner** para detectar cobertura e lacunas de sequência
+- usa **Prompt Builder / Prompt Grounding** para validar se a cena já está pronta para gerar
+- usa **Image Review + Canon Promotion** para priorizar revisão e resolver conflitos canônicos
+- usa **Story/Lore + referências** para reduzir risco de inconsistência antes de avançar
+- tudo permanece **local-first no MacBook**, sem backend SaaS
 
 ## Estrutura do projeto
 
