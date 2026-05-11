@@ -34,17 +34,15 @@ const refs = {
   videoSpec: $('videoSpec')
 };
 
-const parseLines = (value) =>
-  value
-    .split('\n')
-    .map((line) => line.trim())
+const parseTextList = (value, separator) =>
+  (typeof value === 'string' ? value : '')
+    .split(separator)
+    .map((entry) => entry.trim())
     .filter(Boolean);
 
-const parseTags = (value) =>
-  value
-    .split(',')
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+const parseLines = (value) => parseTextList(value, '\n');
+
+const parseTags = (value) => parseTextList(value, ',');
 
 const resetImportedFile = (input) => {
   input.value = '';

@@ -14,6 +14,8 @@ const stringList = (value) =>
 
 const recordValue = (value) => (value && typeof value === 'object' ? value : null);
 
+const hasRequiredFields = (value, fields) => fields.every((field) => stringValue(value[field]));
+
 const baseSettings = () => ({
   imagePipeline: {
     provider: 'local-runner',
@@ -141,7 +143,7 @@ const normalizeProject = (project) => {
 
 const normalizeBook = (book) => {
   const value = recordValue(book);
-  if (!value || !stringValue(value.id) || !stringValue(value.projectId)) return null;
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
   const createdAt = stringValue(value.createdAt) || now();
   return {
     id: value.id,
@@ -155,7 +157,7 @@ const normalizeBook = (book) => {
 
 const normalizeChapter = (chapter) => {
   const value = recordValue(chapter);
-  if (!value || !stringValue(value.id) || !stringValue(value.projectId) || !stringValue(value.bookId)) return null;
+  if (!value || !hasRequiredFields(value, ['id', 'projectId', 'bookId'])) return null;
   const createdAt = stringValue(value.createdAt) || now();
   return {
     id: value.id,
@@ -171,7 +173,7 @@ const normalizeChapter = (chapter) => {
 
 const normalizeCharacter = (character) => {
   const value = recordValue(character);
-  if (!value || !stringValue(value.id) || !stringValue(value.projectId)) return null;
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
   const createdAt = stringValue(value.createdAt) || now();
   return {
     id: value.id,
@@ -189,7 +191,7 @@ const normalizeCharacter = (character) => {
 
 const normalizeLoreEntry = (entry) => {
   const value = recordValue(entry);
-  if (!value || !stringValue(value.id) || !stringValue(value.projectId)) return null;
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
   const createdAt = stringValue(value.createdAt) || now();
   return {
     id: value.id,
@@ -204,7 +206,7 @@ const normalizeLoreEntry = (entry) => {
 
 const normalizeScene = (scene) => {
   const value = recordValue(scene);
-  if (!value || !stringValue(value.id) || !stringValue(value.projectId)) return null;
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
   const createdAt = stringValue(value.createdAt) || now();
   return {
     id: value.id,
@@ -220,7 +222,7 @@ const normalizeScene = (scene) => {
 
 const normalizeAsset = (asset) => {
   const value = recordValue(asset);
-  if (!value || !stringValue(value.id) || !stringValue(value.projectId)) return null;
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
   return {
     id: value.id,
     projectId: value.projectId,
@@ -282,14 +284,12 @@ export const deleteEntity = (state, entityType, id) => {
 
   if (entityType === 'project') {
     const bookIds = new Set(current.books.filter((book) => book.projectId === id).map((book) => book.id));
-    const chapterIds = new Set(
-      current.chapters.filter((chapter) => chapter.projectId === id || bookIds.has(chapter.bookId)).map((chapter) => chapter.id)
-    );
+    const chapterIds = new Set(current.chapters.filter((chapter) => bookIds.has(chapter.bookId)).map((chapter) => chapter.id));
     return normalizeState({
       ...current,
       projects: current.projects.filter((project) => project.id !== id),
       books: current.books.filter((book) => book.projectId !== id),
-      chapters: current.chapters.filter((chapter) => chapter.projectId !== id && !bookIds.has(chapter.bookId)),
+      chapters: current.chapters.filter((chapter) => !bookIds.has(chapter.bookId)),
       scenes: current.scenes.filter((scene) => scene.projectId !== id && !chapterIds.has(scene.chapterId)),
       characters: current.characters.filter((character) => character.projectId !== id),
       loreEntries: current.loreEntries.filter((entry) => entry.projectId !== id),
