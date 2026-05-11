@@ -607,6 +607,22 @@ const renderChecklist = (container, items, selectedIds, emptyText) => {
 const checkedValues = (container) =>
   Array.from(container?.querySelectorAll('input[type="checkbox"]:checked') || []).map((input) => input.value);
 
+const findMissingContinuityRules = (previousShot, currentShot) =>
+  previousShot
+    ? (() => {
+        const currentKeep = new Set(currentShot?.continuityMustKeep || []);
+        const currentVary = new Set(currentShot?.continuityMayVary || []);
+        return (previousShot.continuityMustKeep || []).filter(
+          (rule) => !currentKeep.has(rule) && !currentVary.has(rule)
+        );
+      })()
+    : [];
+
+const formatShotTransition = (previousShot, currentShot) =>
+  previousShot
+    ? `transição: ${previousShot.shotType || 'plano'} / ${previousShot.dominantEmotion || 'emoção'} → ${currentShot.shotType || 'plano'} / ${currentShot.dominantEmotion || 'emoção'}`
+    : 'transição: abertura da sequência';
+
 const renderShotPlanner = () => {
   const chapterOptions = state.chapters
     .filter((chapter) => chapter.projectId === selectedProjectId())
@@ -791,12 +807,7 @@ const renderShotPlanner = () => {
       item.type = 'button';
       item.className = `sp-shot-item${entry.id === refs.shotSelect.value ? ' active' : ''}`;
       const previous = plannerSceneShots(entry.sceneId).find((shotItem) => shotItem.order === entry.order - 1);
-      const missingContinuity = previous
-        ? (previous.continuityMustKeep || []).filter(
-            (rule) =>
-              !(entry.continuityMustKeep || []).includes(rule) && !(entry.continuityMayVary || []).includes(rule)
-          )
-        : [];
+      const missingContinuity = findMissingContinuityRules(previous, entry);
       item.innerHTML = `
         <strong>${entry.order + 1}. ${entry.title}</strong>
         <span class="sp-shot-meta">${context.chapter?.title || 'Sem capítulo'} · ${context.scene?.title || 'Sem cena'}${context.beat ? ` · ${context.beat.title}` : ''}</span>
@@ -830,11 +841,7 @@ const renderShotPlanner = () => {
   const next = shotIndex >= 0 && shotIndex < sceneShots.length - 1 ? sceneShots[shotIndex + 1] : null;
   const context = plannerShotContext(shot);
   const continuityReferences = plannerSequenceReferenceNames(shot.continuityReferenceIds);
-  const missingContinuity = previous
-    ? (previous.continuityMustKeep || []).filter(
-        (rule) => !(shot.continuityMustKeep || []).includes(rule) && !(shot.continuityMayVary || []).includes(rule)
-      )
-    : [];
+  const missingContinuity = findMissingContinuityRules(previous, shot);
   refs.shotContinuityPreview.textContent = JSON.stringify(
     {
       shot: shot.title,
@@ -886,9 +893,7 @@ const renderShotPlanner = () => {
     ...sceneShots.map((entry, index) => {
       const entryContext = plannerShotContext(entry);
       const prev = index > 0 ? sceneShots[index - 1] : null;
-      const transition = prev
-        ? `transição: ${prev.shotType || 'plano'} / ${prev.dominantEmotion || 'emoção'} → ${entry.shotType || 'plano'} / ${entry.dominantEmotion || 'emoção'}`
-        : 'transição: abertura da sequência';
+      const transition = formatShotTransition(prev, entry);
       return `${index + 1}. [${entry.status}] ${entry.title}${entryContext.beat ? ` · beat ${entryContext.beat.title}` : ''}\n   ${entry.shotType || 'plano livre'} · ${entry.cameraMovement || 'movimento livre'} · foco ${entryContext.focus?.name || 'aberto'}\n   objetivo: ${entry.narrativeObjective || '—'}\n   progressão: ${entry.visualProgression || entry.narrativeProgression || transition}`;
     })
   ].join('\n\n');

@@ -7,6 +7,9 @@ const nowUtc = () => new Date().toISOString();
 
 const stringValue = (value, fallback = '') => (typeof value === 'string' ? value : fallback);
 
+const normalizeOrderIndex = (value) =>
+  typeof value === 'number' && value >= 0 ? Math.floor(value) : 0;
+
 const stringList = (value) =>
   Array.isArray(value)
     ? value.map((entry) => stringValue(entry).trim()).filter(Boolean)
@@ -334,7 +337,7 @@ export const createBeat = ({
   sceneId,
   title,
   summary,
-  order: typeof order === 'number' && order >= 0 ? Math.floor(order) : 0,
+  order: normalizeOrderIndex(order),
   createdAt: nowUtc(),
   updatedAt: nowUtc()
 });
@@ -376,7 +379,7 @@ export const createShot = ({
   sceneId,
   beatId,
   title,
-  order: typeof order === 'number' && order >= 0 ? Math.floor(order) : 0,
+  order: normalizeOrderIndex(order),
   status: SHOT_STATUSES.includes(status) ? status : 'idea',
   shotType,
   angle,
@@ -743,7 +746,7 @@ const normalizeBeat = (beat) => {
     sceneId: value.sceneId,
     title: stringValue(value.title, 'Beat sem título'),
     summary: stringValue(value.summary),
-    order: typeof value.order === 'number' && value.order >= 0 ? Math.floor(value.order) : 0,
+    order: normalizeOrderIndex(value.order),
     createdAt,
     updatedAt: stringValue(value.updatedAt) || createdAt
   };
@@ -761,7 +764,7 @@ const normalizeShot = (shot) => {
     sceneId: value.sceneId,
     beatId: stringValue(value.beatId),
     title: stringValue(value.title, 'Shot sem título'),
-    order: typeof value.order === 'number' && value.order >= 0 ? Math.floor(value.order) : 0,
+    order: normalizeOrderIndex(value.order),
     status: SHOT_STATUSES.includes(rawStatus) ? rawStatus : 'idea',
     shotType: stringValue(value.shotType),
     angle: stringValue(value.angle),
@@ -1083,20 +1086,31 @@ export const deleteEntity = (state, entityType, id) => {
   }
 
   if (entityType === 'generationJob') {
-    return normalizeState({
+    const removedOutputIds = new Set(
+      current.generationJobs.find((job) => job.id === id)?.outputs?.map((output) => output.id) || []
+    );
+    return {
       ...current,
-      generationJobs: current.generationJobs.filter((job) => job.id !== id)
-    });
+      generationJobs: current.generationJobs.filter((job) => job.id !== id),
+      shots: (current.shots || []).map((shot) => ({
+        ...shot,
+        generationOutputIds: shot.generationOutputIds.filter((outputId) => !removedOutputIds.has(outputId))
+      }))
+    };
   }
 
   if (entityType === 'generationOutput') {
-    return normalizeState({
+    return {
       ...current,
       generationJobs: current.generationJobs.map((job) => ({
         ...job,
         outputs: job.outputs.filter((output) => output.id !== id)
+      })),
+      shots: (current.shots || []).map((shot) => ({
+        ...shot,
+        generationOutputIds: shot.generationOutputIds.filter((outputId) => outputId !== id)
       }))
-    });
+    };
   }
 
   if (entityType === 'book') {
