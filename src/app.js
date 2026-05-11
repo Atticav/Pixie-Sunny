@@ -498,8 +498,10 @@ const applyShotLanguagePreset = (shot, presetId) => {
   };
 };
 
+const timestampOrEnd = (value) => (value ? new Date(value).getTime() : Number.MAX_SAFE_INTEGER);
+
 const shotOrderSorter = (a, b) =>
-  (a.order || 0) - (b.order || 0) || new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+  (a.order || 0) - (b.order || 0) || timestampOrEnd(a.createdAt) - timestampOrEnd(b.createdAt);
 
 const plannerVisibleScenes = () => {
   const chapterId = refs.shotFilterChapter.value || '';
@@ -607,16 +609,14 @@ const renderChecklist = (container, items, selectedIds, emptyText) => {
 const checkedValues = (container) =>
   Array.from(container?.querySelectorAll('input[type="checkbox"]:checked') || []).map((input) => input.value);
 
-const findMissingContinuityRules = (previousShot, currentShot) =>
-  previousShot
-    ? (() => {
-        const currentKeep = new Set(currentShot?.continuityMustKeep || []);
-        const currentVary = new Set(currentShot?.continuityMayVary || []);
-        return (previousShot.continuityMustKeep || []).filter(
-          (rule) => !currentKeep.has(rule) && !currentVary.has(rule)
-        );
-      })()
-    : [];
+const findMissingContinuityRules = (previousShot, currentShot) => {
+  if (!previousShot) return [];
+  const currentKeep = new Set(currentShot?.continuityMustKeep || []);
+  const currentVary = new Set(currentShot?.continuityMayVary || []);
+  return (previousShot.continuityMustKeep || []).filter(
+    (rule) => !currentKeep.has(rule) && !currentVary.has(rule)
+  );
+};
 
 const formatShotTransition = (previousShot, currentShot) =>
   previousShot
