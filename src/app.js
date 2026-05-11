@@ -764,7 +764,7 @@ wsRefs.metaSaveBtn.addEventListener('click', () => {
   chapter.conflict = wsRefs.conflict.value.trim();
   chapter.presentCharacters = parseTags(wsRefs.presentCharacters.value);
   chapter.continuity = wsRefs.continuity.value.trim();
-  chapter.wordGoal = parseInt(wsRefs.wordGoal.value, 10) || 0;
+  chapter.wordGoal = Math.max(0, parseInt(wsRefs.wordGoal.value, 10) || 0);
   chapter.notes = wsRefs.notes.value.trim();
   chapter.updatedAt = new Date().toISOString();
   state = store.save(state);
@@ -803,7 +803,14 @@ wsRefs.chapterSelect.addEventListener('change', () => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && wsIsOpen) closeWriterStudio();
+  if (event.key !== 'Escape' || !wsIsOpen) return;
+  const active = document.activeElement;
+  const isMetaInput =
+    active &&
+    active !== wsRefs.content &&
+    (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.tagName === 'SELECT');
+  if (isMetaInput) return;
+  closeWriterStudio();
 });
 
 render();
