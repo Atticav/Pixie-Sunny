@@ -44,10 +44,6 @@ const parseLines = (value) => parseTextList(value, '\n');
 
 const parseTags = (value) => parseTextList(value, ',');
 
-const resetImportedFile = (input) => {
-  input.value = '';
-};
-
 const selectedProjectId = () => refs.projectSelect.value;
 
 const selectedBookId = () => refs.bookSelect.value;
@@ -532,11 +528,10 @@ $('importDataInput').addEventListener('change', async (event) => {
   try {
     state = sanitizeState(JSON.parse(content));
     persist();
+    event.target.value = '';
   } catch (error) {
     console.error('Falha ao importar JSON', error);
     alert(`Erro ao importar JSON: ${error?.message || 'o arquivo não contém dados válidos ou está corrompido'}`);
-  } finally {
-    resetImportedFile(event.target);
   }
 });
 

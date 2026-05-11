@@ -3,7 +3,7 @@ const newId = () => {
   return `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 };
 
-const now = () => new Date().toISOString();
+const nowUtc = () => new Date().toISOString();
 
 const stringValue = (value, fallback = '') => (typeof value === 'string' ? value : fallback);
 
@@ -47,8 +47,8 @@ export const createProject = ({ name, tone = '', description = '' }) => ({
   name,
   tone,
   description,
-  createdAt: now(),
-  updatedAt: now()
+  createdAt: nowUtc(),
+  updatedAt: nowUtc()
 });
 
 export const createBook = ({ projectId, title, synopsis = '' }) => ({
@@ -56,8 +56,8 @@ export const createBook = ({ projectId, title, synopsis = '' }) => ({
   projectId,
   title,
   synopsis,
-  createdAt: now(),
-  updatedAt: now()
+  createdAt: nowUtc(),
+  updatedAt: nowUtc()
 });
 
 export const createChapter = ({ projectId, bookId, title, summary = '', content = '' }) => ({
@@ -67,8 +67,8 @@ export const createChapter = ({ projectId, bookId, title, summary = '', content 
   title,
   summary,
   content,
-  createdAt: now(),
-  updatedAt: now()
+  createdAt: nowUtc(),
+  updatedAt: nowUtc()
 });
 
 export const createCharacter = ({
@@ -87,8 +87,8 @@ export const createCharacter = ({
   masterPrompt,
   negativePrompt,
   references: [],
-  createdAt: now(),
-  updatedAt: now()
+  createdAt: nowUtc(),
+  updatedAt: nowUtc()
 });
 
 export const createLoreEntry = ({ projectId, title, content, tags = [] }) => ({
@@ -97,8 +97,8 @@ export const createLoreEntry = ({ projectId, title, content, tags = [] }) => ({
   title,
   content,
   tags,
-  createdAt: now(),
-  updatedAt: now()
+  createdAt: nowUtc(),
+  updatedAt: nowUtc()
 });
 
 export const createScene = ({
@@ -114,8 +114,8 @@ export const createScene = ({
   title,
   description,
   location,
-  createdAt: now(),
-  updatedAt: now()
+  createdAt: nowUtc(),
+  updatedAt: nowUtc()
 });
 
 export const createAsset = ({ projectId, name, type, path }) => ({
@@ -124,13 +124,13 @@ export const createAsset = ({ projectId, name, type, path }) => ({
   name,
   type,
   path,
-  createdAt: now()
+  createdAt: nowUtc()
 });
 
 const normalizeProject = (project) => {
   const value = recordValue(project);
   if (!value || !stringValue(value.id)) return null;
-  const createdAt = stringValue(value.createdAt) || now();
+  const createdAt = stringValue(value.createdAt) || nowUtc();
   return {
     id: value.id,
     name: stringValue(value.name, 'Projeto sem nome'),
@@ -144,7 +144,7 @@ const normalizeProject = (project) => {
 const normalizeBook = (book) => {
   const value = recordValue(book);
   if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
-  const createdAt = stringValue(value.createdAt) || now();
+  const createdAt = stringValue(value.createdAt) || nowUtc();
   return {
     id: value.id,
     projectId: value.projectId,
@@ -158,7 +158,7 @@ const normalizeBook = (book) => {
 const normalizeChapter = (chapter) => {
   const value = recordValue(chapter);
   if (!value || !hasRequiredFields(value, ['id', 'projectId', 'bookId'])) return null;
-  const createdAt = stringValue(value.createdAt) || now();
+  const createdAt = stringValue(value.createdAt) || nowUtc();
   return {
     id: value.id,
     projectId: value.projectId,
@@ -174,7 +174,7 @@ const normalizeChapter = (chapter) => {
 const normalizeCharacter = (character) => {
   const value = recordValue(character);
   if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
-  const createdAt = stringValue(value.createdAt) || now();
+  const createdAt = stringValue(value.createdAt) || nowUtc();
   return {
     id: value.id,
     projectId: value.projectId,
@@ -192,7 +192,7 @@ const normalizeCharacter = (character) => {
 const normalizeLoreEntry = (entry) => {
   const value = recordValue(entry);
   if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
-  const createdAt = stringValue(value.createdAt) || now();
+  const createdAt = stringValue(value.createdAt) || nowUtc();
   return {
     id: value.id,
     projectId: value.projectId,
@@ -207,7 +207,7 @@ const normalizeLoreEntry = (entry) => {
 const normalizeScene = (scene) => {
   const value = recordValue(scene);
   if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
-  const createdAt = stringValue(value.createdAt) || now();
+  const createdAt = stringValue(value.createdAt) || nowUtc();
   return {
     id: value.id,
     projectId: value.projectId,
@@ -229,7 +229,7 @@ const normalizeAsset = (asset) => {
     name: stringValue(value.name, 'Asset sem nome'),
     type: stringValue(value.type, 'ref'),
     path: stringValue(value.path),
-    createdAt: stringValue(value.createdAt) || now()
+    createdAt: stringValue(value.createdAt) || nowUtc()
   };
 };
 
