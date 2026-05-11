@@ -6,6 +6,20 @@ const toTimestamp = (value) => {
   return Number.isFinite(time) ? time : 0;
 };
 
+const isOutputStale = (output, staleCutoff) => {
+  const createdAt = toTimestamp(output?.createdAt);
+  return createdAt > 0 && createdAt < staleCutoff;
+};
+
+const assistiveItemType = (entryType) => {
+  if (entryType === 'review required') return 'automation_confirmation';
+  if (entryType === 'scene not production-ready') return 'readiness_risk';
+  return 'operational_signal';
+};
+
+const buildOutputComparisonKey = (output) =>
+  [output.sceneId || 'scene:global', output.characterId || 'char:global', output.generationType || 'type:generic'].join('|');
+
 const priorityFromScore = (score = 0) => {
   if (score >= 78) return 'high';
   if (score >= 48) return 'medium';
@@ -71,7 +85,7 @@ export const buildReviewInboxItems = ({ state, projectId, assistiveBundle, now =
     const chapter = chaptersById.get(entry.chapterId || scene?.chapterId || '');
     pushItem(items, {
       id: `assistive:${entry.id}`,
-      type: entry.type === 'review required' ? 'automation_confirmation' : entry.type === 'scene not production-ready' ? 'readiness_risk' : 'operational_signal',
+      type: assistiveItemType(entry.type),
       title: entry.title,
       reason: `${entry.description} (via dashboard de readiness e rules engine local).`,
       priority: priorityFromScore(entry.priorityScore),
@@ -115,7 +129,7 @@ export const buildReviewInboxItems = ({ state, projectId, assistiveBundle, now =
       });
     }
 
-    const isStale = toTimestamp(output.createdAt) > 0 && toTimestamp(output.createdAt) < staleCutoff;
+    const isStale = isOutputStale(output, staleCutoff);
     if (isPendingReview && isStale) {
       pushItem(items, {
         id: `stale:${output.id}`,
@@ -139,7 +153,7 @@ export const buildReviewInboxItems = ({ state, projectId, assistiveBundle, now =
 
   const compareBuckets = new Map();
   projectOutputs.forEach((output) => {
-    const key = [output.sceneId || 'scene:global', output.characterId || 'char:global', output.generationType || 'type:generic'].join('|');
+    const key = buildOutputComparisonKey(output);
     if (!compareBuckets.has(key)) compareBuckets.set(key, []);
     compareBuckets.get(key).push(output);
   });

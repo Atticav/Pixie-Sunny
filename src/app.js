@@ -1176,7 +1176,7 @@ const reviewInboxFocusItemContext = (item, { openReview = false } = {}) => {
 
   if (openReview && item.outputId) {
     openImageReviewStudio();
-    if (item.outputId) irsSelectOutput(item.outputId);
+    irsSelectOutput(item.outputId);
     return;
   }
 
