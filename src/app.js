@@ -6,7 +6,8 @@ import {
   createLoreEntry,
   createProject,
   createScene,
-  deleteEntity
+  deleteEntity,
+  UNASSIGNED_CHAPTER_ID
 } from './models.js';
 import { createStore, sanitizeState } from './store.js';
 import { buildSceneSpec, buildVideoSpec, searchLore, suggestNextParagraph } from './assistant.js';
@@ -44,6 +45,10 @@ const parseTags = (value) =>
     .split(',')
     .map((tag) => tag.trim())
     .filter(Boolean);
+
+const resetImportedFile = (input) => {
+  input.value = '';
+};
 
 const selectedProjectId = () => refs.projectSelect.value;
 
@@ -118,7 +123,9 @@ const projectScenes = () =>
   state.scenes.filter(
     (scene) =>
       scene.projectId === selectedProjectId() &&
-      (!selectedChapterId() || !scene.chapterId || scene.chapterId === selectedChapterId())
+      (!selectedChapterId() ||
+        scene.chapterId === UNASSIGNED_CHAPTER_ID ||
+        scene.chapterId === selectedChapterId())
   );
 
 const projectAssets = () => state.assets.filter((asset) => asset.projectId === selectedProjectId());
@@ -443,7 +450,7 @@ $('createSceneBtn').addEventListener('click', () => {
   state.scenes.push(
     createScene({
       projectId: selectedProjectId(),
-      chapterId: selectedChapterId(),
+      chapterId: selectedChapterId() || UNASSIGNED_CHAPTER_ID,
       title,
       description,
       location: $('newSceneLocation').value.trim()
@@ -527,10 +534,11 @@ $('importDataInput').addEventListener('change', async (event) => {
   try {
     state = sanitizeState(JSON.parse(content));
     persist();
-    event.target.value = '';
   } catch (error) {
     console.error('Falha ao importar JSON', error);
     alert(`Erro ao importar JSON: ${error?.message || 'o arquivo não contém dados válidos ou está corrompido'}`);
+  } finally {
+    resetImportedFile(event.target);
   }
 });
 

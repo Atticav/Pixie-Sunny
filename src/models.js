@@ -27,6 +27,8 @@ const baseSettings = () => ({
   }
 });
 
+export const UNASSIGNED_CHAPTER_ID = '';
+
 export const emptyState = () => ({
   projects: [],
   books: [],
@@ -97,7 +99,13 @@ export const createLoreEntry = ({ projectId, title, content, tags = [] }) => ({
   updatedAt: now()
 });
 
-export const createScene = ({ projectId, chapterId = '', title, description, location = '' }) => ({
+export const createScene = ({
+  projectId,
+  chapterId = UNASSIGNED_CHAPTER_ID,
+  title,
+  description,
+  location = ''
+}) => ({
   id: newId(),
   projectId,
   chapterId,
@@ -201,7 +209,7 @@ const normalizeScene = (scene) => {
   return {
     id: value.id,
     projectId: value.projectId,
-    chapterId: stringValue(value.chapterId),
+    chapterId: stringValue(value.chapterId, UNASSIGNED_CHAPTER_ID),
     title: stringValue(value.title, 'Cena sem título'),
     description: stringValue(value.description),
     location: stringValue(value.location),
@@ -243,7 +251,7 @@ export const normalizeState = (raw) => {
       (scene) =>
         scene &&
         projectIds.has(scene.projectId) &&
-        (!scene.chapterId || chapterIds.has(scene.chapterId))
+        (scene.chapterId === UNASSIGNED_CHAPTER_ID || chapterIds.has(scene.chapterId))
     );
 
   return {
