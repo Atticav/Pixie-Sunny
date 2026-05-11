@@ -4243,7 +4243,7 @@ const irsBuildContextCatalog = () => {
           sections: [
             { label: 'Prompt principal', text: version.masterPrompt || '' },
             { label: 'Prompt negativo', text: version.negativePrompt || '' },
-            { label: 'Briefing curto/detalhado', text: [version.shortPrompt, version.detailedPrompt].filter(Boolean).join('\n\n') },
+            { label: 'Briefing curto e detalhado', text: [version.shortPrompt, version.detailedPrompt].filter(Boolean).join('\n\n') },
             { label: 'Prompt de cena', text: version.scenePrompt || '' },
             { label: 'Prompt cinematográfico', text: version.cinematicPrompt || '' },
             { label: 'Preservar', text: irsContextText(version.preserve) },
@@ -4620,9 +4620,10 @@ const irsRenderContextCompare = () => {
       if (mode === 'inline') {
         const list = document.createElement('ul');
         list.className = 'irs-context-inline';
+        const inlineClassByType = { added: 'is-added', removed: 'is-removed', equal: 'is-equal' };
         section.diff.rows.forEach((row) => {
           const item = document.createElement('li');
-          item.className = row.type === 'added' ? 'is-added' : row.type === 'removed' ? 'is-removed' : 'is-equal';
+          item.className = inlineClassByType[row.type] || 'is-equal';
           item.textContent = `${row.type === 'added' ? '+' : row.type === 'removed' ? '-' : ' '} ${row.text}`;
           list.append(item);
         });

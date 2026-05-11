@@ -1,12 +1,12 @@
-const textValue = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+const toStringValue = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
 const normalizeLine = (line) => line.replace(/\s+/g, ' ').trim();
 const PROMPT_SECTION_PATTERN = /prompt|briefing/i;
 const CONTINUITY_SECTION_PATTERN = /continuidade|continuity/i;
 
 export const buildLineDiff = (beforeText = '', afterText = '') => {
-  const beforeLines = textValue(beforeText).split(/\r?\n/).map((line) => line.trimEnd());
-  const afterLines = textValue(afterText).split(/\r?\n/).map((line) => line.trimEnd());
+  const beforeLines = toStringValue(beforeText).split(/\r?\n/).map((line) => line.trimEnd());
+  const afterLines = toStringValue(afterText).split(/\r?\n/).map((line) => line.trimEnd());
 
   const rows = [];
   let i = 0;
@@ -56,8 +56,8 @@ export const buildLineDiff = (beforeText = '', afterText = '') => {
 export const buildMetadataDiff = (before = {}, after = {}) => {
   const keys = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].sort();
   const rows = keys.map((key) => {
-    const previous = textValue(before?.[key]).trim();
-    const next = textValue(after?.[key]).trim();
+    const previous = toStringValue(before?.[key]).trim();
+    const next = toStringValue(after?.[key]).trim();
     let type = 'equal';
     if (previous && !next) type = 'removed';
     else if (!previous && next) type = 'added';
