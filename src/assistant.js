@@ -27,7 +27,7 @@ export const buildSceneSpec = ({ projectTone, scene, characters }) => ({
     character: character.name,
     lockTraits: character.canonTraits
   })),
-  prompt: `Cena "${scene?.title}": ${scene?.description}. Estilo realista cinematográfico, textura natural de pele e tecido, iluminação dramática coerente com floresta enevoada.`,
+  prompt: `Cena "${scene?.title}": ${scene?.description}. Estilo realista cinematográfico, textura natural de pele e tecido, iluminação dramática coerente com o cenário descrito.`,
   negativePrompt: 'anime, cartoon, proporções irreais, maquiagem glamour moderna, olhos inconsistentes, figurino moderno'
 });
 

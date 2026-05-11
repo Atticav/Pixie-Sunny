@@ -21,6 +21,7 @@ const refs = {
   chapterSelect: $('chapterSelect'),
   characterSelect: $('characterSelect'),
   sceneSelect: $('sceneSelect'),
+  videoImageAssetSelect: $('videoImageAssetSelect'),
   loreList: $('loreList'),
   assetList: $('assetList')
 };
@@ -72,11 +73,15 @@ const renderLore = () => {
 
 const renderAssets = () => {
   refs.assetList.innerHTML = '';
-  projectAssets().forEach((asset) => {
+  const assets = projectAssets();
+  assets.forEach((asset) => {
     const li = document.createElement('li');
     li.textContent = `${asset.type} · ${asset.name} · ${asset.path}`;
     refs.assetList.append(li);
   });
+
+  const imageAssets = assets.filter((asset) => asset.type.toLowerCase() === 'image');
+  renderOptions(refs.videoImageAssetSelect, imageAssets, refs.videoImageAssetSelect.value || imageAssets[0]?.id);
 };
 
 const render = () => {
@@ -255,7 +260,7 @@ $('saveAssetBtn').addEventListener('click', () => {
 
 $('generateVideoSpecBtn').addEventListener('click', () => {
   const scene = projectScenes().find((item) => item.id === refs.sceneSelect.value);
-  const imageAsset = projectAssets().find((asset) => asset.type.toLowerCase() === 'image');
+  const imageAsset = projectAssets().find((asset) => asset.id === refs.videoImageAssetSelect.value);
   const spec = buildVideoSpec({
     scene,
     imageAsset,
@@ -284,7 +289,7 @@ $('importDataInput').addEventListener('change', async (event) => {
     state = { ...state, ...imported };
     persist();
   } catch {
-    alert('JSON inválido.');
+    alert('Erro ao importar: arquivo JSON inválido. Verifique o formato do arquivo.');
   }
 });
 
