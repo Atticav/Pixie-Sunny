@@ -41,6 +41,7 @@ import {
 } from './assistant.js';
 import { buildAssetLineageGraph } from './asset-lineage.js';
 import { buildAssistivePlanningBundle } from './assistive-planning.js';
+import { buildDiffSummary, buildLineDiff, buildMetadataDiff, buildSemanticHighlights } from './context-compare.js';
 import {
   initializeLocalWorkspace,
   localWorkspaceSupported,
@@ -3605,6 +3606,8 @@ let irsIsOpen = false;
 let irsSelectedOutputId = null;
 let irsCompareIds = [];
 let irsCanonModalOutputId = null;
+let irsContextCatalog = new Map();
+let irsContextConnections = [];
 
 const irsRefs = {
   overlay: $('imageReviewStudio'),
@@ -3614,10 +3617,12 @@ const irsRefs = {
   tabBtnPromotions: $('irsTabBtnPromotions'),
   tabBtnDecisions: $('irsTabBtnDecisions'),
   tabBtnLineage: $('irsTabBtnLineage'),
+  tabBtnCompare: $('irsTabBtnCompare'),
   tabReview: $('irsTabReview'),
   tabPromotions: $('irsTabPromotions'),
   tabDecisions: $('irsTabDecisions'),
   tabLineage: $('irsTabLineage'),
+  tabCompare: $('irsTabCompare'),
   // Filters
   filterCharacter: $('irsFilterCharacter'),
   filterScene: $('irsFilterScene'),
@@ -3673,6 +3678,21 @@ const irsRefs = {
   lineageCount: $('irsLineageCount'),
   lineageSummary: $('irsLineageSummary'),
   lineageList: $('irsLineageList'),
+  // Context compare
+  compareCatalogCount: $('irsCompareCatalogCount'),
+  compareConnectionFilter: $('irsCompareConnectionFilter'),
+  compareEntityA: $('irsCompareEntityA'),
+  compareEntityB: $('irsCompareEntityB'),
+  compareMode: $('irsCompareMode'),
+  compareApplyBtn: $('irsCompareApplyBtn'),
+  contextSummary: $('irsContextSummary'),
+  contextHighlights: $('irsContextHighlights'),
+  contextDiff: $('irsContextDiff'),
+  compareOpenA: $('irsCompareOpenA'),
+  compareOpenB: $('irsCompareOpenB'),
+  compareOpenDecisions: $('irsCompareOpenDecisions'),
+  compareOpenLineage: $('irsCompareOpenLineage'),
+  compareOpenAssistive: $('irsCompareOpenAssistive'),
   // Canon modal
   canonModal: $('irsCanonModal'),
   modalImg: $('irsModalImg'),
@@ -4096,6 +4116,535 @@ const irsScopeItemLabel = (scopeType, scopeId) => {
 };
 
 const irsOutputDisplayName = (output) => output.fileName || `Output ${output.id.substring(0, 8)}`;
+
+const irsContextText = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean).join('\n');
+  if (value == null) return '';
+  return typeof value === 'string' ? value : String(value);
+};
+
+const irsSceneReadiness = (sceneId) => {
+  if (!sceneId) return 'not-assessed';
+  const bundle = buildAssistivePlanningBundle({
+    state,
+    projectId: selectedProjectId(),
+    scopeType: 'scene',
+    scopeValue: sceneId
+  });
+  const scoped = (bundle.recommendations || []).filter((entry) => entry.sceneId === sceneId);
+  if (!scoped.length) return 'stable';
+  if (scoped.some((entry) => entry.status === 'blocked')) return 'blocked';
+  if (scoped.some((entry) => entry.status === 'ready-to-review')) return 'ready-to-review';
+  if (scoped.some((entry) => entry.status === 'ready-to-generate')) return 'ready-to-generate';
+  return 'stable';
+};
+
+const irsBuildContextCatalog = () => {
+  const projectId = selectedProjectId();
+  const catalog = new Map();
+  const links = [];
+  const pushLink = (id, label, leftId, rightId, source) => {
+    if (!leftId || !rightId || leftId === rightId) return;
+    links.push({ id, label, leftId, rightId, source });
+  };
+  const putEntry = (entry) => {
+    if (!entry?.id || catalog.has(entry.id)) return;
+    catalog.set(entry.id, entry);
+  };
+
+  const outputs = irsAllOutputs();
+  const allDecisions = irsAllDecisionEvents();
+  const latestDecisionByAsset = new Map();
+  allDecisions
+    .filter((event) => event.scopeType === 'asset')
+    .sort((a, b) => b.happenedAt.localeCompare(a.happenedAt))
+    .forEach((event) => {
+      if (!latestDecisionByAsset.has(event.scopeId)) latestDecisionByAsset.set(event.scopeId, event);
+    });
+
+  outputs.forEach(({ output, job }) => {
+    const decision = latestDecisionByAsset.get(output.id);
+    const shot = irsFindPrimaryShotForOutput(output.id);
+    putEntry({
+      id: `output:${output.id}`,
+      label: `Asset output · ${irsOutputDisplayName(output)}`,
+      source: 'Asset Version Lineage / Supersession Graph',
+      open: { kind: 'output', id: output.id },
+      metadata: {
+        kind: 'asset_output',
+        generationType: output.generationType,
+        reviewStatus: output.reviewStatus,
+        score: output.score,
+        isCanonical: output.isCanonical ? 'yes' : '',
+        isFavorite: output.isFavorite ? 'yes' : '',
+        sceneId: output.sceneId,
+        characterId: output.characterId,
+        shotId: shot?.id || '',
+        promptId: job.promptDocumentId || '',
+        seed: output.seed,
+        readiness: irsSceneReadiness(output.sceneId),
+        resultingStatus: decision?.resultingStatus || '',
+        createdAt: output.createdAt
+      },
+      sections: [
+        { label: 'Prompt principal', text: output.prompt || '' },
+        { label: 'Notas editoriais', text: output.notes || '' },
+        { label: 'Parâmetros de geração', text: JSON.stringify(output.params || {}, null, 2) }
+      ]
+    });
+  });
+
+  (state.promptDocuments || [])
+    .filter((document) => document.projectId === projectId)
+    .forEach((document) => {
+      const active = (document.versions || []).find((version) => version.id === document.activeVersionId) || document.versions?.[0];
+      putEntry({
+        id: `promptDoc:${document.id}`,
+        label: `Briefing/Prompt · ${document.title}`,
+        source: 'Prompt Grounding / Context Assembly',
+        open: { kind: 'promptDocument', id: document.id, targetType: document.targetType },
+        metadata: {
+          kind: 'briefing_prompt',
+          targetType: document.targetType,
+          targetId: document.targetId,
+          promptMedium: document.promptMedium,
+          stylePreset: document.stylePreset,
+          cinematicPreset: document.cinematicPreset,
+          lensLightingPreset: document.lensLightingPreset,
+          isOfficial: document.isOfficial ? 'yes' : '',
+          isFavorite: document.isFavorite ? 'yes' : '',
+          activeVersionId: document.activeVersionId,
+          updatedAt: document.updatedAt
+        },
+        sections: [
+          { label: 'Notas de briefing', text: document.notes || '' },
+          { label: 'Prompt principal', text: active?.masterPrompt || '' },
+          { label: 'Prompt negativo', text: active?.negativePrompt || '' },
+          { label: 'Prompt de cena', text: active?.scenePrompt || '' },
+          { label: 'Prompt cinematográfico', text: active?.cinematicPrompt || '' }
+        ]
+      });
+
+      (document.versions || []).forEach((version, index) => {
+        const versionId = `promptVersion:${document.id}:${version.id}`;
+        putEntry({
+          id: versionId,
+          label: `Prompt versão · ${document.title} · ${version.label || `v${index + 1}`}`,
+          source: 'Refresh / Rewrite',
+          open: { kind: 'promptDocument', id: document.id, targetType: document.targetType },
+          metadata: {
+            kind: 'prompt_version',
+            targetType: document.targetType,
+            targetId: document.targetId,
+            label: version.label,
+            source: version.source,
+            createdAt: version.createdAt
+          },
+          sections: [
+            { label: 'Prompt principal', text: version.masterPrompt || '' },
+            { label: 'Prompt negativo', text: version.negativePrompt || '' },
+            { label: 'Briefing curto e detalhado', text: [version.shortPrompt, version.detailedPrompt].filter(Boolean).join('\n\n') },
+            { label: 'Prompt de cena', text: version.scenePrompt || '' },
+            { label: 'Prompt cinematográfico', text: version.cinematicPrompt || '' },
+            { label: 'Preservar', text: irsContextText(version.preserve) },
+            { label: 'Variar', text: irsContextText(version.vary) },
+            { label: 'Notas', text: version.notes || '' }
+          ]
+        });
+
+        const previous = index > 0 ? document.versions[index - 1] : null;
+        if (previous) {
+          pushLink(
+            `prompt:${document.id}:${previous.id}->${version.id}`,
+            `refresh / rewrite · ${document.title}`,
+            `promptVersion:${document.id}:${previous.id}`,
+            versionId,
+            'Prompt Grounding / Context Assembly'
+          );
+        }
+      });
+    });
+
+  (state.scenes || [])
+    .filter((scene) => scene.projectId === projectId)
+    .forEach((scene) => {
+      const relatedShots = (state.shots || []).filter((shot) => shot.sceneId === scene.id && shot.projectId === projectId);
+      const relatedOutputs = outputs.filter(({ output }) => output.sceneId === scene.id);
+      putEntry({
+        id: `scene:${scene.id}`,
+        label: `Cena · ${scene.title}`,
+        source: 'Scene Briefing Generator / Director Pack',
+        open: { kind: 'scene', id: scene.id, chapterId: scene.chapterId },
+        metadata: {
+          kind: 'scene',
+          chapterId: scene.chapterId,
+          location: scene.location,
+          shots: relatedShots.length,
+          outputs: relatedOutputs.length,
+          canonicalOutputs: relatedOutputs.filter(({ output }) => output.isCanonical).length,
+          readiness: irsSceneReadiness(scene.id),
+          updatedAt: scene.updatedAt
+        },
+        sections: [{ label: 'Descrição de cena', text: scene.description || '' }]
+      });
+    });
+
+  (state.shots || [])
+    .filter((shot) => shot.projectId === projectId)
+    .forEach((shot) => {
+      putEntry({
+        id: `shot:${shot.id}`,
+        label: `Shot · ${shot.title}`,
+        source: 'Production Board',
+        open: { kind: 'shot', id: shot.id, sceneId: shot.sceneId, chapterId: shot.chapterId, beatId: shot.beatId },
+        metadata: {
+          kind: 'shot',
+          status: shot.status,
+          sceneId: shot.sceneId,
+          beatId: shot.beatId,
+          focusCharacterId: shot.focusCharacterId,
+          promptLinks: (shot.promptDocumentIds || []).length,
+          outputLinks: (shot.generationOutputIds || []).length,
+          continuityReferences: (shot.continuityReferenceIds || []).length,
+          updatedAt: shot.updatedAt
+        },
+        sections: [
+          { label: 'Direção / briefing', text: [shot.narrativeObjective, shot.directorNotes].filter(Boolean).join('\n\n') },
+          { label: 'Progressão visual e narrativa', text: [shot.visualProgression, shot.narrativeProgression].filter(Boolean).join('\n\n') },
+          { label: 'Continuidade', text: [irsContextText(shot.continuityMustKeep), irsContextText(shot.continuityMayVary), irsContextText(shot.continuityRisks)].filter(Boolean).join('\n\n') }
+        ]
+      });
+    });
+
+  (state.characters || [])
+    .filter((character) => character.projectId === projectId)
+    .forEach((character) => {
+      putEntry({
+        id: `canonCharacter:${character.id}`,
+        label: `Canon entry · Personagem · ${character.name}`,
+        source: 'Character Canon Studio',
+        open: { kind: 'character', id: character.id },
+        metadata: {
+          kind: 'canon_entry',
+          entryType: 'character',
+          visualAesthetic: character.visualAesthetic,
+          colorPalette: character.colorPalette,
+          periodStyle: character.periodStyle,
+          updatedAt: character.updatedAt
+        },
+        sections: [
+          { label: 'Notas', text: character.notes || '' },
+          { label: 'Traços canônicos', text: irsContextText(character.canonTraits) },
+          { label: 'Traços fixos / variáveis', text: [irsContextText(character.fixedTraits), irsContextText(character.variableTraits)].filter(Boolean).join('\n\n') },
+          { label: 'Prompt principal', text: character.masterPrompt || '' },
+          { label: 'Prompt negativo', text: character.negativePrompt || '' }
+        ]
+      });
+    });
+
+  (state.loreEntries || [])
+    .filter((entry) => entry.projectId === projectId)
+    .forEach((entry) => {
+      putEntry({
+        id: `canonLore:${entry.id}`,
+        label: `Canon entry · Universe memory · ${entry.title}`,
+        source: 'Story Bible / Universe Memory',
+        open: { kind: 'lore', id: entry.id },
+        metadata: {
+          kind: 'canon_entry',
+          entryType: 'lore',
+          tags: irsContextText(entry.tags),
+          updatedAt: entry.updatedAt
+        },
+        sections: [{ label: 'Conteúdo canon', text: entry.content || '' }]
+      });
+    });
+
+  (state.referenceImages || [])
+    .filter((reference) => reference.projectId === projectId)
+    .forEach((reference) => {
+      putEntry({
+        id: `reference:${reference.id}`,
+        label: `Asset metadata · Referência · ${reference.name}`,
+        source: 'Reference Studio',
+        open: { kind: 'reference', id: reference.id, linkedEntityType: reference.linkedEntityType, linkedEntityId: reference.linkedEntityId },
+        metadata: {
+          kind: 'asset_metadata',
+          type: reference.type,
+          linkedEntityType: reference.linkedEntityType,
+          linkedEntityId: reference.linkedEntityId,
+          characterId: reference.characterId,
+          isCanonical: reference.isCanonical ? 'yes' : '',
+          createdAt: reference.createdAt
+        },
+        sections: [
+          { label: 'Preservar / variar', text: [reference.preserve, reference.mayVary].filter(Boolean).join('\n\n') },
+          { label: 'Notas', text: reference.notes || '' }
+        ]
+      });
+    });
+
+  (state.assets || [])
+    .filter((asset) => asset.projectId === projectId)
+    .forEach((asset) => {
+      putEntry({
+        id: `asset:${asset.id}`,
+        label: `Asset metadata · ${asset.name}`,
+        source: 'Production Board',
+        open: { kind: 'asset', id: asset.id },
+        metadata: {
+          kind: 'asset_metadata',
+          type: asset.type,
+          path: asset.path,
+          createdAt: asset.createdAt
+        },
+        sections: [{ label: 'Asset', text: `${asset.name}\n${asset.path}` }]
+      });
+    });
+
+  allDecisions.forEach((event) => {
+    if (event.targetType === 'generationOutput' && event.targetId && event.relatedItemType === 'generationOutput' && event.relatedItemId) {
+      pushLink(
+        `decision:${event.id}`,
+        `${irsDecisionTypeLabels[event.decisionType] || event.decisionType} · ${new Date(event.happenedAt).toLocaleDateString('pt-BR')}`,
+        `output:${event.targetId}`,
+        `output:${event.relatedItemId}`,
+        'Approval & Decision History Layer'
+      );
+    }
+  });
+
+  const lineageGraph = buildAssetLineageGraph({
+    outputs: outputs.map(({ output }) => output),
+    decisionEvents: allDecisions,
+    canonPromotions: (state.canonPromotions || []).filter((promotion) => promotion.projectId === projectId)
+  });
+  lineageGraph.edges.forEach((edge) => {
+    pushLink(
+      `lineage:${edge.from}->${edge.to}:${edge.relation}`,
+      `${edge.relation === 'supersedes' ? 'supersession' : 'derived variant'} · ${new Date(edge.happenedAt).toLocaleDateString('pt-BR')}`,
+      `output:${edge.from}`,
+      `output:${edge.to}`,
+      'Asset Version Lineage / Supersession Graph'
+    );
+  });
+
+  return { catalog, links };
+};
+
+const irsContextConnectionLabel = (link) => `${link.label} (${link.source})`;
+
+const irsPopulateContextCompareSelectors = () => {
+  const previousA = irsRefs.compareEntityA.value;
+  const previousB = irsRefs.compareEntityB.value;
+  const previousConnection = irsRefs.compareConnectionFilter.value;
+  const { catalog, links } = irsBuildContextCatalog();
+  irsContextCatalog = catalog;
+  irsContextConnections = links;
+
+  const options = [...catalog.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  irsRefs.compareCatalogCount.textContent = `${options.length} entradas comparáveis · ${links.length} conexões sugeridas`;
+  const baseOption = '<option value="">Selecione</option>';
+  irsRefs.compareEntityA.innerHTML = baseOption;
+  irsRefs.compareEntityB.innerHTML = baseOption;
+  options.forEach((entry) => {
+    const optionA = document.createElement('option');
+    optionA.value = entry.id;
+    optionA.textContent = entry.label;
+    if (entry.id === previousA) optionA.selected = true;
+    irsRefs.compareEntityA.append(optionA);
+    const optionB = document.createElement('option');
+    optionB.value = entry.id;
+    optionB.textContent = entry.label;
+    if (entry.id === previousB) optionB.selected = true;
+    irsRefs.compareEntityB.append(optionB);
+  });
+
+  irsRefs.compareConnectionFilter.innerHTML = '<option value="">Seleção manual</option>';
+  links.forEach((link) => {
+    const option = document.createElement('option');
+    option.value = link.id;
+    option.textContent = irsContextConnectionLabel(link);
+    if (link.id === previousConnection) option.selected = true;
+    irsRefs.compareConnectionFilter.append(option);
+  });
+};
+
+const irsSetContextHighlights = (items) => {
+  irsRefs.contextHighlights.innerHTML = '';
+  if (!items.length) {
+    const item = document.createElement('li');
+    item.textContent = 'Sem highlight semântico adicional.';
+    irsRefs.contextHighlights.append(item);
+    return;
+  }
+  items.forEach((entry) => {
+    const item = document.createElement('li');
+    item.textContent = entry;
+    irsRefs.contextHighlights.append(item);
+  });
+};
+
+const irsOpenContextEntry = (entryId) => {
+  const entry = irsContextCatalog.get(entryId);
+  if (!entry?.open) return;
+  const open = entry.open;
+  if (open.kind === 'output') {
+    irsSwitchTab('review');
+    irsSelectOutput(open.id);
+    return;
+  }
+  closeImageReviewStudio();
+  if (open.kind === 'scene') {
+    refs.chapterSelect.value = open.chapterId || '';
+    refs.sceneSelect.value = open.id;
+    render();
+    document.querySelector('.sp-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (open.kind === 'shot') {
+    refs.chapterSelect.value = open.chapterId || '';
+    refs.sceneSelect.value = open.sceneId || '';
+    refs.shotBeatSelect.value = open.beatId || '';
+    refs.shotSelect.value = open.id;
+    refs.shotFilterChapter.value = open.chapterId || '';
+    refs.shotFilterScene.value = open.sceneId || '';
+    render();
+    document.querySelector('.sp-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (open.kind === 'promptDocument') {
+    refs.promptDocumentSelect.value = open.id;
+    render();
+    psOpenStudio(open.targetType === 'scene' ? 'scene' : 'character');
+    return;
+  }
+  if (open.kind === 'character') {
+    refs.characterSelect.value = open.id;
+    render();
+    return;
+  }
+  if (open.kind === 'lore') {
+    refs.loreSelect.value = open.id;
+    render();
+    return;
+  }
+  if (open.kind === 'reference') {
+    render();
+    document.querySelector('#referenceStudio')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  render();
+};
+
+const irsRenderContextCompare = () => {
+  const leftId = irsRefs.compareEntityA.value;
+  const rightId = irsRefs.compareEntityB.value;
+  const left = irsContextCatalog.get(leftId);
+  const right = irsContextCatalog.get(rightId);
+
+  if (!left || !right || leftId === rightId) {
+    irsRefs.contextSummary.textContent = leftId && rightId && leftId === rightId
+      ? 'Selecione duas versões diferentes para comparar.'
+      : 'Selecione duas versões para comparar contexto e mudanças.';
+    irsSetContextHighlights([]);
+    irsRefs.contextDiff.innerHTML = '<p class="irs-hint">A comparação ficará disponível aqui depois de selecionar duas versões.</p>';
+    return;
+  }
+
+  const metadataDiff = buildMetadataDiff(left.metadata, right.metadata);
+  const labels = [...new Set([...(left.sections || []).map((section) => section.label), ...(right.sections || []).map((section) => section.label)])];
+  const sectionDiffs = labels.map((label) => {
+    const before = (left.sections || []).find((section) => section.label === label)?.text || '';
+    const after = (right.sections || []).find((section) => section.label === label)?.text || '';
+    return { label, before, after, diff: buildLineDiff(before, after) };
+  });
+  const summary = buildDiffSummary({ metadataDiff, sectionDiffs });
+  const highlights = buildSemanticHighlights({ metadataDiff, sectionDiffs });
+  const mode = irsRefs.compareMode.value;
+
+  irsRefs.contextSummary.textContent = [
+    `Comparando: ${left.label} vs ${right.label}`,
+    `Mudanças de metadata: ${summary.metadataChanged} alteradas, ${summary.metadataAdded} adicionadas, ${summary.metadataRemoved} removidas`,
+    `Mudanças textuais: ${summary.changedSections} seções com ${summary.textOps} operações`,
+    `Conexões: ${left.source} ↔ ${right.source}`
+  ].join(' · ');
+  irsSetContextHighlights(highlights);
+
+  irsRefs.contextDiff.innerHTML = '';
+
+  const changedMetaRows = metadataDiff.rows.filter((row) => row.type !== 'equal');
+  const metaSection = document.createElement('section');
+  metaSection.className = 'irs-context-section';
+  const metaTitle = document.createElement('h4');
+  metaTitle.className = 'irs-context-section-title';
+  metaTitle.textContent = 'Metadata diff';
+  metaSection.append(metaTitle);
+  if (!changedMetaRows.length) {
+    const empty = document.createElement('p');
+    empty.className = 'irs-context-source';
+    empty.textContent = 'Sem mudanças de metadata entre as versões selecionadas.';
+    metaSection.append(empty);
+  } else {
+    const table = document.createElement('table');
+    table.className = 'irs-context-meta-table';
+    const thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Campo</th><th>Versão A</th><th>Versão B</th></tr>';
+    table.append(thead);
+    const tbody = document.createElement('tbody');
+    changedMetaRows.forEach((row) => {
+      const tr = document.createElement('tr');
+      const keyCell = document.createElement('td');
+      keyCell.textContent = row.key;
+      const beforeCell = document.createElement('td');
+      beforeCell.textContent = row.before || '—';
+      const afterCell = document.createElement('td');
+      afterCell.textContent = row.after || '—';
+      tr.append(keyCell, beforeCell, afterCell);
+      tbody.append(tr);
+    });
+    table.append(tbody);
+    metaSection.append(table);
+  }
+  irsRefs.contextDiff.append(metaSection);
+
+  sectionDiffs
+    .filter((section) => section.diff.stats.changed > 0)
+    .forEach((section) => {
+      const wrapper = document.createElement('section');
+      wrapper.className = 'irs-context-section';
+      const title = document.createElement('h4');
+      title.className = 'irs-context-section-title';
+      title.textContent = section.label;
+      wrapper.append(title);
+      if (mode === 'inline') {
+        const list = document.createElement('ul');
+        list.className = 'irs-context-inline';
+        const inlineClassByType = { added: 'is-added', removed: 'is-removed', equal: 'is-equal' };
+        section.diff.rows.forEach((row) => {
+          const item = document.createElement('li');
+          item.className = inlineClassByType[row.type] || 'is-equal';
+          item.textContent = `${row.type === 'added' ? '+' : row.type === 'removed' ? '-' : ' '} ${row.text}`;
+          list.append(item);
+        });
+        wrapper.append(list);
+      } else {
+        const side = document.createElement('div');
+        side.className = 'irs-context-side';
+        const leftPre = document.createElement('pre');
+        leftPre.textContent = section.before || '—';
+        const rightPre = document.createElement('pre');
+        rightPre.textContent = section.after || '—';
+        side.append(leftPre, rightPre);
+        wrapper.append(side);
+      }
+      irsRefs.contextDiff.append(wrapper);
+    });
+
+  if (!irsRefs.contextDiff.children.length) {
+    irsRefs.contextDiff.innerHTML = '<p class="irs-hint">Nenhuma mudança detectada.</p>';
+  }
+};
 
 const irsLineageTagClass = (tag) => {
   if (tag === 'current_official') return 'irs-lineage-badge irs-lineage-badge-official';
@@ -4966,20 +5515,27 @@ const irsSwitchTab = (tab) => {
   irsRefs.tabPromotions.classList.toggle('irs-hidden', !isPromotions);
   irsRefs.tabDecisions.classList.toggle('irs-hidden', tab !== 'decisions');
   irsRefs.tabLineage.classList.toggle('irs-hidden', tab !== 'lineage');
+  irsRefs.tabCompare.classList.toggle('irs-hidden', tab !== 'compare');
   irsRefs.tabBtnReview.classList.toggle('irs-tab-active', isReview);
   irsRefs.tabBtnPromotions.classList.toggle('irs-tab-active', isPromotions);
   irsRefs.tabBtnDecisions.classList.toggle('irs-tab-active', tab === 'decisions');
   irsRefs.tabBtnLineage.classList.toggle('irs-tab-active', tab === 'lineage');
+  irsRefs.tabBtnCompare.classList.toggle('irs-tab-active', tab === 'compare');
 
   if (isPromotions) irsRenderPromotionsList();
   if (tab === 'decisions') irsRenderDecisionHistory();
   if (tab === 'lineage') irsRenderLineageGraph();
+  if (tab === 'compare') {
+    irsPopulateContextCompareSelectors();
+    irsRenderContextCompare();
+  }
 };
 
 irsRefs.tabBtnReview.addEventListener('click', () => irsSwitchTab('review'));
 irsRefs.tabBtnPromotions.addEventListener('click', () => irsSwitchTab('promotions'));
 irsRefs.tabBtnDecisions.addEventListener('click', () => irsSwitchTab('decisions'));
 irsRefs.tabBtnLineage.addEventListener('click', () => irsSwitchTab('lineage'));
+irsRefs.tabBtnCompare.addEventListener('click', () => irsSwitchTab('compare'));
 
 irsRefs.applyFiltersBtn.addEventListener('click', () => {
   irsRenderGallery();
@@ -4991,6 +5547,47 @@ irsRefs.decisionApplyBtn.addEventListener('click', () => {
 
 irsRefs.lineageApplyBtn.addEventListener('click', () => {
   irsRenderLineageGraph();
+});
+
+irsRefs.compareApplyBtn.addEventListener('click', () => {
+  irsRenderContextCompare();
+});
+
+irsRefs.compareConnectionFilter.addEventListener('change', () => {
+  const selected = irsContextConnections.find((entry) => entry.id === irsRefs.compareConnectionFilter.value);
+  if (selected) {
+    irsRefs.compareEntityA.value = selected.leftId;
+    irsRefs.compareEntityB.value = selected.rightId;
+  }
+  irsRenderContextCompare();
+});
+
+irsRefs.compareEntityA.addEventListener('change', () => {
+  irsRefs.compareConnectionFilter.value = '';
+  irsRenderContextCompare();
+});
+irsRefs.compareEntityB.addEventListener('change', () => {
+  irsRefs.compareConnectionFilter.value = '';
+  irsRenderContextCompare();
+});
+irsRefs.compareMode.addEventListener('change', () => {
+  irsRenderContextCompare();
+});
+irsRefs.compareOpenA.addEventListener('click', () => {
+  irsOpenContextEntry(irsRefs.compareEntityA.value);
+});
+irsRefs.compareOpenB.addEventListener('click', () => {
+  irsOpenContextEntry(irsRefs.compareEntityB.value);
+});
+irsRefs.compareOpenDecisions.addEventListener('click', () => {
+  irsSwitchTab('decisions');
+});
+irsRefs.compareOpenLineage.addEventListener('click', () => {
+  irsSwitchTab('lineage');
+});
+irsRefs.compareOpenAssistive.addEventListener('click', () => {
+  closeImageReviewStudio();
+  document.querySelector('.ap-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 irsRefs.clearCompareBtn.addEventListener('click', () => {
