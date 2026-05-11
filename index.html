@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pixie Sunny — Estúdio Criativo Local</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Pixie Sunny · Estúdio Criativo Local</h1>
+      <p>Local-first para escrita, lore e base visual de imagem/vídeo.</p>
+      <div class="header-actions">
+        <button id="exportDataBtn">Exportar JSON</button>
+        <label class="file-btn">
+          Importar JSON
+          <input id="importDataInput" type="file" accept="application/json" />
+        </label>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section>
+        <h2>Projeto</h2>
+        <div class="stack">
+          <label>Projeto atual
+            <select id="projectSelect"></select>
+          </label>
+          <input id="newProjectName" placeholder="Novo projeto" />
+          <textarea id="newProjectTone" rows="2" placeholder="Tom visual/narrativo"></textarea>
+          <button id="createProjectBtn">Criar projeto</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Livros e capítulos</h2>
+        <div class="stack">
+          <input id="newBookTitle" placeholder="Título do livro" />
+          <button id="createBookBtn">Adicionar livro</button>
+          <select id="bookSelect"></select>
+          <input id="newChapterTitle" placeholder="Título do capítulo" />
+          <button id="createChapterBtn">Adicionar capítulo</button>
+          <select id="chapterSelect"></select>
+          <textarea id="chapterContent" rows="8" placeholder="Escreva o capítulo..."></textarea>
+          <button id="saveChapterBtn">Salvar capítulo</button>
+          <button id="suggestTextBtn">Sugestão de escrita</button>
+          <pre id="writingSuggestion"></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Personagens</h2>
+        <div class="stack">
+          <input id="newCharacterName" placeholder="Nome" />
+          <textarea id="newCharacterCanon" rows="4" placeholder="Traços canônicos (um por linha)"></textarea>
+          <textarea id="newCharacterPrompt" rows="3" placeholder="Prompt mestre"></textarea>
+          <textarea id="newCharacterNegativePrompt" rows="2" placeholder="Negative prompt"></textarea>
+          <button id="createCharacterBtn">Salvar personagem</button>
+          <select id="characterSelect"></select>
+          <pre id="characterPreview"></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Lore e memória</h2>
+        <div class="stack">
+          <input id="newLoreTitle" placeholder="Fato canônico" />
+          <textarea id="newLoreContent" rows="3" placeholder="Descrição detalhada"></textarea>
+          <button id="createLoreBtn">Salvar na memória</button>
+          <input id="loreSearch" placeholder="Buscar na memória" />
+          <ul id="loreList"></ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>Cenas e estúdio visual</h2>
+        <div class="stack">
+          <input id="newSceneTitle" placeholder="Cena" />
+          <textarea id="newSceneDescription" rows="3" placeholder="Descrição da cena"></textarea>
+          <button id="createSceneBtn">Salvar cena</button>
+          <select id="sceneSelect"></select>
+          <button id="generateSceneSpecBtn">Gerar spec de imagem</button>
+          <pre id="sceneSpec"></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Base de vídeo</h2>
+        <div class="stack">
+          <input id="assetName" placeholder="Nome do asset" />
+          <input id="assetType" placeholder="Tipo (image/video/audio/ref)" />
+          <input id="assetPath" placeholder="Caminho/arquivo local" />
+          <button id="saveAssetBtn">Salvar asset</button>
+          <label>Imagem para vídeo
+            <select id="videoImageAssetSelect"></select>
+          </label>
+          <button id="generateVideoSpecBtn">Gerar spec de vídeo</button>
+          <pre id="videoSpec"></pre>
+          <ul id="assetList"></ul>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <small>
+        Extensões prontas: conectar runner local de imagem/vídeo em <code>src/pipelines.js</code>.
+      </small>
+    </footer>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
