@@ -342,6 +342,114 @@ select:disabled {
   }
 }
 
+/* =========== Review Inbox / Triage Workspace =========== */
+.ri-section {
+  grid-column: 1 / -1;
+}
+
+.ri-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.ri-search-label {
+  grid-column: 1 / -1;
+}
+
+.ri-toolbar,
+.ri-batch-bar {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.ri-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.ri-group {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #111722;
+  display: grid;
+  gap: 8px;
+}
+
+.ri-group-title {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+
+.ri-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #121824;
+}
+
+.ri-item:focus {
+  outline: 1px solid var(--accent);
+}
+
+.ri-item.ri-priority-high {
+  border-color: #7a3a2b;
+}
+
+.ri-item.ri-risk-high {
+  box-shadow: 0 0 0 1px color-mix(in srgb, #ff6b5f, transparent 65%);
+}
+
+.ri-item-body {
+  display: grid;
+  gap: 6px;
+}
+
+.ri-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ri-item-chips,
+.ri-item-meta,
+.ri-item-reason {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.ri-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ri-item-actions button {
+  font-size: 0.72rem;
+  padding: 4px 7px;
+}
+
+.ri-empty {
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
 /* =========== Writer Studio =========== */
 .ws-overlay {
   position: fixed;

@@ -350,6 +350,118 @@
         </div>
       </section>
 
+      <section class="ri-section">
+        <h2>Review Inbox / Triage Workspace</h2>
+        <p class="storage-note">
+          Centro operacional local-first no MacBook para consolidar conflitos, riscos, itens stale e pendências que exigem decisão humana no pipeline.
+        </p>
+        <div class="ri-controls">
+          <label>Tipo
+            <select id="reviewInboxTypeFilter">
+              <option value="">Todos</option>
+              <option value="human_review">human review</option>
+              <option value="stale_needs_refresh">stale / needs refresh</option>
+              <option value="diff_review">diff review</option>
+              <option value="blocked_shot">blocked shot</option>
+              <option value="readiness_risk">readiness risk</option>
+              <option value="automation_confirmation">automation confirmation</option>
+              <option value="decision_follow_up">decision follow-up</option>
+              <option value="operational_signal">operational signal</option>
+            </select>
+          </label>
+          <label>Prioridade
+            <select id="reviewInboxPriorityFilter">
+              <option value="">Todas</option>
+              <option value="high">high</option>
+              <option value="medium">medium</option>
+              <option value="low">low</option>
+            </select>
+          </label>
+          <label>Risco
+            <select id="reviewInboxRiskFilter">
+              <option value="">Todos</option>
+              <option value="high">high</option>
+              <option value="medium">medium</option>
+              <option value="low">low</option>
+            </select>
+          </label>
+          <label>Status
+            <select id="reviewInboxStatusFilter">
+              <option value="">Todos</option>
+              <option value="pending_review">pending review</option>
+              <option value="blocked">blocked</option>
+              <option value="needs_refresh">needs refresh</option>
+            </select>
+          </label>
+          <label>Entidade
+            <select id="reviewInboxEntityFilter">
+              <option value="">Todas</option>
+              <option value="asset">asset</option>
+              <option value="scene">scene</option>
+              <option value="shot">shot</option>
+              <option value="chapter">chapter</option>
+              <option value="sequence">sequence</option>
+              <option value="project">project</option>
+            </select>
+          </label>
+          <label>Capítulo
+            <select id="reviewInboxChapterFilter"></select>
+          </label>
+          <label>Cena
+            <select id="reviewInboxSceneFilter"></select>
+          </label>
+          <label>Ordenar
+            <select id="reviewInboxSortBy">
+              <option value="priority">prioridade</option>
+              <option value="risk">risco</option>
+              <option value="newest">mais recente</option>
+              <option value="oldest">mais antigo</option>
+              <option value="type">tipo</option>
+            </select>
+          </label>
+          <label>Agrupar
+            <select id="reviewInboxGroupBy">
+              <option value="type">tipo</option>
+              <option value="priority">prioridade</option>
+              <option value="risk">risco</option>
+              <option value="status">status</option>
+              <option value="entity">entidade</option>
+              <option value="sceneId">cena</option>
+              <option value="chapterId">capítulo</option>
+              <option value="source">origem</option>
+            </select>
+          </label>
+          <label class="ri-search-label">Busca
+            <input id="reviewInboxSearch" placeholder="Buscar por título, motivo ou origem" />
+          </label>
+        </div>
+        <div class="ri-toolbar">
+          <select id="reviewInboxSavedViewSelect">
+            <option value="">Views salvas</option>
+          </select>
+          <input id="reviewInboxSavedViewName" placeholder="Nome da view (ex: riscos canon críticos)" />
+          <button id="reviewInboxSaveViewBtn">Salvar view</button>
+          <button id="reviewInboxDeleteViewBtn">Excluir view</button>
+          <button id="reviewInboxApplyBtn">Aplicar filtros</button>
+        </div>
+        <div class="ri-batch-bar">
+          <label class="check-inline">
+            <input id="reviewInboxSelectAll" type="checkbox" />
+            Selecionar visíveis
+          </label>
+          <select id="reviewInboxBatchAction">
+            <option value="">Ação em lote</option>
+            <option value="approve">approve</option>
+            <option value="reject">reject</option>
+            <option value="defer">defer</option>
+            <option value="mark-refresh">mark for refresh</option>
+          </select>
+          <button id="reviewInboxRunBatchBtn">Executar lote</button>
+        </div>
+        <pre id="reviewInboxSummary">Selecione um projeto para ativar a inbox.</pre>
+        <div id="reviewInboxList" class="ri-list"></div>
+      </section>
+
       <section>
         <h2>Base de vídeo</h2>
         <div class="stack">
