@@ -3,12 +3,16 @@ import {
   createBook,
   createChapter,
   createCharacter,
+  createGenerationJob,
+  createGenerationOutput,
   createLoreEntry,
   createPromptDocument,
   createProject,
   createReferenceImage,
   createScene,
   deleteEntity,
+  IMAGE_GEN_PROVIDER_TYPES,
+  IMAGE_GEN_TYPES,
   REFERENCE_TYPES,
   UNASSIGNED_CHAPTER_ID
 } from './models.js';
@@ -33,6 +37,7 @@ import {
   saveExportToWorkspace,
   saveReferenceFileToWorkspace
 } from './local-workspace.js';
+import { runImageGeneration } from './pipelines.js';
 
 const store = createStore();
 let state = store.load();
@@ -376,6 +381,7 @@ const render = () => {
     ['openPromptStudioBtn', 'createPromptDocumentBtn', 'openPromptStudioFromCharacterBtn', 'openPromptStudioFromSceneBtn'],
     !selectedProjectId()
   );
+  setDisabled(['openImageGenStudioBtn'], !selectedProjectId());
 };
 
 const persist = () => {
@@ -2003,6 +2009,656 @@ document.addEventListener('keydown', (event) => {
     (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.tagName === 'SELECT');
   if (isInput) return;
   psCloseStudio();
+});
+
+// =========== Image Generation Studio ===========
+
+let igsIsOpen = false;
+let igsSelectedOutputId = null;
+let igsCompareIds = [];
+let igsSelectedJobId = null;
+let igsIsRunning = false;
+
+const igsRefs = {
+  overlay: $('imageGenStudio'),
+  closeBtn: $('igsCloseBtn'),
+  runBtn: $('igsRunBtn'),
+  tabBtnStudio: $('igsTabBtnStudio'),
+  tabBtnHistory: $('igsTabBtnHistory'),
+  tabBtnConfig: $('igsTabBtnConfig'),
+  tabStudio: $('igsTabStudio'),
+  tabHistory: $('igsTabHistory'),
+  tabConfig: $('igsTabConfig'),
+  // Studio
+  genType: $('igsGenType'),
+  characterSelect: $('igsCharacterSelect'),
+  sceneSelect: $('igsSceneSelect'),
+  promptDocSelect: $('igsPromptDocSelect'),
+  loadPromptBtn: $('igsLoadPromptBtn'),
+  referenceList: $('igsReferenceList'),
+  prompt: $('igsPrompt'),
+  negativePrompt: $('igsNegativePrompt'),
+  resolution: $('igsResolution'),
+  steps: $('igsSteps'),
+  cfgScale: $('igsCfgScale'),
+  sampler: $('igsSampler'),
+  seed: $('igsSeed'),
+  numImages: $('igsNumImages'),
+  seedLock: $('igsSeedLock'),
+  runBtnMain: $('igsRunBtnMain'),
+  status: $('igsStatus'),
+  outputGallery: $('igsOutputGallery'),
+  outputDetail: $('igsOutputDetail'),
+  detailImg: $('igsDetailImg'),
+  detailMeta: $('igsDetailMeta'),
+  detailFavoriteBtn: $('igsDetailFavoriteBtn'),
+  detailCanonBtn: $('igsDetailCanonBtn'),
+  detailUseAsRefBtn: $('igsDetailUseAsRefBtn'),
+  detailVariationBtn: $('igsDetailVariationBtn'),
+  detailRegenerateBtn: $('igsDetailRegenerateBtn'),
+  detailDeleteBtn: $('igsDetailDeleteBtn'),
+  compareArea: $('igsCompareArea'),
+  // History
+  jobList: $('igsJobList'),
+  jobDetail: $('igsJobDetail'),
+  jobDetailPre: $('igsJobDetailPre'),
+  jobDetailGallery: $('igsJobDetailGallery'),
+  // Config
+  configType: $('igsConfigType'),
+  configEndpoint: $('igsConfigEndpoint'),
+  configResolution: $('igsConfigResolution'),
+  configSteps: $('igsConfigSteps'),
+  configCfgScale: $('igsConfigCfgScale'),
+  configSampler: $('igsConfigSampler'),
+  configSeed: $('igsConfigSeed'),
+  configNumImages: $('igsConfigNumImages'),
+  configSeedLock: $('igsConfigSeedLock'),
+  configSaveBtn: $('igsConfigSaveBtn'),
+  configStatus: $('igsConfigStatus')
+};
+
+const igsProviderSettings = () => state.settings?.imageGenProvider || {};
+
+const igsProjectJobs = () =>
+  (state.generationJobs || []).filter((job) => job.projectId === selectedProjectId());
+
+const igsCurrentJob = () =>
+  (state.generationJobs || []).find((job) => job.id === igsSelectedJobId);
+
+const igsAllOutputsForCurrentJob = () => {
+  const job = igsCurrentJob();
+  return job ? job.outputs || [] : [];
+};
+
+const igsFindOutput = (outputId) => {
+  for (const job of (state.generationJobs || [])) {
+    const output = (job.outputs || []).find((o) => o.id === outputId);
+    if (output) return { job, output };
+  }
+  return null;
+};
+
+const igsSetStatus = (text, type = '') => {
+  igsRefs.status.textContent = text;
+  igsRefs.status.className = `igs-status${type ? ` ${type}` : ''}`;
+};
+
+const igsSetRunning = (running) => {
+  igsIsRunning = running;
+  igsRefs.runBtn.disabled = running;
+  igsRefs.runBtnMain.disabled = running;
+};
+
+const igsSwitchTab = (tab) => {
+  const tabs = ['studio', 'history', 'config'];
+  tabs.forEach((t) => {
+    const panel = igsRefs[`tab${t.charAt(0).toUpperCase() + t.slice(1)}`];
+    const btn = igsRefs[`tabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`];
+    if (panel) panel.classList.toggle('igs-hidden', t !== tab);
+    if (btn) btn.classList.toggle('igs-tab-active', t === tab);
+  });
+};
+
+const igsRenderReferenceList = () => {
+  const projectReferences = state.referenceImages.filter(
+    (ref) => ref.projectId === selectedProjectId()
+  );
+  igsRefs.referenceList.innerHTML = '';
+  if (!projectReferences.length) {
+    igsRefs.referenceList.innerHTML = '<p class="igs-hint">Nenhuma referência cadastrada neste projeto.</p>';
+    return;
+  }
+  projectReferences.forEach((ref) => {
+    const label = document.createElement('label');
+    label.className = 'igs-reference-item';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = ref.id;
+    const info = document.createElement('span');
+    const name = document.createElement('strong');
+    name.textContent = ref.name || 'Referência sem nome';
+    const meta = document.createElement('small');
+    const badges = [ref.isCanonical ? 'canon' : '', ref.type ? `tipo: ${ref.type}` : ''].filter(Boolean).join(' · ');
+    meta.textContent = badges || 'referência visual';
+    info.append(name, meta);
+    label.append(checkbox, info);
+    igsRefs.referenceList.append(label);
+  });
+};
+
+const igsSelectedReferenceIds = () =>
+  Array.from(igsRefs.referenceList.querySelectorAll('input[type="checkbox"]:checked')).map(
+    (input) => input.value
+  );
+
+const igsRenderOutputGallery = (outputs, galleryEl, currentSelectedId = null) => {
+  galleryEl.innerHTML = '';
+  if (!outputs || !outputs.length) {
+    galleryEl.innerHTML = '<p class="igs-hint">Nenhum output neste job.</p>';
+    return;
+  }
+  outputs.forEach((output) => {
+    const thumb = document.createElement('div');
+    const isSelected = currentSelectedId === output.id;
+    const isCompareA = igsCompareIds[0] === output.id;
+    const isCompareB = igsCompareIds[1] === output.id;
+    let cls = 'igs-output-thumb';
+    if (isSelected) cls += ' selected';
+    if (isCompareA) cls += ' compare-a';
+    if (isCompareB) cls += ' compare-b';
+    thumb.className = cls;
+    thumb.dataset.outputId = output.id;
+
+    if (output.dataUrl) {
+      const img = document.createElement('img');
+      img.src = output.dataUrl;
+      img.alt = 'Output gerado';
+      thumb.append(img);
+    } else {
+      const placeholder = document.createElement('div');
+      placeholder.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--muted)';
+      placeholder.textContent = '🖼';
+      thumb.append(placeholder);
+    }
+
+    const badgesEl = document.createElement('div');
+    badgesEl.className = 'igs-output-thumb-badges';
+    if (output.isFavorite) {
+      const b = document.createElement('span');
+      b.className = 'igs-badge igs-badge-fav';
+      b.textContent = '★';
+      badgesEl.append(b);
+    }
+    if (output.isCanonical) {
+      const b = document.createElement('span');
+      b.className = 'igs-badge igs-badge-canon';
+      b.textContent = 'C';
+      badgesEl.append(b);
+    }
+    if (badgesEl.children.length) thumb.append(badgesEl);
+
+    thumb.addEventListener('click', (event) => {
+      if (event.shiftKey) {
+        igsHandleCompareClick(output.id);
+      } else {
+        igsSelectOutput(output.id);
+      }
+    });
+    galleryEl.append(thumb);
+  });
+};
+
+const igsRenderCurrentJobGallery = () => {
+  const outputs = igsAllOutputsForCurrentJob();
+  igsRenderOutputGallery(outputs, igsRefs.outputGallery, igsSelectedOutputId);
+};
+
+const igsHandleCompareClick = (outputId) => {
+  if (igsCompareIds.includes(outputId)) {
+    igsCompareIds = igsCompareIds.filter((id) => id !== outputId);
+  } else if (igsCompareIds.length < 2) {
+    igsCompareIds = [...igsCompareIds, outputId];
+  } else {
+    igsCompareIds = [igsCompareIds[1], outputId];
+  }
+  igsRenderCurrentJobGallery();
+  igsRenderCompare();
+};
+
+const igsRenderCompare = () => {
+  igsRefs.compareArea.innerHTML = '';
+  if (!igsCompareIds.length) {
+    igsRefs.compareArea.innerHTML = '<p class="igs-hint">Selecione dois outputs para comparar. Use Shift+clique na galeria.</p>';
+    return;
+  }
+  igsCompareIds.forEach((id, idx) => {
+    const found = igsFindOutput(id);
+    if (!found) return;
+    const { output } = found;
+    if (output.dataUrl) {
+      const img = document.createElement('img');
+      img.src = output.dataUrl;
+      img.alt = `Output ${idx + 1}`;
+      img.title = `seed: ${output.seed}`;
+      igsRefs.compareArea.append(img);
+    }
+  });
+  if (!igsRefs.compareArea.children.length) {
+    igsRefs.compareArea.innerHTML = '<p class="igs-hint">Outputs não encontrados para comparação.</p>';
+  }
+};
+
+const igsSelectOutput = (outputId) => {
+  igsSelectedOutputId = outputId;
+  igsRenderCurrentJobGallery();
+  const found = igsFindOutput(outputId);
+  if (!found) {
+    igsRefs.outputDetail.classList.add('igs-hidden');
+    return;
+  }
+  const { output } = found;
+  igsRefs.detailImg.src = output.dataUrl || '';
+  igsRefs.detailImg.style.display = output.dataUrl ? 'block' : 'none';
+  igsRefs.detailMeta.textContent = [
+    `Tipo: ${output.generationType}`,
+    `Seed: ${output.seed >= 0 ? output.seed : 'aleatório'}`,
+    output.fileName ? `Arquivo: ${output.fileName}` : '',
+    output.isCanonical ? '✓ Canônico' : '',
+    output.isFavorite ? '★ Favorito' : ''
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  igsRefs.detailFavoriteBtn.textContent = output.isFavorite ? '★ Favorito' : '☆ Favorito';
+  igsRefs.detailCanonBtn.textContent = output.isCanonical ? '✓ Canônico' : '◇ Canônico';
+  igsRefs.outputDetail.classList.remove('igs-hidden');
+};
+
+const igsReadParams = () => ({
+  resolution: igsRefs.resolution.value.trim() || '512x768',
+  steps: parseInt(igsRefs.steps.value, 10) || 28,
+  cfgScale: parseFloat(igsRefs.cfgScale.value) || 7,
+  sampler: igsRefs.sampler.value.trim() || 'DPM++ 2M Karras',
+  seed: parseInt(igsRefs.seed.value, 10) ?? -1,
+  numImages: parseInt(igsRefs.numImages.value, 10) || 1
+});
+
+const igsLoadParamsFromConfig = () => {
+  const config = igsProviderSettings();
+  igsRefs.resolution.value = config.resolution || '512x768';
+  igsRefs.steps.value = config.steps ?? 28;
+  igsRefs.cfgScale.value = config.cfgScale ?? 7;
+  igsRefs.sampler.value = config.sampler || 'DPM++ 2M Karras';
+  igsRefs.seed.value = config.seed ?? -1;
+  igsRefs.numImages.value = config.numImages ?? 1;
+  igsRefs.seedLock.checked = Boolean(config.seedLocked);
+};
+
+const igsLoadConfigTab = () => {
+  const config = igsProviderSettings();
+  igsRefs.configType.value = config.type || 'mock';
+  igsRefs.configEndpoint.value = config.endpoint || 'http://127.0.0.1:7860';
+  igsRefs.configResolution.value = config.resolution || '512x768';
+  igsRefs.configSteps.value = config.steps ?? 28;
+  igsRefs.configCfgScale.value = config.cfgScale ?? 7;
+  igsRefs.configSampler.value = config.sampler || 'DPM++ 2M Karras';
+  igsRefs.configSeed.value = config.seed ?? -1;
+  igsRefs.configNumImages.value = config.numImages ?? 1;
+  igsRefs.configSeedLock.checked = Boolean(config.seedLocked);
+};
+
+const igsRenderJobList = () => {
+  const jobs = igsProjectJobs().slice().reverse();
+  igsRefs.jobList.innerHTML = '';
+  if (!jobs.length) {
+    igsRefs.jobList.innerHTML = '<p class="igs-hint">Nenhum job registrado ainda.</p>';
+    return;
+  }
+  jobs.forEach((job) => {
+    const item = document.createElement('div');
+    item.className = `igs-job-item${job.id === igsSelectedJobId ? ' selected' : ''}`;
+    item.dataset.jobId = job.id;
+    const titleEl = document.createElement('div');
+    titleEl.className = 'igs-job-item-title';
+    const typeLabel = IMAGE_GEN_TYPES.includes(job.generationType) ? job.generationType : 'imagem';
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `igs-job-status igs-job-status-${job.status}`;
+    statusBadge.textContent = job.status;
+    titleEl.textContent = `${typeLabel} · ${job.outputs.length} output(s)`;
+    titleEl.append(statusBadge);
+    const metaEl = document.createElement('div');
+    metaEl.className = 'igs-job-item-meta';
+    metaEl.textContent = `${new Date(job.createdAt).toLocaleString('pt-BR')} · ${job.providerLabel}`;
+    item.append(titleEl, metaEl);
+    item.addEventListener('click', () => {
+      igsSelectedJobId = job.id;
+      igsSelectedOutputId = null;
+      igsRenderJobList();
+      igsRenderJobDetail(job);
+    });
+    igsRefs.jobList.append(item);
+  });
+};
+
+const igsRenderJobDetail = (job) => {
+  if (!job) {
+    igsRefs.jobDetail.classList.add('igs-hidden');
+    return;
+  }
+  igsRefs.jobDetail.classList.remove('igs-hidden');
+  igsRefs.jobDetailPre.textContent = JSON.stringify(
+    {
+      id: job.id,
+      status: job.status,
+      generationType: job.generationType,
+      provider: job.providerLabel,
+      prompt: job.prompt ? job.prompt.substring(0, 120) + (job.prompt.length > 120 ? '…' : '') : '',
+      params: job.params,
+      outputs: job.outputs.length,
+      createdAt: job.createdAt,
+      errorMessage: job.errorMessage || undefined
+    },
+    null,
+    2
+  );
+  igsRenderOutputGallery(job.outputs, igsRefs.jobDetailGallery, igsSelectedOutputId);
+  igsRefs.jobDetailGallery.querySelectorAll('.igs-output-thumb').forEach((thumb) => {
+    thumb.addEventListener('click', () => {
+      igsSelectedJobId = job.id;
+      igsSelectedOutputId = thumb.dataset.outputId;
+      igsSwitchTab('studio');
+      igsRenderCurrentJobGallery();
+      igsSelectOutput(igsSelectedOutputId);
+    });
+  });
+};
+
+const igsPopulateSelectors = () => {
+  renderOptions(igsRefs.characterSelect, projectCharacters(), selectedCharacterId(), 'Nenhum personagem');
+  renderOptions(igsRefs.sceneSelect, projectScenes(), selectedSceneId(), 'Nenhuma cena');
+  renderOptions(
+    igsRefs.promptDocSelect,
+    projectPromptDocuments().map((pd) => ({
+      ...pd,
+      name: `${pd.isOfficial ? '✓ ' : ''}${pd.isFavorite ? '★ ' : ''}${pd.title}`
+    })),
+    currentPromptDocument()?.id,
+    'Nenhum prompt estruturado'
+  );
+};
+
+const igsRunGeneration = async () => {
+  if (igsIsRunning || !selectedProjectId()) return;
+  const prompt = igsRefs.prompt.value.trim();
+  if (!prompt) {
+    igsSetStatus('Preencha o prompt antes de gerar.', 'error');
+    return;
+  }
+  const config = igsProviderSettings();
+  const params = igsReadParams();
+  const providerLabels = { mock: 'Mock', 'local-api': 'API Local' };
+  const job = createGenerationJob({
+    projectId: selectedProjectId(),
+    generationType: igsRefs.genType.value || 'character',
+    characterId: igsRefs.characterSelect.value || '',
+    sceneId: igsRefs.sceneSelect.value || '',
+    promptDocumentId: igsRefs.promptDocSelect.value || '',
+    prompt,
+    negativePrompt: igsRefs.negativePrompt.value.trim(),
+    referenceIds: igsSelectedReferenceIds(),
+    params,
+    providerType: config.type || 'mock',
+    providerLabel: providerLabels[config.type] || config.type || 'Mock'
+  });
+  job.status = 'running';
+  if (!state.generationJobs) state.generationJobs = [];
+  state.generationJobs.push(job);
+  igsSelectedJobId = job.id;
+  state = store.save(state);
+  igsSetRunning(true);
+  igsSetStatus('Gerando…', 'running');
+
+  let result;
+  try {
+    result = await runImageGeneration(
+      { prompt, negativePrompt: igsRefs.negativePrompt.value.trim(), params },
+      { ...config, ...params }
+    );
+  } catch (error) {
+    result = { status: 'error', provider: config.type, error: error.message };
+  }
+
+  const savedJob = state.generationJobs.find((j) => j.id === job.id);
+  if (!savedJob) {
+    igsSetRunning(false);
+    igsSetStatus('Job não encontrado após geração.', 'error');
+    return;
+  }
+
+  if (result.status === 'done') {
+    const outputs = (result.outputs || []).map((out) =>
+      createGenerationOutput({
+        projectId: selectedProjectId(),
+        jobId: job.id,
+        characterId: igsRefs.characterSelect.value || '',
+        sceneId: igsRefs.sceneSelect.value || '',
+        prompt,
+        params,
+        dataUrl: out.dataUrl || '',
+        fileName: out.fileName || '',
+        generationType: igsRefs.genType.value || 'character',
+        seed: typeof out.seed === 'number' ? out.seed : -1
+      })
+    );
+    savedJob.outputs = outputs;
+    savedJob.status = 'done';
+    savedJob.updatedAt = new Date().toISOString();
+
+    if (igsRefs.seedLock.checked && outputs.length > 0) {
+      const firstSeed = outputs[0].seed;
+      if (firstSeed >= 0) igsRefs.seed.value = firstSeed;
+    }
+
+    igsSetStatus(`✓ ${outputs.length} imagem(ns) gerada(s).`, 'done');
+    if (outputs.length) igsSelectedOutputId = outputs[0].id;
+  } else {
+    savedJob.status = 'error';
+    savedJob.errorMessage = result.error || 'Erro desconhecido';
+    savedJob.updatedAt = new Date().toISOString();
+    igsSetStatus(`Erro: ${savedJob.errorMessage}`, 'error');
+  }
+
+  state = store.save(state);
+  igsSetRunning(false);
+  igsRenderCurrentJobGallery();
+  if (igsSelectedOutputId) igsSelectOutput(igsSelectedOutputId);
+};
+
+const openImageGenStudio = () => {
+  if (!selectedProjectId()) return;
+  igsIsOpen = true;
+  igsSelectedOutputId = null;
+  igsCompareIds = [];
+  igsSelectedJobId = null;
+  igsPopulateSelectors();
+  igsRenderReferenceList();
+  igsLoadParamsFromConfig();
+  igsLoadConfigTab();
+  igsSwitchTab('studio');
+  igsRefs.outputGallery.innerHTML = '<p class="igs-hint">Os outputs gerados aparecerão aqui.</p>';
+  igsRefs.outputDetail.classList.add('igs-hidden');
+  igsRefs.compareArea.innerHTML = '<p class="igs-hint">Selecione dois outputs para comparar. Use Shift+clique na galeria.</p>';
+  igsSetStatus('');
+  igsRenderJobList();
+  igsRefs.overlay.classList.remove('igs-hidden');
+  document.body.style.overflow = 'hidden';
+};
+
+const closeImageGenStudio = () => {
+  igsIsOpen = false;
+  igsRefs.overlay.classList.add('igs-hidden');
+  document.body.style.overflow = '';
+  render();
+};
+
+// Detail action handlers
+igsRefs.detailFavoriteBtn.addEventListener('click', () => {
+  const found = igsFindOutput(igsSelectedOutputId);
+  if (!found) return;
+  found.output.isFavorite = !found.output.isFavorite;
+  state = store.save(state);
+  igsSelectOutput(igsSelectedOutputId);
+  igsRenderCurrentJobGallery();
+});
+
+igsRefs.detailCanonBtn.addEventListener('click', () => {
+  const found = igsFindOutput(igsSelectedOutputId);
+  if (!found) return;
+  found.output.isCanonical = !found.output.isCanonical;
+  state = store.save(state);
+  igsSelectOutput(igsSelectedOutputId);
+  igsRenderCurrentJobGallery();
+});
+
+igsRefs.detailUseAsRefBtn.addEventListener('click', () => {
+  const found = igsFindOutput(igsSelectedOutputId);
+  if (!found || !found.output.dataUrl) {
+    alert('Output sem imagem disponível para usar como referência.');
+    return;
+  }
+  const { output, job } = found;
+  const characterId = output.characterId || igsRefs.characterSelect.value || '';
+  const ref = createReferenceImage({
+    projectId: selectedProjectId(),
+    characterId,
+    name: `Gerado · ${output.generationType} · seed ${output.seed >= 0 ? output.seed : 'rand'}`,
+    type: output.generationType === 'character' || output.generationType === 'portrait' ? 'character' : 'scene',
+    dataUrl: output.dataUrl,
+    fileName: output.fileName || 'generated.png',
+    isCanonical: output.isCanonical,
+    linkedEntityId: characterId || output.sceneId || job.id,
+    linkedEntityType: characterId ? 'character' : output.sceneId ? 'scene' : 'job',
+    notes: `Criado pelo Estúdio de Geração · job ${job.id.substring(0, 8)}`
+  });
+  if (!state.referenceImages) state.referenceImages = [];
+  state.referenceImages.push(ref);
+  state = store.save(state);
+  igsRenderReferenceList();
+  alert(`Referência "${ref.name}" criada com sucesso.`);
+});
+
+igsRefs.detailVariationBtn.addEventListener('click', () => {
+  const found = igsFindOutput(igsSelectedOutputId);
+  if (!found) return;
+  const { output } = found;
+  igsRefs.prompt.value = output.prompt || igsRefs.prompt.value;
+  const params = output.params || {};
+  if (params.resolution) igsRefs.resolution.value = params.resolution;
+  if (params.steps) igsRefs.steps.value = params.steps;
+  if (params.cfgScale) igsRefs.cfgScale.value = params.cfgScale;
+  if (params.sampler) igsRefs.sampler.value = params.sampler;
+  igsRefs.seed.value = -1;
+  igsRefs.seedLock.checked = false;
+  igsSetStatus('Parâmetros carregados para variação. Ajuste e clique em Gerar.', '');
+});
+
+igsRefs.detailRegenerateBtn.addEventListener('click', () => {
+  const found = igsFindOutput(igsSelectedOutputId);
+  if (!found) return;
+  const { output } = found;
+  igsRefs.prompt.value = output.prompt || igsRefs.prompt.value;
+  const params = output.params || {};
+  if (params.resolution) igsRefs.resolution.value = params.resolution;
+  if (params.steps) igsRefs.steps.value = params.steps;
+  if (params.cfgScale) igsRefs.cfgScale.value = params.cfgScale;
+  if (params.sampler) igsRefs.sampler.value = params.sampler;
+  if (typeof output.seed === 'number' && output.seed >= 0) {
+    igsRefs.seed.value = output.seed;
+    igsRefs.seedLock.checked = true;
+  }
+  igsRunGeneration();
+});
+
+igsRefs.detailDeleteBtn.addEventListener('click', () => {
+  const found = igsFindOutput(igsSelectedOutputId);
+  if (!found || !window.confirm('Remover este output?')) return;
+  state = deleteEntity(state, 'generationOutput', igsSelectedOutputId);
+  state = store.save(state);
+  igsSelectedOutputId = null;
+  igsRefs.outputDetail.classList.add('igs-hidden');
+  igsRenderCurrentJobGallery();
+});
+
+igsRefs.loadPromptBtn.addEventListener('click', () => {
+  const promptDocument = state.promptDocuments.find(
+    (pd) => pd.id === igsRefs.promptDocSelect.value
+  );
+  if (!promptDocument) return;
+  const version =
+    promptDocument.versions.find((v) => v.id === promptDocument.activeVersionId) ||
+    promptDocument.versions[0];
+  if (!version) return;
+  const text =
+    version.cinematicPrompt ||
+    version.scenePrompt ||
+    version.masterPrompt ||
+    version.detailedPrompt ||
+    version.shortPrompt ||
+    '';
+  igsRefs.prompt.value = text;
+  if (version.negativePrompt) igsRefs.negativePrompt.value = version.negativePrompt;
+  igsSetStatus('Prompt carregado.', 'done');
+});
+
+igsRefs.runBtn.addEventListener('click', igsRunGeneration);
+igsRefs.runBtnMain.addEventListener('click', igsRunGeneration);
+
+igsRefs.tabBtnStudio.addEventListener('click', () => igsSwitchTab('studio'));
+igsRefs.tabBtnHistory.addEventListener('click', () => {
+  igsRenderJobList();
+  igsSwitchTab('history');
+});
+igsRefs.tabBtnConfig.addEventListener('click', () => {
+  igsLoadConfigTab();
+  igsSwitchTab('config');
+});
+
+igsRefs.closeBtn.addEventListener('click', closeImageGenStudio);
+
+$('openImageGenStudioBtn').addEventListener('click', openImageGenStudio);
+
+igsRefs.configSaveBtn.addEventListener('click', () => {
+  const type = igsRefs.configType.value;
+  const config = {
+    type: IMAGE_GEN_PROVIDER_TYPES.includes(type) ? type : 'mock',
+    endpoint: igsRefs.configEndpoint.value.trim() || 'http://127.0.0.1:7860',
+    outputDir: igsProviderSettings().outputDir || 'outputs',
+    resolution: igsRefs.configResolution.value.trim() || '512x768',
+    steps: parseInt(igsRefs.configSteps.value, 10) || 28,
+    cfgScale: parseFloat(igsRefs.configCfgScale.value) || 7,
+    sampler: igsRefs.configSampler.value.trim() || 'DPM++ 2M Karras',
+    numImages: parseInt(igsRefs.configNumImages.value, 10) || 1,
+    seed: parseInt(igsRefs.configSeed.value, 10) ?? -1,
+    seedLocked: igsRefs.configSeedLock.checked
+  };
+  state.settings = { ...state.settings, imageGenProvider: config };
+  state = store.save(state);
+  igsLoadParamsFromConfig();
+  igsRefs.configStatus.textContent = 'Configuração salva.';
+  igsRefs.configStatus.className = 'igs-status done';
+  setTimeout(() => {
+    igsRefs.configStatus.textContent = '';
+    igsRefs.configStatus.className = 'igs-status';
+  }, 2500);
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !igsIsOpen) return;
+  const active = document.activeElement;
+  const isInput =
+    active &&
+    (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.tagName === 'SELECT');
+  if (isInput) return;
+  closeImageGenStudio();
 });
 
 render();
