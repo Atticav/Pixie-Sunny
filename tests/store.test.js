@@ -7,9 +7,11 @@ import {
   createCharacter,
   createLoreEntry,
   createProject,
+  createReferenceImage,
   createScene,
   deleteEntity,
-  CHAPTER_STATUSES
+  CHAPTER_STATUSES,
+  REFERENCE_TYPES
 } from '../src/models.js';
 import { searchLore } from '../src/assistant.js';
 
@@ -214,4 +216,212 @@ test('store persists chapter writer studio fields across save/load', () => {
   assert.equal(loaded.chapters[0].status, 'revisão');
   assert.equal(loaded.chapters[0].notes, 'Nota de teste');
   assert.equal(loaded.chapters[0].wordGoal, 1000);
+});
+
+test('createCharacter includes visual canon fields with correct defaults', () => {
+  const project = createProject({ name: 'Universo' });
+  const character = createCharacter({ projectId: project.id, name: 'Lyra' });
+
+  assert.equal(character.apparentAge, '');
+  assert.equal(character.genderPresentation, '');
+  assert.equal(character.skinTone, '');
+  assert.equal(character.hair, '');
+  assert.equal(character.eyes, '');
+  assert.equal(character.faceShape, '');
+  assert.equal(character.bodyType, '');
+  assert.equal(character.marks, '');
+  assert.equal(character.typicalClothing, '');
+  assert.equal(character.accessories, '');
+  assert.equal(character.dominantExpression, '');
+  assert.equal(character.presence, '');
+  assert.equal(character.visualAesthetic, '');
+  assert.equal(character.colorPalette, '');
+  assert.equal(character.periodStyle, '');
+  assert.deepEqual(character.fixedTraits, []);
+  assert.deepEqual(character.variableTraits, []);
+  assert.deepEqual(character.consistencyRules, []);
+  assert.deepEqual(character.visualTags, []);
+  assert.equal(character.cinematicNotes, '');
+  assert.equal(character.masterPrompt, '');
+  assert.equal(character.negativePrompt, '');
+});
+
+test('createCharacter stores custom visual canon fields', () => {
+  const project = createProject({ name: 'Universo' });
+  const character = createCharacter({
+    projectId: project.id,
+    name: 'Lyra',
+    apparentAge: '28-32',
+    skinTone: 'médio acobreado',
+    eyes: 'azul-acinzentados',
+    hair: 'ruivo acobreado, ondulado',
+    fixedTraits: ['sardas', 'olhos azul-acinzentados'],
+    variableTraits: ['expressão', 'pose'],
+    consistencyRules: ['nunca mudar cor dos olhos', 'não usar roupa moderna'],
+    visualTags: ['ruiva', 'sardas', 'medieval'],
+    cinematicNotes: 'luz suave exalta sardas',
+    masterPrompt: 'ruiva com sardas, olhos azul-cinza',
+    negativePrompt: 'anime, cartoon'
+  });
+
+  assert.equal(character.apparentAge, '28-32');
+  assert.equal(character.skinTone, 'médio acobreado');
+  assert.equal(character.eyes, 'azul-acinzentados');
+  assert.equal(character.hair, 'ruivo acobreado, ondulado');
+  assert.deepEqual(character.fixedTraits, ['sardas', 'olhos azul-acinzentados']);
+  assert.deepEqual(character.variableTraits, ['expressão', 'pose']);
+  assert.deepEqual(character.consistencyRules, ['nunca mudar cor dos olhos', 'não usar roupa moderna']);
+  assert.deepEqual(character.visualTags, ['ruiva', 'sardas', 'medieval']);
+  assert.equal(character.cinematicNotes, 'luz suave exalta sardas');
+  assert.equal(character.masterPrompt, 'ruiva com sardas, olhos azul-cinza');
+  assert.equal(character.negativePrompt, 'anime, cartoon');
+});
+
+test('REFERENCE_TYPES contains all expected types', () => {
+  assert.deepEqual(REFERENCE_TYPES, ['character', 'place', 'scene', 'clothing', 'aesthetic', 'pose', 'lighting', 'object']);
+});
+
+test('createReferenceImage creates a reference with required fields', () => {
+  const project = createProject({ name: 'P' });
+  const character = createCharacter({ projectId: project.id, name: 'Lyra' });
+  const ref = createReferenceImage({
+    projectId: project.id,
+    characterId: character.id,
+    name: 'Rosto canônico',
+    type: 'character',
+    dataUrl: 'data:image/png;base64,abc123',
+    isCanonical: true,
+    preserve: 'estrutura facial, sardas',
+    mayVary: 'ângulo, expressão',
+    notes: 'Referência oficial'
+  });
+
+  assert.ok(ref.id);
+  assert.equal(ref.projectId, project.id);
+  assert.equal(ref.characterId, character.id);
+  assert.equal(ref.name, 'Rosto canônico');
+  assert.equal(ref.type, 'character');
+  assert.equal(ref.dataUrl, 'data:image/png;base64,abc123');
+  assert.equal(ref.isCanonical, true);
+  assert.equal(ref.preserve, 'estrutura facial, sardas');
+  assert.equal(ref.mayVary, 'ângulo, expressão');
+  assert.equal(ref.notes, 'Referência oficial');
+  assert.ok(ref.createdAt);
+});
+
+test('createReferenceImage has correct defaults', () => {
+  const project = createProject({ name: 'P' });
+  const ref = createReferenceImage({ projectId: project.id, name: 'Ref' });
+
+  assert.equal(ref.characterId, '');
+  assert.equal(ref.type, 'character');
+  assert.equal(ref.dataUrl, '');
+  assert.equal(ref.linkedEntityId, '');
+  assert.equal(ref.linkedEntityType, '');
+  assert.equal(ref.isCanonical, false);
+  assert.equal(ref.preserve, '');
+  assert.equal(ref.mayVary, '');
+  assert.equal(ref.notes, '');
+});
+
+test('normalizeState includes referenceImages from raw data', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'p1', name: 'Projeto A' }],
+    characters: [{ id: 'c1', projectId: 'p1', name: 'Lyra' }],
+    referenceImages: [
+      { id: 'r1', projectId: 'p1', characterId: 'c1', name: 'Rosto', type: 'character' },
+      { id: 'r2', projectId: 'ghost-project', characterId: 'c1', name: 'Órfã', type: 'place' }
+    ]
+  });
+
+  assert.equal(sanitized.referenceImages.length, 1);
+  assert.equal(sanitized.referenceImages[0].id, 'r1');
+  assert.equal(sanitized.referenceImages[0].type, 'character');
+});
+
+test('normalizeState coerces invalid reference type to character', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'p1', name: 'P' }],
+    referenceImages: [
+      { id: 'r1', projectId: 'p1', name: 'Ref', type: 'invalid-type' }
+    ]
+  });
+
+  assert.equal(sanitized.referenceImages[0].type, 'character');
+});
+
+test('deleteEntity removes character and its referenceImages', () => {
+  const project = createProject({ name: 'P' });
+  const character = createCharacter({ projectId: project.id, name: 'Lyra' });
+  const otherCharacter = createCharacter({ projectId: project.id, name: 'Kael' });
+  const ref1 = createReferenceImage({ projectId: project.id, characterId: character.id, name: 'R1' });
+  const ref2 = createReferenceImage({ projectId: project.id, characterId: otherCharacter.id, name: 'R2' });
+
+  const next = deleteEntity(
+    { projects: [project], books: [], chapters: [], scenes: [], characters: [character, otherCharacter], loreEntries: [], assets: [], referenceImages: [ref1, ref2] },
+    'character',
+    character.id
+  );
+
+  assert.equal(next.characters.length, 1);
+  assert.equal(next.characters[0].id, otherCharacter.id);
+  assert.equal(next.referenceImages.length, 1);
+  assert.equal(next.referenceImages[0].id, ref2.id);
+});
+
+test('deleteEntity removes project and its referenceImages', () => {
+  const project = createProject({ name: 'P' });
+  const character = createCharacter({ projectId: project.id, name: 'Lyra' });
+  const ref = createReferenceImage({ projectId: project.id, characterId: character.id, name: 'R1' });
+
+  const next = deleteEntity(
+    { projects: [project], books: [], chapters: [], scenes: [], characters: [character], loreEntries: [], assets: [], referenceImages: [ref] },
+    'project',
+    project.id
+  );
+
+  assert.equal(next.projects.length, 0);
+  assert.equal(next.characters.length, 0);
+  assert.equal(next.referenceImages.length, 0);
+});
+
+test('deleteEntity removes a single referenceImage by id', () => {
+  const project = createProject({ name: 'P' });
+  const ref1 = createReferenceImage({ projectId: project.id, name: 'R1' });
+  const ref2 = createReferenceImage({ projectId: project.id, name: 'R2' });
+
+  const next = deleteEntity(
+    { projects: [project], books: [], chapters: [], scenes: [], characters: [], loreEntries: [], assets: [], referenceImages: [ref1, ref2] },
+    'referenceImage',
+    ref1.id
+  );
+
+  assert.equal(next.referenceImages.length, 1);
+  assert.equal(next.referenceImages[0].id, ref2.id);
+});
+
+test('store persists character visual canon fields across save/load', () => {
+  const storage = fakeStorage();
+  const store = createStore({ key: 'test-canon', storage });
+  const project = createProject({ name: 'Canon Test' });
+  const character = createCharacter({
+    projectId: project.id,
+    name: 'Lyra',
+    apparentAge: '28',
+    eyes: 'azul-acinzentados',
+    fixedTraits: ['sardas', 'olhos azul-acinzentados'],
+    consistencyRules: ['nunca mudar cor dos olhos']
+  });
+  const ref = createReferenceImage({ projectId: project.id, characterId: character.id, name: 'Rosto', type: 'character', isCanonical: true });
+
+  store.save({ ...store.load(), projects: [project], characters: [character], referenceImages: [ref] });
+  const loaded = store.load();
+
+  assert.equal(loaded.characters[0].apparentAge, '28');
+  assert.equal(loaded.characters[0].eyes, 'azul-acinzentados');
+  assert.deepEqual(loaded.characters[0].fixedTraits, ['sardas', 'olhos azul-acinzentados']);
+  assert.deepEqual(loaded.characters[0].consistencyRules, ['nunca mudar cor dos olhos']);
+  assert.equal(loaded.referenceImages.length, 1);
+  assert.equal(loaded.referenceImages[0].name, 'Rosto');
+  assert.equal(loaded.referenceImages[0].isCanonical, true);
 });
