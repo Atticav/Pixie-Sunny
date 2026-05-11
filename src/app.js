@@ -4,6 +4,7 @@ import {
   createChapter,
   createCharacter,
   createLoreEntry,
+  createPromptDocument,
   createProject,
   createReferenceImage,
   createScene,
@@ -12,12 +13,27 @@ import {
   UNASSIGNED_CHAPTER_ID
 } from './models.js';
 import { createStore, sanitizeState } from './store.js';
-import { buildSceneSpec, buildVideoSpec, searchLore, suggestNextParagraph } from './assistant.js';
+import {
+  buildCharacterPromptPack,
+  buildScenePromptPack,
+  buildSceneSpec,
+  buildVideoSpec,
+  inferSceneCharactersFromContext,
+  PROMPT_CINEMATIC_PRESETS,
+  PROMPT_LENS_LIGHT_PRESETS,
+  PROMPT_STYLE_PRESETS,
+  searchLore,
+  suggestNextParagraph
+} from './assistant.js';
 
 const store = createStore();
 let state = store.load();
 
 const $ = (id) => document.getElementById(id);
+const newClientId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.floor(Math.random() * 1e9)}-${Math.floor(Math.random() * 1e6)}`;
 
 const refs = {
   projectSelect: $('projectSelect'),
@@ -33,7 +49,9 @@ const refs = {
   writingSuggestion: $('writingSuggestion'),
   characterPreview: $('characterPreview'),
   sceneSpec: $('sceneSpec'),
-  videoSpec: $('videoSpec')
+  videoSpec: $('videoSpec'),
+  promptDocumentSelect: $('promptDocumentSelect'),
+  promptDocumentPreview: $('promptDocumentPreview')
 };
 
 const parseTextList = (value, separator) =>
@@ -45,6 +63,8 @@ const parseTextList = (value, separator) =>
 const parseLines = (value) => parseTextList(value, '\n');
 
 const parseTags = (value) => parseTextList(value, ',');
+
+const sanitizeFilename = (value) => (value || 'prompt').replace(/[^\w-]+/g, '-').toLowerCase();
 
 const selectedProjectId = () => refs.projectSelect.value;
 
@@ -125,6 +145,17 @@ const projectScenes = () =>
   );
 
 const projectAssets = () => state.assets.filter((asset) => asset.projectId === selectedProjectId());
+
+const projectPromptDocuments = () =>
+  state.promptDocuments.filter((promptDocument) => promptDocument.projectId === selectedProjectId());
+
+const currentPromptDocument = () =>
+  state.promptDocuments.find((promptDocument) => promptDocument.id === refs.promptDocumentSelect.value);
+
+const currentPromptVersion = (promptDocument = currentPromptDocument()) =>
+  promptDocument?.versions?.find((version) => version.id === promptDocument.activeVersionId) ||
+  promptDocument?.versions?.[0] ||
+  null;
 
 const renderLore = () => {
   const query = $('loreSearch').value;
@@ -210,6 +241,39 @@ const renderSceneEditor = () => {
   setDisabled(['saveSceneBtn', 'deleteSceneBtn', 'generateSceneSpecBtn'], !scene);
 };
 
+const renderPromptEditor = () => {
+  const promptDocument = currentPromptDocument();
+  const version = currentPromptVersion(promptDocument);
+  if (!promptDocument || !version) {
+    refs.promptDocumentPreview.textContent = 'Nenhum prompt estruturado selecionado.';
+    return;
+  }
+
+  const targetLabel =
+    promptDocument.targetType === 'scene'
+      ? state.scenes.find((scene) => scene.id === promptDocument.targetId)?.title || 'Cena removida'
+      : state.characters.find((character) => character.id === promptDocument.targetId)?.name || 'Personagem removido';
+  refs.promptDocumentPreview.textContent = JSON.stringify(
+    {
+      title: promptDocument.title,
+      targetType: promptDocument.targetType,
+      target: targetLabel,
+      promptMedium: promptDocument.promptMedium,
+      favorite: promptDocument.isFavorite,
+      official: promptDocument.isOfficial,
+      version: version.label,
+      preserve: version.preserve,
+      vary: version.vary,
+      masterPrompt: version.masterPrompt,
+      scenePrompt: version.scenePrompt,
+      cinematicPrompt: version.cinematicPrompt,
+      fixedChecklist: version.fixedChecklist
+    },
+    null,
+    2
+  );
+};
+
 const render = () => {
   renderOptions(refs.projectSelect, state.projects, selectedProjectId(), 'Crie seu primeiro projeto');
 
@@ -228,17 +292,33 @@ const render = () => {
   const scenes = projectScenes();
   renderOptions(refs.sceneSelect, scenes, selectedSceneId(), 'Nenhuma cena neste contexto');
 
+  const promptDocuments = projectPromptDocuments();
+  renderOptions(
+    refs.promptDocumentSelect,
+    promptDocuments.map((promptDocument) => ({
+      ...promptDocument,
+      name: `${promptDocument.isOfficial ? '✓ ' : ''}${promptDocument.isFavorite ? '★ ' : ''}${promptDocument.title}`
+    })),
+    refs.promptDocumentSelect.value,
+    'Nenhum prompt estruturado'
+  );
+
   renderProjectEditor();
   renderBookEditor();
   renderChapterEditor();
   renderCharacterEditor();
   renderLoreEditor();
   renderSceneEditor();
+  renderPromptEditor();
   renderLore();
   renderAssets();
 
   setDisabled(['createBookBtn', 'createCharacterBtn', 'createLoreBtn', 'createSceneBtn', 'saveAssetBtn'], !selectedProjectId());
   setDisabled(['openCanonStudioBtn'], !selectedCharacterId() || !selectedProjectId());
+  setDisabled(
+    ['openPromptStudioBtn', 'createPromptDocumentBtn', 'openPromptStudioFromCharacterBtn', 'openPromptStudioFromSceneBtn'],
+    !selectedProjectId()
+  );
 };
 
 const persist = () => {
@@ -1153,6 +1233,618 @@ document.addEventListener('keydown', (event) => {
     (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.tagName === 'SELECT');
   if (isInput) return;
   closeCanonStudio();
+});
+
+// =========== Prompt Builder ===========
+
+let psIsOpen = false;
+
+const psRefs = {
+  overlay: $('promptStudio'),
+  closeBtn: $('psCloseBtn'),
+  promptSelect: $('psPromptSelect'),
+  newPromptBtn: $('psNewPromptBtn'),
+  duplicatePromptBtn: $('psDuplicatePromptBtn'),
+  title: $('psTitle'),
+  targetType: $('psTargetType'),
+  promptMedium: $('psPromptMedium'),
+  targetSelect: $('psTargetSelect'),
+  stylePreset: $('psStylePreset'),
+  cinematicPreset: $('psCinematicPreset'),
+  lensLightingPreset: $('psLensLightingPreset'),
+  emotionalTone: $('psEmotionalTone'),
+  environment: $('psEnvironment'),
+  lighting: $('psLighting'),
+  composition: $('psComposition'),
+  builderNotes: $('psBuilderNotes'),
+  referenceList: $('psReferenceList'),
+  preserve: $('psPreserve'),
+  vary: $('psVary'),
+  generateBtn: $('psGenerateBtn'),
+  saveVersionBtn: $('psSaveVersionBtn'),
+  favoriteBtn: $('psFavoriteBtn'),
+  officialBtn: $('psOfficialBtn'),
+  masterPrompt: $('psMasterPrompt'),
+  negativePrompt: $('psNegativePrompt'),
+  shortPrompt: $('psShortPrompt'),
+  detailedPrompt: $('psDetailedPrompt'),
+  scenePrompt: $('psScenePrompt'),
+  cinematicPrompt: $('psCinematicPrompt'),
+  variations: $('psVariations'),
+  fixedChecklist: $('psFixedChecklist'),
+  versionList: $('psVersionList'),
+  exportTextBtn: $('psExportTextBtn'),
+  exportJsonBtn: $('psExportJsonBtn'),
+  exportPreview: $('psExportPreview')
+};
+
+const promptDocById = (id) => state.promptDocuments.find((promptDocument) => promptDocument.id === id);
+
+const psCurrentDocument = () => promptDocById(psRefs.promptSelect.value || refs.promptDocumentSelect.value);
+
+const psCurrentVersion = (promptDocument = psCurrentDocument()) =>
+  promptDocument?.versions?.find((version) => version.id === promptDocument.activeVersionId) ||
+  promptDocument?.versions?.[0] ||
+  null;
+
+const promptTargetLabel = (targetType, targetId) => {
+  if (targetType === 'scene') {
+    return state.scenes.find((scene) => scene.id === targetId)?.title || 'Cena';
+  }
+  return state.characters.find((character) => character.id === targetId)?.name || 'Personagem';
+};
+
+const promptTargetOptions = (targetType) => (targetType === 'scene' ? projectScenes() : projectCharacters());
+
+const promptDefaultTitle = (targetType, targetId) => {
+  const targetLabel = promptTargetLabel(targetType, targetId);
+  return targetType === 'scene' ? `${targetLabel} · Prompt de cena` : `${targetLabel} · Prompt mestre`;
+};
+
+const promptReferenceCandidates = (targetType, targetId) => {
+  const projectReferences = state.referenceImages.filter((reference) => reference.projectId === selectedProjectId());
+  if (targetType === 'character') {
+    return projectReferences.filter(
+      (reference) => reference.characterId === targetId || (!reference.characterId && reference.type === 'character')
+    );
+  }
+
+  const scene = state.scenes.find((entry) => entry.id === targetId);
+  const chapter = state.chapters.find((entry) => entry.id === scene?.chapterId);
+  const sceneCharacters = inferSceneCharactersFromContext(projectCharacters(), scene, chapter);
+  const sceneCharacterIds = new Set(sceneCharacters.map((character) => character.id));
+  return projectReferences.filter(
+    (reference) =>
+      sceneCharacterIds.has(reference.characterId) ||
+      ['scene', 'place', 'aesthetic', 'lighting', 'object', 'pose', 'clothing'].includes(reference.type) ||
+      reference.linkedEntityId === targetId
+  );
+};
+
+const promptDefaultReferenceIds = (targetType, targetId) =>
+  promptReferenceCandidates(targetType, targetId)
+    .filter((reference) => reference.isCanonical || reference.characterId === targetId || reference.linkedEntityId === targetId)
+    .map((reference) => reference.id);
+
+const syncPromptSelectors = (promptId) => {
+  refs.promptDocumentSelect.value = promptId || '';
+  psRefs.promptSelect.value = promptId || '';
+};
+
+const createPromptFromContext = (preferredTargetType) => {
+  const targetType =
+    preferredTargetType ||
+    (selectedSceneId() ? 'scene' : selectedCharacterId() ? 'character' : projectScenes().length ? 'scene' : 'character');
+  const targetId =
+    targetType === 'scene'
+      ? selectedSceneId() || projectScenes()[0]?.id || ''
+      : selectedCharacterId() || projectCharacters()[0]?.id || '';
+  if (!selectedProjectId() || !targetId) return null;
+
+  const promptDocument = createPromptDocument({
+    projectId: selectedProjectId(),
+    title: promptDefaultTitle(targetType, targetId),
+    targetType,
+    targetId,
+    promptMedium: 'image',
+    stylePreset: 'cinematic-realism',
+    cinematicPreset: targetType === 'scene' ? 'wide-establishing' : 'portrait-intimate',
+    lensLightingPreset: 'natural-soft',
+    emotionalTone: currentProject()?.tone || '',
+    environment:
+      targetType === 'scene'
+        ? state.scenes.find((scene) => scene.id === targetId)?.location || ''
+        : '',
+    referenceIds: promptDefaultReferenceIds(targetType, targetId)
+  });
+  state.promptDocuments.push(promptDocument);
+  state = store.save(state);
+  syncPromptSelectors(promptDocument.id);
+  render();
+  return promptDocument;
+};
+
+const psRenderPresetOptions = () => {
+  renderOptions(
+    psRefs.stylePreset,
+    PROMPT_STYLE_PRESETS.map((preset) => ({ ...preset, name: preset.label })),
+    psRefs.stylePreset.value || PROMPT_STYLE_PRESETS[0].id,
+    'Nenhum preset'
+  );
+  renderOptions(
+    psRefs.cinematicPreset,
+    PROMPT_CINEMATIC_PRESETS.map((preset) => ({ ...preset, name: preset.label })),
+    psRefs.cinematicPreset.value || PROMPT_CINEMATIC_PRESETS[0].id,
+    'Nenhum preset'
+  );
+  renderOptions(
+    psRefs.lensLightingPreset,
+    PROMPT_LENS_LIGHT_PRESETS.map((preset) => ({ ...preset, name: preset.label })),
+    psRefs.lensLightingPreset.value || PROMPT_LENS_LIGHT_PRESETS[0].id,
+    'Nenhum preset'
+  );
+};
+
+const psRenderDocumentOptions = (selectedId) => {
+  renderOptions(
+    psRefs.promptSelect,
+    projectPromptDocuments().map((promptDocument) => ({
+      ...promptDocument,
+      name: `${promptDocument.isOfficial ? '✓ ' : ''}${promptDocument.isFavorite ? '★ ' : ''}${promptDocument.title}`
+    })),
+    selectedId || currentPromptDocument()?.id,
+    'Nenhum prompt estruturado'
+  );
+};
+
+const psRenderTargetOptions = (targetType, selectedId) => {
+  renderOptions(
+    psRefs.targetSelect,
+    promptTargetOptions(targetType),
+    selectedId,
+    targetType === 'scene' ? 'Nenhuma cena' : 'Nenhum personagem'
+  );
+};
+
+const psRenderReferenceOptions = (promptDocument) => {
+  const targetType = psRefs.targetType.value;
+  const targetId = psRefs.targetSelect.value;
+  const selectedReferenceIds = new Set(promptDocument?.referenceIds || []);
+  const candidates = promptReferenceCandidates(targetType, targetId);
+  psRefs.referenceList.innerHTML = '';
+  if (!candidates.length) {
+    psRefs.referenceList.textContent = 'Nenhuma referência aplicável encontrada neste projeto.';
+    return;
+  }
+
+  candidates.forEach((reference) => {
+    const label = document.createElement('label');
+    label.className = 'ps-reference-item';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = reference.id;
+    checkbox.checked = selectedReferenceIds.has(reference.id);
+    const text = document.createElement('span');
+    const badges = [
+      reference.isCanonical ? 'canon' : '',
+      reference.type ? `tipo ${reference.type}` : ''
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    const title = document.createElement('strong');
+    title.textContent = reference.name || 'Referência sem nome';
+    const meta = document.createElement('small');
+    meta.textContent = badges || 'referência visual';
+    const rules = document.createElement('small');
+    rules.textContent = `Preservar: ${reference.preserve || '—'} | Variar: ${reference.mayVary || '—'}`;
+    text.append(title, meta, rules);
+    label.append(checkbox, text);
+    psRefs.referenceList.append(label);
+  });
+};
+
+const psRenderVersionList = (promptDocument) => {
+  psRefs.versionList.innerHTML = '';
+  const versions = promptDocument?.versions || [];
+  if (!versions.length) {
+    psRefs.versionList.textContent = 'Nenhuma versão salva.';
+    return;
+  }
+  versions
+    .slice()
+    .reverse()
+    .forEach((version) => {
+      const button = document.createElement('button');
+      button.className = `ps-version-btn${version.id === promptDocument.activeVersionId ? ' active' : ''}`;
+      button.textContent = `${version.label} · ${new Date(version.createdAt).toLocaleString('pt-BR')}`;
+      button.addEventListener('click', () => {
+        const documentToUpdate = psCurrentDocument();
+        if (!documentToUpdate) return;
+        documentToUpdate.activeVersionId = version.id;
+        documentToUpdate.updatedAt = new Date().toISOString();
+        state = store.save(state);
+        psLoadDocument(documentToUpdate.id);
+      });
+      psRefs.versionList.append(button);
+    });
+};
+
+const psApplyVersionToFields = (version) => {
+  psRefs.preserve.value = Array.isArray(version?.preserve) ? version.preserve.join('\n') : '';
+  psRefs.vary.value = Array.isArray(version?.vary) ? version.vary.join('\n') : '';
+  psRefs.masterPrompt.value = version?.masterPrompt || '';
+  psRefs.negativePrompt.value = version?.negativePrompt || '';
+  psRefs.shortPrompt.value = version?.shortPrompt || '';
+  psRefs.detailedPrompt.value = version?.detailedPrompt || '';
+  psRefs.scenePrompt.value = version?.scenePrompt || '';
+  psRefs.cinematicPrompt.value = version?.cinematicPrompt || '';
+  psRefs.variations.value = Array.isArray(version?.variations) ? version.variations.join('\n') : '';
+  psRefs.fixedChecklist.value = Array.isArray(version?.fixedChecklist) ? version.fixedChecklist.join('\n') : '';
+};
+
+const psLoadDocument = (promptId) => {
+  const promptDocument = promptDocById(promptId) || currentPromptDocument();
+  if (!promptDocument) return;
+  syncPromptSelectors(promptDocument.id);
+  psRenderDocumentOptions(promptDocument.id);
+  psRefs.title.value = promptDocument.title || '';
+  psRefs.targetType.value = promptDocument.targetType || 'character';
+  psRefs.promptMedium.value = promptDocument.promptMedium || 'image';
+  psRenderTargetOptions(psRefs.targetType.value, promptDocument.targetId);
+  psRenderPresetOptions();
+  psRefs.stylePreset.value = promptDocument.stylePreset || PROMPT_STYLE_PRESETS[0].id;
+  psRefs.cinematicPreset.value = promptDocument.cinematicPreset || PROMPT_CINEMATIC_PRESETS[0].id;
+  psRefs.lensLightingPreset.value = promptDocument.lensLightingPreset || PROMPT_LENS_LIGHT_PRESETS[0].id;
+  psRefs.emotionalTone.value = promptDocument.emotionalTone || '';
+  psRefs.environment.value = promptDocument.environment || '';
+  psRefs.lighting.value = promptDocument.lighting || '';
+  psRefs.composition.value = promptDocument.composition || '';
+  psRefs.builderNotes.value = promptDocument.notes || '';
+  psRenderReferenceOptions(promptDocument);
+  psRenderVersionList(promptDocument);
+  psApplyVersionToFields(psCurrentVersion(promptDocument));
+  psRefs.favoriteBtn.textContent = promptDocument.isFavorite ? '★ Favorito' : '☆ Favorito';
+  psRefs.officialBtn.textContent = promptDocument.isOfficial ? '✓ Oficial' : 'Oficial';
+  const previewText = psRefs.scenePrompt.value || psRefs.masterPrompt.value || 'Selecione ou gere um prompt para exportar.';
+  psRefs.exportPreview.textContent = previewText;
+};
+
+const psSelectedReferenceIds = () =>
+  Array.from(psRefs.referenceList.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
+
+const psSyncDocumentFields = (promptDocument) => {
+  if (!promptDocument) return null;
+  promptDocument.title = psRefs.title.value.trim() || promptDocument.title;
+  promptDocument.targetType = psRefs.targetType.value;
+  promptDocument.targetId = psRefs.targetSelect.value;
+  promptDocument.promptMedium = psRefs.promptMedium.value;
+  promptDocument.stylePreset = psRefs.stylePreset.value;
+  promptDocument.cinematicPreset = psRefs.cinematicPreset.value;
+  promptDocument.lensLightingPreset = psRefs.lensLightingPreset.value;
+  promptDocument.emotionalTone = psRefs.emotionalTone.value.trim();
+  promptDocument.environment = psRefs.environment.value.trim();
+  promptDocument.lighting = psRefs.lighting.value.trim();
+  promptDocument.composition = psRefs.composition.value.trim();
+  promptDocument.notes = psRefs.builderNotes.value.trim();
+  promptDocument.referenceIds = psSelectedReferenceIds();
+  promptDocument.updatedAt = new Date().toISOString();
+  return promptDocument;
+};
+
+const psSnapshotVersionFields = (label, source) => ({
+  id: newClientId(),
+  label,
+  source,
+  preserve: parseLines(psRefs.preserve.value),
+  vary: parseLines(psRefs.vary.value),
+  masterPrompt: psRefs.masterPrompt.value.trim(),
+  negativePrompt: psRefs.negativePrompt.value.trim(),
+  shortPrompt: psRefs.shortPrompt.value.trim(),
+  detailedPrompt: psRefs.detailedPrompt.value.trim(),
+  scenePrompt: psRefs.scenePrompt.value.trim(),
+  cinematicPrompt: psRefs.cinematicPrompt.value.trim(),
+  variations: parseLines(psRefs.variations.value),
+  fixedChecklist: parseLines(psRefs.fixedChecklist.value),
+  notes: psRefs.builderNotes.value.trim(),
+  createdAt: new Date().toISOString()
+});
+
+const psBuildPackForDocument = (promptDocument) => {
+  const references = state.referenceImages.filter((reference) => promptDocument.referenceIds.includes(reference.id));
+  if (promptDocument.targetType === 'scene') {
+    const scene = state.scenes.find((entry) => entry.id === promptDocument.targetId);
+    const chapter = state.chapters.find((entry) => entry.id === scene?.chapterId);
+    return buildScenePromptPack({
+      projectTone: currentProject()?.tone,
+      scene,
+      chapter,
+      characters: projectCharacters(),
+      loreEntries: projectLore(),
+      references,
+      promptMedium: promptDocument.promptMedium,
+      preserve: parseLines(psRefs.preserve.value),
+      vary: parseLines(psRefs.vary.value),
+      stylePreset: promptDocument.stylePreset,
+      cinematicPreset: promptDocument.cinematicPreset,
+      lensLightingPreset: promptDocument.lensLightingPreset,
+      emotionalTone: promptDocument.emotionalTone,
+      environment: promptDocument.environment,
+      lighting: promptDocument.lighting,
+      composition: promptDocument.composition
+    });
+  }
+
+  const character = state.characters.find((entry) => entry.id === promptDocument.targetId);
+  return buildCharacterPromptPack({
+    character,
+    projectTone: currentProject()?.tone,
+    references,
+    promptMedium: promptDocument.promptMedium,
+    preserve: parseLines(psRefs.preserve.value),
+    vary: parseLines(psRefs.vary.value),
+    stylePreset: promptDocument.stylePreset,
+    cinematicPreset: promptDocument.cinematicPreset,
+    lensLightingPreset: promptDocument.lensLightingPreset
+  });
+};
+
+const psApplyPackToFields = (pack) => {
+  psRefs.masterPrompt.value = pack.masterPrompt || '';
+  psRefs.negativePrompt.value = pack.negativePrompt || '';
+  psRefs.shortPrompt.value = pack.shortPrompt || '';
+  psRefs.detailedPrompt.value = pack.detailedPrompt || '';
+  psRefs.scenePrompt.value = pack.scenePrompt || '';
+  psRefs.cinematicPrompt.value = pack.cinematicPrompt || '';
+  psRefs.variations.value = Array.isArray(pack.variations) ? pack.variations.join('\n') : '';
+  psRefs.fixedChecklist.value = Array.isArray(pack.fixedChecklist) ? pack.fixedChecklist.join('\n') : '';
+  psRefs.exportPreview.textContent = psRefs.scenePrompt.value || psRefs.masterPrompt.value || 'Selecione ou gere um prompt para exportar.';
+};
+
+const psOpenStudio = (preferredTargetType) => {
+  if (!selectedProjectId()) return;
+  psIsOpen = true;
+  psRenderPresetOptions();
+  let promptDocument = currentPromptDocument();
+  if (!promptDocument) {
+    promptDocument = createPromptFromContext(preferredTargetType);
+  }
+  psRefs.overlay.classList.remove('ps-hidden');
+  document.body.style.overflow = 'hidden';
+  if (promptDocument) {
+    psLoadDocument(promptDocument.id);
+  }
+};
+
+const psCloseStudio = () => {
+  psIsOpen = false;
+  psRefs.overlay.classList.add('ps-hidden');
+  document.body.style.overflow = '';
+  render();
+};
+
+const exportPromptPayload = () => {
+  const promptDocument = psCurrentDocument();
+  if (!promptDocument) return null;
+  const syncedDocument = psSyncDocumentFields(promptDocument);
+  const activeVersion = psSnapshotVersionFields(
+    psCurrentVersion(promptDocument)?.label || `Versão ${promptDocument.versions.length}`,
+    psCurrentVersion(promptDocument)?.source || 'manual'
+  );
+  return {
+    ...syncedDocument,
+    targetLabel: promptTargetLabel(syncedDocument.targetType, syncedDocument.targetId),
+    activeVersion
+  };
+};
+
+const downloadFile = (filename, content, type) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
+const exportPromptText = (payload) =>
+  [
+    `# ${payload.title}`,
+    '',
+    `tipo: ${payload.targetType}`,
+    `alvo: ${payload.targetLabel}`,
+    `saída: ${payload.promptMedium}`,
+    `favorito: ${payload.isFavorite ? 'sim' : 'não'}`,
+    `oficial: ${payload.isOfficial ? 'sim' : 'não'}`,
+    '',
+    '## preservar',
+    ...(payload.activeVersion.preserve.length ? payload.activeVersion.preserve.map((entry) => `- ${entry}`) : ['- —']),
+    '',
+    '## variar',
+    ...(payload.activeVersion.vary.length ? payload.activeVersion.vary.map((entry) => `- ${entry}`) : ['- —']),
+    '',
+    '## prompt mestre',
+    payload.activeVersion.masterPrompt || '—',
+    '',
+    '## negative prompt',
+    payload.activeVersion.negativePrompt || '—',
+    '',
+    '## versão curta',
+    payload.activeVersion.shortPrompt || '—',
+    '',
+    '## versão detalhada',
+    payload.activeVersion.detailedPrompt || '—',
+    '',
+    '## prompt visual da cena',
+    payload.activeVersion.scenePrompt || '—',
+    '',
+    '## prompt cinematográfico',
+    payload.activeVersion.cinematicPrompt || '—',
+    '',
+    '## variações',
+    ...(payload.activeVersion.variations.length ? payload.activeVersion.variations.map((entry) => `- ${entry}`) : ['- —']),
+    '',
+    '## checklist fixo',
+    ...(payload.activeVersion.fixedChecklist.length ? payload.activeVersion.fixedChecklist.map((entry) => `- ${entry}`) : ['- —'])
+  ].join('\n');
+
+$('openPromptStudioBtn').addEventListener('click', () => psOpenStudio());
+$('openPromptStudioFromCharacterBtn').addEventListener('click', () => psOpenStudio('character'));
+$('openPromptStudioFromSceneBtn').addEventListener('click', () => psOpenStudio('scene'));
+$('createPromptDocumentBtn').addEventListener('click', () => {
+  const promptDocument = createPromptFromContext();
+  if (promptDocument) {
+    psOpenStudio(promptDocument.targetType);
+  }
+});
+
+refs.promptDocumentSelect.addEventListener('change', () => {
+  syncPromptSelectors(refs.promptDocumentSelect.value);
+  renderPromptEditor();
+});
+
+psRefs.closeBtn.addEventListener('click', psCloseStudio);
+
+psRefs.promptSelect.addEventListener('change', () => {
+  syncPromptSelectors(psRefs.promptSelect.value);
+  psLoadDocument(psRefs.promptSelect.value);
+});
+
+psRefs.targetType.addEventListener('change', () => {
+  const targetType = psRefs.targetType.value;
+  const firstTargetId = promptTargetOptions(targetType)[0]?.id || '';
+  psRenderTargetOptions(targetType, firstTargetId);
+  const currentDocument = psCurrentDocument();
+  if (currentDocument && !currentDocument.referenceIds.length) {
+    currentDocument.referenceIds = promptDefaultReferenceIds(targetType, firstTargetId);
+  }
+  psRenderReferenceOptions(currentDocument);
+  psRefs.title.value = promptDefaultTitle(targetType, firstTargetId);
+});
+
+psRefs.targetSelect.addEventListener('change', () => {
+  const currentDocument = psCurrentDocument();
+  if (currentDocument && !currentDocument.referenceIds.length) {
+    currentDocument.referenceIds = promptDefaultReferenceIds(psRefs.targetType.value, psRefs.targetSelect.value);
+  }
+  psRenderReferenceOptions(currentDocument);
+  if (!psRefs.title.value.trim()) {
+    psRefs.title.value = promptDefaultTitle(psRefs.targetType.value, psRefs.targetSelect.value);
+  }
+});
+
+psRefs.newPromptBtn.addEventListener('click', () => {
+  const promptDocument = createPromptFromContext(psRefs.targetType.value);
+  if (promptDocument) {
+    psLoadDocument(promptDocument.id);
+  }
+});
+
+psRefs.duplicatePromptBtn.addEventListener('click', () => {
+  const promptDocument = psCurrentDocument();
+  const version = psCurrentVersion(promptDocument);
+  if (!promptDocument || !version) return;
+  const duplicate = createPromptDocument({
+    projectId: promptDocument.projectId,
+    title: `${promptDocument.title} (cópia)`,
+    targetType: promptDocument.targetType,
+    targetId: promptDocument.targetId,
+    promptMedium: promptDocument.promptMedium,
+    stylePreset: promptDocument.stylePreset,
+    cinematicPreset: promptDocument.cinematicPreset,
+    lensLightingPreset: promptDocument.lensLightingPreset,
+    emotionalTone: promptDocument.emotionalTone,
+    environment: promptDocument.environment,
+    lighting: promptDocument.lighting,
+    composition: promptDocument.composition,
+    notes: promptDocument.notes,
+    referenceIds: [...promptDocument.referenceIds],
+    versions: [
+      {
+        ...version,
+        id: newClientId(),
+        label: 'Versão inicial (duplicada)',
+        createdAt: new Date().toISOString()
+      }
+    ]
+  });
+  state.promptDocuments.push(duplicate);
+  state = store.save(state);
+  syncPromptSelectors(duplicate.id);
+  psLoadDocument(duplicate.id);
+  render();
+});
+
+psRefs.generateBtn.addEventListener('click', () => {
+  const promptDocument = psSyncDocumentFields(psCurrentDocument());
+  if (!promptDocument) return;
+  const pack = psBuildPackForDocument(promptDocument);
+  psApplyPackToFields(pack);
+  const version = psSnapshotVersionFields(`Versão ${promptDocument.versions.length + 1} · gerada`, 'generated');
+  promptDocument.versions.push(version);
+  promptDocument.activeVersionId = version.id;
+  promptDocument.updatedAt = new Date().toISOString();
+  state = store.save(state);
+  psLoadDocument(promptDocument.id);
+  render();
+});
+
+psRefs.saveVersionBtn.addEventListener('click', () => {
+  const promptDocument = psSyncDocumentFields(psCurrentDocument());
+  if (!promptDocument) return;
+  const version = psSnapshotVersionFields(`Versão ${promptDocument.versions.length + 1} · manual`, 'manual');
+  promptDocument.versions.push(version);
+  promptDocument.activeVersionId = version.id;
+  promptDocument.updatedAt = new Date().toISOString();
+  state = store.save(state);
+  psLoadDocument(promptDocument.id);
+  render();
+});
+
+psRefs.favoriteBtn.addEventListener('click', () => {
+  const promptDocument = psSyncDocumentFields(psCurrentDocument());
+  if (!promptDocument) return;
+  promptDocument.isFavorite = !promptDocument.isFavorite;
+  promptDocument.updatedAt = new Date().toISOString();
+  state = store.save(state);
+  psLoadDocument(promptDocument.id);
+  render();
+});
+
+psRefs.officialBtn.addEventListener('click', () => {
+  const promptDocument = psSyncDocumentFields(psCurrentDocument());
+  if (!promptDocument) return;
+  promptDocument.isOfficial = !promptDocument.isOfficial;
+  promptDocument.updatedAt = new Date().toISOString();
+  state = store.save(state);
+  psLoadDocument(promptDocument.id);
+  render();
+});
+
+psRefs.exportTextBtn.addEventListener('click', () => {
+  const payload = exportPromptPayload();
+  if (!payload) return;
+  downloadFile(`${sanitizeFilename(payload.title)}.txt`, exportPromptText(payload), 'text/plain');
+});
+
+psRefs.exportJsonBtn.addEventListener('click', () => {
+  const payload = exportPromptPayload();
+  if (!payload) return;
+  downloadFile(
+    `${sanitizeFilename(payload.title)}.json`,
+    JSON.stringify(payload, null, 2),
+    'application/json'
+  );
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !psIsOpen) return;
+  const active = document.activeElement;
+  const isInput =
+    active &&
+    (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.tagName === 'SELECT');
+  if (isInput) return;
+  psCloseStudio();
 });
 
 render();
