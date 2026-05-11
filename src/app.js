@@ -7,7 +7,7 @@ import {
   createProject,
   createScene
 } from './models.js';
-import { createStore } from './store.js';
+import { createStore, sanitizeState } from './store.js';
 import { buildSceneSpec, buildVideoSpec, searchLore, suggestNextParagraph } from './assistant.js';
 
 const store = createStore();
@@ -275,7 +275,7 @@ $('exportDataBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'pixie-sunny-local-backup.json';
+  a.download = 'pixie-sunny-studio-backup.json';
   a.click();
   URL.revokeObjectURL(url);
 });
@@ -286,10 +286,11 @@ $('importDataInput').addEventListener('change', async (event) => {
   const content = await file.text();
   try {
     const imported = JSON.parse(content);
-    state = { ...state, ...imported };
+    state = sanitizeState(imported);
     persist();
-  } catch {
-    alert('Erro ao importar: arquivo JSON inválido. Verifique o formato do arquivo.');
+  } catch (error) {
+    console.error('Falha ao importar JSON', error);
+    alert(`Erro ao importar JSON: ${error?.message || 'o arquivo não contém dados válidos ou está corrompido'}`);
   }
 });
 

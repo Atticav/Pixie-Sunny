@@ -1,3 +1,7 @@
+const DEFAULT_PROTAGONIST_TEXT = 'a pessoa protagonista';
+const DEFAULT_NEGATIVE_PROMPT =
+  'anime, cartoon, proporções irreais, maquiagem glamour moderna, olhos inconsistentes, figurino moderno';
+
 export const suggestNextParagraph = ({ chapterContent, chapterTitle, loreEntries, characters }) => {
   const lore = loreEntries.slice(0, 3).map((entry) => `- ${entry.title}: ${entry.content}`).join('\n');
   const cast = characters.slice(0, 3).map((character) => character.name).join(', ');
@@ -5,7 +9,7 @@ export const suggestNextParagraph = ({ chapterContent, chapterTitle, loreEntries
   return [
     `Continuação sugerida para "${chapterTitle}":`,
     '',
-    `No silêncio da cena, ${cast || 'a protagonista'} percebe um detalhe que conecta o presente a um fato canônico do universo.`,
+    `No silêncio da cena, ${cast || DEFAULT_PROTAGONIST_TEXT} percebe um detalhe que conecta o presente a um fato canônico do universo.`,
     'Esse detalhe gera uma decisão concreta e irreversível para o próximo conflito.',
     '',
     'Memória relevante:',
@@ -28,7 +32,7 @@ export const buildSceneSpec = ({ projectTone, scene, characters }) => ({
     lockTraits: character.canonTraits
   })),
   prompt: `Cena "${scene?.title}": ${scene?.description}. Estilo realista cinematográfico, textura natural de pele e tecido, iluminação dramática coerente com o cenário descrito.`,
-  negativePrompt: 'anime, cartoon, proporções irreais, maquiagem glamour moderna, olhos inconsistentes, figurino moderno'
+  negativePrompt: DEFAULT_NEGATIVE_PROMPT
 });
 
 export const buildVideoSpec = ({ scene, imageAsset, projectTone }) => ({

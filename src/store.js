@@ -18,6 +18,25 @@ const resolveStorage = (customStorage) => {
   return memoryStorage();
 };
 
+export const sanitizeState = (raw) => {
+  const base = emptyState();
+  if (!raw || typeof raw !== 'object') return base;
+  return {
+    ...base,
+    projects: Array.isArray(raw.projects) ? raw.projects : base.projects,
+    books: Array.isArray(raw.books) ? raw.books : base.books,
+    chapters: Array.isArray(raw.chapters) ? raw.chapters : base.chapters,
+    scenes: Array.isArray(raw.scenes) ? raw.scenes : base.scenes,
+    characters: Array.isArray(raw.characters) ? raw.characters : base.characters,
+    loreEntries: Array.isArray(raw.loreEntries) ? raw.loreEntries : base.loreEntries,
+    assets: Array.isArray(raw.assets) ? raw.assets : base.assets,
+    settings: {
+      ...base.settings,
+      ...(raw.settings && typeof raw.settings === 'object' ? raw.settings : {})
+    }
+  };
+};
+
 export const createStore = ({ key = 'pixieSunnyStudio', storage } = {}) => {
   const db = resolveStorage(storage);
 
@@ -25,7 +44,7 @@ export const createStore = ({ key = 'pixieSunnyStudio', storage } = {}) => {
     const raw = db.getItem(key);
     if (!raw) return emptyState();
     try {
-      return { ...emptyState(), ...JSON.parse(raw) };
+      return sanitizeState(JSON.parse(raw));
     } catch {
       return emptyState();
     }
@@ -46,12 +65,13 @@ export const createStore = ({ key = 'pixieSunnyStudio', storage } = {}) => {
     mutate((state) => {
       const list = state[collection] ?? [];
       const idx = list.findIndex((entry) => entry.id === item.id);
+      const nextList = [...list];
       if (idx >= 0) {
-        list[idx] = item;
+        nextList[idx] = item;
       } else {
-        list.push(item);
+        nextList.push(item);
       }
-      return { ...state, [collection]: list };
+      return { ...state, [collection]: nextList };
     });
 
   const remove = (collection, id) =>

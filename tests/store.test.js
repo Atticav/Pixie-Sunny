@@ -38,3 +38,27 @@ test('lore search finds matching text', () => {
   assert.equal(found.length, 1);
   assert.equal(found[0].title, 'Magia de Sangue');
 });
+
+test('lore search handles empty and case-insensitive queries', () => {
+  const entries = [
+    { title: 'Aliança Lunar', content: 'Pacto selado em ruínas antigas.' },
+    { title: 'Guarda do Norte', content: 'Juramento no inverno eterno.' }
+  ];
+
+  assert.equal(searchLore(entries, '').length, 2);
+  assert.equal(searchLore(entries, 'LUNAR').length, 1);
+  assert.equal(searchLore(entries, '??').length, 0);
+});
+
+test('store load ignores unexpected parsed properties', () => {
+  const storage = fakeStorage();
+  storage.setItem(
+    'test',
+    JSON.stringify({ projects: [{ id: '1', name: 'A' }], injected: { malicious: true } })
+  );
+  const store = createStore({ key: 'test', storage });
+  const loaded = store.load();
+
+  assert.equal(loaded.projects.length, 1);
+  assert.equal(loaded.injected, undefined);
+});
