@@ -4230,7 +4230,7 @@ const irsBuildContextCatalog = () => {
         putEntry({
           id: versionId,
           label: `Prompt versão · ${document.title} · ${version.label || `v${index + 1}`}`,
-          source: 'refresh / rewrite',
+          source: 'Refresh / Rewrite',
           open: { kind: 'promptDocument', id: document.id, targetType: document.targetType },
           metadata: {
             kind: 'prompt_version',
@@ -4564,7 +4564,7 @@ const irsRenderContextCompare = () => {
   const mode = irsRefs.compareMode.value;
 
   irsRefs.contextSummary.textContent = [
-    `Comparando: ${left.label} → ${right.label}`,
+    `Comparando: ${left.label} vs ${right.label}`,
     `Mudanças de metadata: ${summary.metadataChanged} alteradas, ${summary.metadataAdded} adicionadas, ${summary.metadataRemoved} removidas`,
     `Mudanças textuais: ${summary.changedSections} seções com ${summary.textOps} operações`,
     `Conexões: ${left.source} ↔ ${right.source}`

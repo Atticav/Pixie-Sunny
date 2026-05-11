@@ -1,6 +1,8 @@
 const textValue = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
 const normalizeLine = (line) => line.replace(/\s+/g, ' ').trim();
+const PROMPT_SECTION_PATTERN = /prompt|briefing/i;
+const CONTINUITY_SECTION_PATTERN = /continuidade|continuity/i;
 
 export const buildLineDiff = (beforeText = '', afterText = '') => {
   const beforeLines = textValue(beforeText).split(/\r?\n/).map((line) => line.trimEnd());
@@ -98,10 +100,10 @@ export const buildSemanticHighlights = ({ metadataDiff, sectionDiffs }) => {
   if (keys.has('score') || keys.has('status') || keys.has('readiness')) {
     highlights.push('Sinal de prontidão de produção mudou.');
   }
-  if ([...sectionLabels].some((label) => /prompt|briefing/i.test(label))) {
+  if ([...sectionLabels].some((label) => PROMPT_SECTION_PATTERN.test(label))) {
     highlights.push('Prompt/briefing sofreu mudança semântica.');
   }
-  if ([...sectionLabels].some((label) => /continuidade|continuity/i.test(label))) {
+  if ([...sectionLabels].some((label) => CONTINUITY_SECTION_PATTERN.test(label))) {
     highlights.push('Riscos de continuidade devem ser revisados.');
   }
 

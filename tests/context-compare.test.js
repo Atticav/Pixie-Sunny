@@ -15,6 +15,19 @@ test('buildLineDiff tracks added and removed lines for inline comparison', () =>
   assert.ok(diff.rows.some((row) => row.type === 'removed' && row.text === 'linha B'));
 });
 
+test('buildLineDiff handles empty, whitespace and CRLF variations safely', () => {
+  const diff = buildLineDiff('\r\nlinha A  \r\n', '\nlinha A\n\n');
+  assert.equal(diff.stats.added, 1);
+  assert.equal(diff.stats.removed, 0);
+  assert.ok(diff.rows.some((row) => row.type === 'equal' && row.text.trim() === 'linha A'));
+});
+
+test('buildLineDiff keeps equal rows when texts are identical', () => {
+  const diff = buildLineDiff('texto igual\nlinha 2', 'texto igual\nlinha 2');
+  assert.equal(diff.stats.changed, 0);
+  assert.ok(diff.rows.every((row) => row.type === 'equal'));
+});
+
 test('buildMetadataDiff classifies changed, added and removed fields', () => {
   const diff = buildMetadataDiff(
     { reviewStatus: 'candidate', score: '2', sceneId: 'scene-1' },
