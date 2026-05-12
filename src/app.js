@@ -12,6 +12,7 @@ import {
   createPromptDocument,
   createProject,
   createReferenceImage,
+  createSandboxPromotion,
   createScene,
   createShot,
   createWorkspaceSandbox,
@@ -25,6 +26,7 @@ import {
   IMAGE_GEN_TYPES,
   OUTPUT_REVIEW_STATUSES,
   REFERENCE_TYPES,
+  SANDBOX_PROMOTION_STATUSES,
   SHOT_STATUSES,
   UNASSIGNED_CHAPTER_ID
 } from './models.js';
@@ -200,7 +202,15 @@ const refs = {
   sandboxOpenInboxBtn: $('sandboxOpenInboxBtn'),
   sandboxOpenRecipesBtn: $('sandboxOpenRecipesBtn'),
   sandboxOpenCheckpointsBtn: $('sandboxOpenCheckpointsBtn'),
-  sandboxRefreshBtn: $('sandboxRefreshBtn')
+  sandboxRefreshBtn: $('sandboxRefreshBtn'),
+  pmSandboxSelect: $('pmSandboxSelect'),
+  pmSummaryPanel: $('pmSummaryPanel'),
+  pmSummaryDl: $('pmSummaryDl'),
+  pmNotes: $('pmNotes'),
+  pmConfirmBtn: $('pmConfirmBtn'),
+  pmCancelBtn: $('pmCancelBtn'),
+  pmStatus: $('pmStatus'),
+  pmHistoryList: $('pmHistoryList')
 };
 
 const SHOT_TEMPLATES = [
@@ -1570,7 +1580,14 @@ const renderWorkspaceSandboxes = () => {
       compareBtn.dataset.sandboxId = sandbox.id;
       compareBtn.textContent = 'Comparar com workspace principal';
 
-      card.append(title, meta, purpose, compareBtn);
+      const promoteBtn = document.createElement('button');
+      promoteBtn.type = 'button';
+      promoteBtn.dataset.action = 'promote';
+      promoteBtn.dataset.sandboxId = sandbox.id;
+      promoteBtn.className = 'sb-promote-btn';
+      promoteBtn.textContent = 'Promover →';
+
+      card.append(title, meta, purpose, compareBtn, promoteBtn);
       refs.sandboxList.append(card);
     });
   }
@@ -1681,6 +1698,100 @@ const checkpointSelectOptions = () =>
     id: checkpoint.id,
     name: `${checkpoint.name} · ${new Date(checkpoint.createdAt).toLocaleString('pt-BR')}`
   }));
+
+const projectSandboxPromotions = () =>
+  (state.sandboxPromotions || [])
+    .filter((promo) => promo.projectId === selectedProjectId())
+    .sort((a, b) => Date.parse(b.promotedAt || 0) - Date.parse(a.promotedAt || 0));
+
+const SANDBOX_STATUS_READINESS = {
+  exploratory: 'Em exploração',
+  candidate: 'Candidato',
+  'review-ready': 'Pronto para revisão / promoção'
+};
+
+const buildPromotionImpactSummary = (sandbox) => {
+  const snap = sandbox.snapshot || {};
+  const parts = [];
+  if (snap.scenes !== undefined) parts.push(`${snap.scenes} cena(s)`);
+  if (snap.characters !== undefined) parts.push(`${snap.characters} personagem(ns)`);
+  if (snap.beats !== undefined) parts.push(`${snap.beats} beat(s)`);
+  if (snap.shots !== undefined) parts.push(`${snap.shots} shot(s)`);
+  if (snap.promptDocuments !== undefined) parts.push(`${snap.promptDocuments} prompt(s)`);
+  if (snap.outputs !== undefined) parts.push(`${snap.outputs} output(s)`);
+  if (snap.decisionEvents !== undefined) parts.push(`${snap.decisionEvents} decisão(ões)`);
+  return parts.length ? parts.join(' · ') : 'Sem dados de snapshot disponíveis.';
+};
+
+let pmSelectedSandboxId = '';
+
+const renderSandboxPromoteSection = () => {
+  if (!refs.pmSandboxSelect || !refs.pmHistoryList) return;
+  const projectId = selectedProjectId();
+
+  renderOptionsWithBlank(
+    refs.pmSandboxSelect,
+    sandboxSelectOptions(),
+    sandboxSelectOptions().some((opt) => opt.id === pmSelectedSandboxId) ? pmSelectedSandboxId : '',
+    'Selecione um sandbox'
+  );
+  pmSelectedSandboxId = refs.pmSandboxSelect?.value || '';
+
+  const sandbox = projectWorkspaceSandboxes().find((entry) => entry.id === pmSelectedSandboxId) || null;
+
+  if (!sandbox || !refs.pmSummaryPanel) {
+    refs.pmSummaryPanel?.classList.add('pm-hidden');
+    if (refs.pmStatus && !refs.pmStatus.textContent) refs.pmStatus.textContent = '';
+  } else {
+    refs.pmSummaryPanel.classList.remove('pm-hidden');
+    if (refs.pmSummaryDl) {
+      const impactSummary = buildPromotionImpactSummary(sandbox);
+      refs.pmSummaryDl.innerHTML = `
+        <dt>Sandbox origem</dt><dd>${sandbox.name || '—'}</dd>
+        <dt>Propósito</dt><dd>${sandbox.purpose || '—'}</dd>
+        <dt>Status</dt><dd>${SANDBOX_STATUS_READINESS[sandbox.status] || sandbox.status}</dd>
+        <dt>Target</dt><dd>workspace principal (${projectId})</dd>
+        <dt>Impacto (snapshot)</dt><dd>${impactSummary}</dd>
+        <dt>Snapshot em</dt><dd>${new Date(sandbox.updatedAt || sandbox.createdAt).toLocaleString('pt-BR')}</dd>
+      `;
+    }
+  }
+
+  const promotions = projectSandboxPromotions();
+  if (!refs.pmHistoryList) return;
+  refs.pmHistoryList.innerHTML = '';
+  if (!promotions.length) {
+    refs.pmHistoryList.innerHTML = '<p class="pm-empty">Nenhuma promoção registrada ainda.</p>';
+    return;
+  }
+  promotions.forEach((promo) => {
+    const card = document.createElement('article');
+    card.className = 'pm-history-card';
+
+    const title = document.createElement('strong');
+    title.className = 'pm-history-title';
+    title.textContent = promo.sandboxName || 'Sandbox sem nome';
+
+    const meta = document.createElement('p');
+    meta.className = 'pm-history-meta';
+    meta.textContent =
+      `${SANDBOX_STATUS_READINESS[promo.sandboxStatus] || promo.sandboxStatus} · promovido em ${new Date(promo.promotedAt).toLocaleString('pt-BR')}`;
+
+    const impact = document.createElement('p');
+    impact.className = 'pm-history-impact';
+    impact.textContent = promo.impactSummary || buildPromotionImpactSummary({ snapshot: promo.sandboxSnapshot });
+
+    if (promo.notes) {
+      const notes = document.createElement('p');
+      notes.className = 'pm-history-notes';
+      notes.textContent = `Notas: ${promo.notes}`;
+      card.append(title, meta, impact, notes);
+    } else {
+      card.append(title, meta, impact);
+    }
+    refs.pmHistoryList.append(card);
+  });
+};
 
 const renderWorkspaceCheckpoints = () => {
   if (!refs.checkpointList || !refs.checkpointSummary) return;
@@ -1873,6 +1984,7 @@ const render = () => {
   renderAssistivePlanning();
   renderReviewInbox();
   renderWorkspaceSandboxes();
+  renderSandboxPromoteSection();
   renderWorkspaceCheckpoints();
   renderLore();
   renderAssets();
@@ -1887,6 +1999,7 @@ const render = () => {
   setDisabled(['openImageGenStudioBtn'], !selectedProjectId());
   setDisabled(['createSandboxBtn'], !selectedProjectId());
   setDisabled(['createCheckpointBtn'], !selectedProjectId());
+  setDisabled(['pmConfirmBtn'], !selectedProjectId() || !pmSelectedSandboxId);
 };
 
 const persist = () => {
@@ -2584,11 +2697,21 @@ refs.createSandboxBtn?.addEventListener('click', () => {
 });
 
 refs.sandboxList?.addEventListener('click', (event) => {
-  const button = event.target.closest('button[data-action="compare"][data-sandbox-id]');
-  if (!button || !refs.sandboxCompareSelect) return;
-  refs.sandboxCompareSelect.value = button.dataset.sandboxId || '';
-  sandboxCompareId = refs.sandboxCompareSelect.value;
-  renderWorkspaceSandboxes();
+  const compareBtn = event.target.closest('button[data-action="compare"][data-sandbox-id]');
+  if (compareBtn && refs.sandboxCompareSelect) {
+    refs.sandboxCompareSelect.value = compareBtn.dataset.sandboxId || '';
+    sandboxCompareId = refs.sandboxCompareSelect.value;
+    renderWorkspaceSandboxes();
+    return;
+  }
+  const promoteBtn = event.target.closest('button[data-action="promote"][data-sandbox-id]');
+  if (promoteBtn && refs.pmSandboxSelect) {
+    const sandboxId = promoteBtn.dataset.sandboxId || '';
+    refs.pmSandboxSelect.value = sandboxId;
+    pmSelectedSandboxId = sandboxId;
+    renderSandboxPromoteSection();
+    document.querySelector('.pm-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 });
 
 refs.sandboxCompareSelect?.addEventListener('change', () => {
@@ -2662,6 +2785,51 @@ refs.checkpointOpenReadinessBtn?.addEventListener('click', () => {
 
 refs.checkpointOpenInboxBtn?.addEventListener('click', () => {
   document.querySelector('.ri-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+// =========== Promote / Merge / Commit-to-Main ===========
+
+refs.pmSandboxSelect?.addEventListener('change', () => {
+  pmSelectedSandboxId = refs.pmSandboxSelect.value || '';
+  if (refs.pmStatus) refs.pmStatus.textContent = '';
+  renderSandboxPromoteSection();
+});
+
+refs.pmCancelBtn?.addEventListener('click', () => {
+  pmSelectedSandboxId = '';
+  if (refs.pmSandboxSelect) refs.pmSandboxSelect.value = '';
+  if (refs.pmNotes) refs.pmNotes.value = '';
+  if (refs.pmStatus) refs.pmStatus.textContent = '';
+  renderSandboxPromoteSection();
+});
+
+refs.pmConfirmBtn?.addEventListener('click', () => {
+  const projectId = selectedProjectId();
+  if (!projectId || !pmSelectedSandboxId) return;
+  const sandbox = (state.workspaceSandboxes || []).find((entry) => entry.id === pmSelectedSandboxId);
+  if (!sandbox) return;
+  const notes = refs.pmNotes?.value.trim() || '';
+  const impactSummary = buildPromotionImpactSummary(sandbox);
+  if (!state.sandboxPromotions) state.sandboxPromotions = [];
+  state.sandboxPromotions.push(
+    createSandboxPromotion({
+      projectId,
+      sandboxId: sandbox.id,
+      sandboxName: sandbox.name,
+      sandboxPurpose: sandbox.purpose,
+      sandboxStatus: sandbox.status,
+      sandboxSnapshot: sandbox.snapshot || {},
+      targetLabel: 'workspace principal',
+      notes,
+      impactSummary
+    })
+  );
+  const promotedName = sandbox.name;
+  pmSelectedSandboxId = '';
+  if (refs.pmSandboxSelect) refs.pmSandboxSelect.value = '';
+  if (refs.pmNotes) refs.pmNotes.value = '';
+  if (refs.pmStatus) refs.pmStatus.textContent = `✓ Sandbox "${promotedName}" promovido com sucesso.`;
+  persist();
 });
 
 // =========== Writer Studio ===========

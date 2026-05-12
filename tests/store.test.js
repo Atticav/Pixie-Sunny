@@ -15,6 +15,7 @@ import {
   createLoreEntry,
   createProject,
   createReferenceImage,
+  createSandboxPromotion,
   createScene,
   createShot,
   createWorkspaceSandbox,
@@ -29,6 +30,7 @@ import {
   IMAGE_GEN_STATUSES,
   OUTPUT_REVIEW_STATUSES,
   REFERENCE_TYPES,
+  SANDBOX_PROMOTION_STATUSES,
   SHOT_STATUSES,
   WORKSPACE_SANDBOX_STATUSES
 } from '../src/models.js';
@@ -1612,4 +1614,99 @@ test('assistive planning respects sequence scope and suggests generation', () =>
       (entry) => entry.type === 'recommended asset to generate' && entry.status === 'ready-to-generate'
     )
   );
+});
+
+test('SANDBOX_PROMOTION_STATUSES contains expected values', () => {
+  assert.deepEqual(SANDBOX_PROMOTION_STATUSES, ['pending', 'confirmed', 'rolled_back']);
+});
+
+test('createSandboxPromotion stores all required fields', () => {
+  const project = createProject({ name: 'Projeto Promote' });
+  const sandbox = createWorkspaceSandbox({
+    projectId: project.id,
+    name: 'Sandbox candidato',
+    purpose: 'Direção visual alternativa',
+    status: 'review-ready',
+    snapshot: { scenes: 3, shots: 10, outputs: 5 }
+  });
+  const promo = createSandboxPromotion({
+    projectId: project.id,
+    sandboxId: sandbox.id,
+    sandboxName: sandbox.name,
+    sandboxPurpose: sandbox.purpose,
+    sandboxStatus: sandbox.status,
+    sandboxSnapshot: sandbox.snapshot,
+    targetLabel: 'workspace principal',
+    notes: 'Aprovado pela equipe',
+    impactSummary: '3 cena(s) · 10 shot(s) · 5 output(s)'
+  });
+
+  assert.ok(promo.id);
+  assert.equal(promo.projectId, project.id);
+  assert.equal(promo.sandboxId, sandbox.id);
+  assert.equal(promo.sandboxName, 'Sandbox candidato');
+  assert.equal(promo.sandboxPurpose, 'Direção visual alternativa');
+  assert.equal(promo.sandboxStatus, 'review-ready');
+  assert.deepEqual(promo.sandboxSnapshot, { scenes: 3, shots: 10, outputs: 5 });
+  assert.equal(promo.targetLabel, 'workspace principal');
+  assert.equal(promo.notes, 'Aprovado pela equipe');
+  assert.equal(promo.impactSummary, '3 cena(s) · 10 shot(s) · 5 output(s)');
+  assert.equal(promo.status, 'confirmed');
+  assert.ok(promo.promotedAt);
+});
+
+test('normalizeState includes sandboxPromotions', () => {
+  const project = createProject({ name: 'P' });
+  const sandbox = createWorkspaceSandbox({ projectId: project.id, name: 'SB' });
+  const promo = createSandboxPromotion({
+    projectId: project.id,
+    sandboxId: sandbox.id,
+    sandboxName: sandbox.name,
+    sandboxStatus: sandbox.status
+  });
+  // sanitizeState from store.js exercises normalizeState internally
+  const loaded = sanitizeState({
+    projects: [project],
+    workspaceSandboxes: [sandbox],
+    sandboxPromotions: [promo]
+  });
+  assert.ok(Array.isArray(loaded.sandboxPromotions));
+  assert.equal(loaded.sandboxPromotions.length, 1);
+  assert.equal(loaded.sandboxPromotions[0].sandboxId, sandbox.id);
+});
+
+test('deleteEntity removes sandboxPromotions belonging to deleted project', () => {
+  const project = createProject({ name: 'P to delete' });
+  const otherProject = createProject({ name: 'Other' });
+  const sandbox = createWorkspaceSandbox({ projectId: project.id, name: 'SB' });
+  const promoA = createSandboxPromotion({ projectId: project.id, sandboxId: sandbox.id, sandboxName: 'SB' });
+  const promoB = createSandboxPromotion({ projectId: otherProject.id, sandboxId: 'other-sb', sandboxName: 'Other SB' });
+
+  const result = deleteEntity(
+    {
+      projects: [project, otherProject],
+      books: [],
+      chapters: [],
+      scenes: [],
+      beats: [],
+      shots: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [],
+      canonPromotions: [],
+      decisionHistory: [],
+      workspaceCheckpoints: [],
+      workspaceSandboxes: [sandbox],
+      sandboxPromotions: [promoA, promoB],
+      settings: {}
+    },
+    'project',
+    project.id
+  );
+
+  assert.equal(result.sandboxPromotions.length, 1);
+  assert.equal(result.sandboxPromotions[0].id, promoB.id);
 });

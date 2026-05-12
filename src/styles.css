@@ -850,6 +850,143 @@ select:disabled {
   }
 }
 
+/* =========== Promote / Merge / Commit-to-Main =========== */
+.pm-section {
+  grid-column: 1 / -1;
+}
+
+.pm-flow {
+  display: grid;
+  gap: 12px;
+}
+
+.pm-selector {
+  max-width: 480px;
+}
+
+.pm-summary-panel {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.pm-summary-title {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.pm-summary-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.pm-summary-dl dt {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.pm-summary-dl dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.pm-notes {
+  font-size: 0.82rem;
+  resize: vertical;
+}
+
+.pm-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pm-confirm-btn {
+  background: #1a5c2e;
+  color: #cdecd9;
+  border-color: #2a8c4a;
+}
+
+.pm-confirm-btn:hover {
+  background: #216a35;
+}
+
+.pm-cancel-btn {
+  background: transparent;
+  color: var(--muted);
+}
+
+.pm-status {
+  font-size: 0.82rem;
+  color: #5ecb7c;
+  margin: 0;
+  min-height: 1.2em;
+}
+
+.pm-hidden {
+  display: none !important;
+}
+
+.pm-history {
+  margin-top: 16px;
+}
+
+.pm-history-title {
+  font-size: 0.9rem;
+  margin: 0 0 8px;
+}
+
+.pm-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.pm-history-card {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.pm-history-title {
+  font-size: 0.88rem;
+}
+
+.pm-history-meta,
+.pm-history-impact,
+.pm-history-notes {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.pm-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.sb-promote-btn {
+  font-size: 0.74rem;
+  padding: 4px 8px;
+  background: #1a3d52;
+  color: #9dd8f4;
+  border-color: #2a6080;
+}
+
+.sb-promote-btn:hover {
+  background: #1e4c65;
+}
+
 /* =========== Writer Studio =========== */
 .ws-overlay {
   position: fixed;

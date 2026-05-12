@@ -262,6 +262,39 @@ O app agora inclui uma superfície local-first para experimentar caminhos altern
 
 Este slice entrega valor prático imediato e prepara a fundação para próximos passos de **promote/merge/commit-to-main** sem depender de backend SaaS.
 
+## Promote / Merge / Commit-to-Main Flow (MVP)
+
+O app agora inclui um fluxo local-first para promover um sandbox candidato ao workspace principal, registrando a decisão de forma rastreável:
+
+- seleciona um sandbox existente (com status `exploratory`, `candidate` ou `review-ready`) como candidato à promoção
+- exibe um **resumo compacto de promoção**:
+  - sandbox de origem (nome, propósito, status/readiness)
+  - target (workspace principal do projeto)
+  - impacto por snapshot: cenas, personagens, beats, shots, prompts, outputs, decisões
+  - timestamp do snapshot de referência
+- aceita **notas opcionais** sobre a promoção antes da confirmação
+- fluxo de **confirmação guiada** com botão "Confirmar promoção →" + opção de cancelar
+- registra a promoção em `state.sandboxPromotions` com metadata completa:
+  - `sandboxId`, nome, propósito, status do sandbox de origem
+  - `sandboxSnapshot` no momento da promoção
+  - `targetLabel`, notas, `impactSummary`
+  - `status: 'confirmed'` e `promotedAt`
+- exibe **histórico de promoções** do projeto na mesma superfície
+- botão "Promover →" nos cards de sandbox permite iniciar o fluxo diretamente, com scroll automático para a seção
+- integração com **Workspace Branching / Scenario Sandbox**: sandboxes com status `review-ready` aparecem como candidatos naturais
+
+### Onde se encaixa no fluxo maior
+
+```
+[criar sandbox] → [explorar] → [comparar vs workspace principal] → [confirmar promoção] → [registro rastreável]
+```
+
+Este MVP recovery slice fecha o ciclo decisório básico e estabelece fundação para:
+- resolução de conflitos conceituais em promoções futuras
+- rollback / revert de promoções
+- merge com diff assistido entre sandbox e workspace principal
+- governança de branch health e promoções automáticas baseadas em readiness
+
 ## Approval & Decision History Layer
 
 O app agora registra e navega decisões editoriais/operacionais por item:
