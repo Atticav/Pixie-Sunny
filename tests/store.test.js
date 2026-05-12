@@ -140,6 +140,8 @@ test('store save/load keeps working when primary key write fails', () => {
   });
 
   assert.equal(next.projects[0].name, 'Persistência resiliente');
+  assert.equal(storage.getItem('primary-fails'), null);
+  assert.match(storage.getItem('primary-fails:backup') || '', /Persistência resiliente/);
   const loaded = store.load();
   assert.equal(loaded.projects.length, 1);
   assert.equal(loaded.projects[0].name, 'Persistência resiliente');

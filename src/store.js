@@ -44,7 +44,7 @@ export const createStore = ({ key = 'pixieSunnyStudio', storage } = {}) => {
       try {
         db.setItem(key, JSON.stringify(backup));
       } catch {
-        // Could fail due quota/restricted storage; keep in-memory recovered state.
+        // Could fail due to quota/restricted storage; keep in-memory recovered state.
       }
       return backup;
     }

@@ -3063,7 +3063,7 @@ refs.sandboxRefreshBtn?.addEventListener('click', () => {
   if (!projectId || !sandboxCompareId) return;
   const sandbox = projectWorkspaceSandboxes().find((entry) => entry.id === sandboxCompareId);
   if (!sandbox) {
-    refs.sandboxSummary.textContent = 'Sandbox selecionado não pertence ao projeto atual.';
+    refs.sandboxSummary.textContent = 'Sandbox selecionado não pertence ao projeto atual. Selecione um sandbox deste projeto ou troque o projeto ativo.';
     return;
   }
   sandbox.snapshot = snapshotProjectState(projectId);
@@ -3180,7 +3180,7 @@ refs.pmConfirmBtn?.addEventListener('click', () => {
       impactSummary
     })
   ) {
-    refs.pmStatus.textContent = 'Promoção já registrada com o mesmo contexto. Ajuste notas/estado antes de confirmar novamente.';
+    refs.pmStatus.textContent = 'Promoção já registrada com o mesmo resumo e notas. Atualize as notas ou o conteúdo do sandbox antes de confirmar novamente.';
     return;
   }
   if (!state.sandboxPromotions) state.sandboxPromotions = [];
@@ -3390,7 +3390,7 @@ refs.pcDownloadBtn?.addEventListener('click', () => {
     return;
   }
   if (productionClosureLastExport.projectId && productionClosureLastExport.projectId !== projectId) {
-    if (refs.pcStatus) refs.pcStatus.textContent = 'O último closure export pertence a outro projeto. Gere um export deste projeto antes de baixar.';
+    if (refs.pcStatus) refs.pcStatus.textContent = 'Closure export pertence a outro projeto. Gere um novo export antes de baixar.';
     return;
   }
   downloadFile(productionClosureLastExport.filename, productionClosureLastExport.content, 'application/json');
