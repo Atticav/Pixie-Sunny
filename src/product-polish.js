@@ -83,7 +83,7 @@ export const buildClosureExportStatusMessage = ({
   blockers = 0,
   warnings = 0
 }) => {
-  const suffix = `blockers=${blockers} · warnings=${warnings}`;
+  const suffix = `bloqueadores=${blockers} · avisos=${warnings}`;
   if (!filename) return `Resumo de closure gerado (${suffix})`;
   return `Resumo de closure gerado: ${filename} (${suffix})`;
 };

@@ -116,6 +116,6 @@ test('buildClosureExportStatusMessage reports blockers and warnings count', () =
       blockers: 2,
       warnings: 1
     }),
-    'Resumo de closure gerado: closure.json (blockers=2 · warnings=1)'
+    'Resumo de closure gerado: closure.json (bloqueadores=2 · avisos=1)'
   );
 });
