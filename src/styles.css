@@ -450,6 +450,215 @@ select:disabled {
   padding: 10px;
 }
 
+/* =========== Workflow Recipes / Guided Playbooks =========== */
+.wr-section {
+  grid-column: 1 / -1;
+}
+
+.wr-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.wr-recipe-list {
+  display: grid;
+  gap: 8px;
+}
+
+.wr-recipe-card {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  transition: border-color 0.15s;
+}
+
+.wr-recipe-card:hover {
+  border-color: var(--accent);
+}
+
+.wr-recipe-card.wr-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent), transparent 60%);
+}
+
+.wr-recipe-title {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.wr-recipe-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.wr-badge {
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #1e2d44;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.wr-badge-complete {
+  background: #1a3a2a;
+  color: #6be88a;
+}
+
+.wr-badge-in_progress {
+  background: #2a2a14;
+  color: #d4c264;
+}
+
+.wr-badge-not_started {
+  background: #1e2d44;
+  color: var(--muted);
+}
+
+.wr-detail {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+}
+
+.wr-detail-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.wr-detail-header {
+  display: grid;
+  gap: 4px;
+}
+
+.wr-detail-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.wr-detail-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.wr-detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wr-detail-actions button {
+  font-size: 0.78rem;
+  padding: 5px 9px;
+}
+
+.wr-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.wr-step {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #121824;
+}
+
+.wr-step-done {
+  opacity: 0.6;
+}
+
+.wr-step-current {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent), transparent 93%);
+}
+
+.wr-step-pending {
+  opacity: 0.75;
+}
+
+.wr-step-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: #1e2d44;
+  color: var(--muted);
+}
+
+.wr-step-done .wr-step-icon {
+  background: #1a3a2a;
+  color: #6be88a;
+}
+
+.wr-step-current .wr-step-icon {
+  background: color-mix(in srgb, var(--accent), transparent 60%);
+  color: var(--text);
+}
+
+.wr-step-body {
+  display: grid;
+  gap: 4px;
+}
+
+.wr-step-label {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.wr-step-rationale {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.wr-step-footer {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.wr-step-footer button {
+  font-size: 0.72rem;
+  padding: 3px 7px;
+}
+
+@media (max-width: 900px) {
+  .wr-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* =========== Writer Studio =========== */
 .ws-overlay {
   position: fixed;

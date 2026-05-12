@@ -55,7 +55,14 @@ import {
   saveExportToWorkspace,
   saveReferenceFileToWorkspace
 } from './local-workspace.js';
-import { runImageGeneration } from './pipelines.js';
+import {
+  WORKFLOW_RECIPES,
+  buildRecipeProgress,
+  buildRecipesSummary,
+  getRecipeById,
+  markStepDone,
+  resetRecipeProgress
+} from './workflow-recipes.js';
 
 const store = createStore();
 let state = store.load();
@@ -157,7 +164,9 @@ const refs = {
   reviewInboxList: $('reviewInboxList'),
   reviewInboxSelectAll: $('reviewInboxSelectAll'),
   reviewInboxBatchAction: $('reviewInboxBatchAction'),
-  reviewInboxRunBatchBtn: $('reviewInboxRunBatchBtn')
+  reviewInboxRunBatchBtn: $('reviewInboxRunBatchBtn'),
+  wrRecipeList: $('wrRecipeList'),
+  wrDetail: $('wrDetail')
 };
 
 const SHOT_TEMPLATES = [
@@ -6095,5 +6104,212 @@ document.addEventListener('keydown', (event) => {
   if (isInput) return;
   closeImageReviewStudio();
 });
+
+// =========== Workflow Recipes / Guided Playbooks ===========
+
+let wrActiveRecipeId = null;
+// stepProgress is stored in memory (not persisted across sessions) for MVP.
+// A future PR can persist this in state / store.
+let wrStepProgress = [];
+
+const wrStatusLabel = (status) => {
+  if (status === 'complete') return '✓ Completo';
+  if (status === 'in_progress') return '▶ Em progresso';
+  return '· Não iniciado';
+};
+
+const wrRenderRecipeList = () => {
+  if (!refs.wrRecipeList) return;
+  const summary = buildRecipesSummary(wrStepProgress);
+  refs.wrRecipeList.innerHTML = '';
+  summary.forEach(({ id, title, recipeStatus, completedSteps, totalSteps }) => {
+    const card = document.createElement('article');
+    card.className = `wr-recipe-card${wrActiveRecipeId === id ? ' wr-active' : ''}`;
+    card.dataset.recipeId = id;
+
+    const titleEl = document.createElement('strong');
+    titleEl.className = 'wr-recipe-title';
+    titleEl.textContent = title;
+
+    const meta = document.createElement('div');
+    meta.className = 'wr-recipe-meta';
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `wr-badge wr-badge-${recipeStatus}`;
+    statusBadge.textContent = wrStatusLabel(recipeStatus);
+
+    const progressBadge = document.createElement('span');
+    progressBadge.className = 'wr-badge';
+    progressBadge.textContent = `${completedSteps}/${totalSteps} etapas`;
+
+    meta.append(statusBadge, progressBadge);
+    card.append(titleEl, meta);
+    refs.wrRecipeList.append(card);
+  });
+};
+
+const wrScrollToTarget = (selector) => {
+  if (!selector) return;
+  try {
+    const el = document.querySelector(selector);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch {
+    // ignore invalid selectors
+  }
+};
+
+const wrRunQuickAction = (action) => {
+  if (action === 'scroll-project') {
+    document.querySelector('section:has(#projectSelect)')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (action === 'scroll-characters') {
+    document.querySelector('section:has(#characterSelect)')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (action === 'scroll-lore') {
+    document.querySelector('section:has(#loreSelect)')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (action === 'scroll-scenes') {
+    document.querySelector('section:has(#sceneSelect)')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (action === 'scroll-review-inbox') {
+    document.querySelector('.ri-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (action === 'scroll-assistive') {
+    document.querySelector('.ap-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (action === 'scroll-diff-viewer') {
+    document.querySelector('.dv-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (action === 'open-shot-planner') {
+    document.querySelector('.sp-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (action === 'open-image-gen') {
+    openImageGenStudio();
+  } else if (action === 'open-image-review') {
+    openImageReviewStudio();
+  } else if (action === 'export-json') {
+    $('exportDataBtn')?.click();
+  }
+};
+
+const wrRenderDetail = () => {
+  if (!refs.wrDetail) return;
+  const recipe = wrActiveRecipeId ? getRecipeById(wrActiveRecipeId) : null;
+  if (!recipe) {
+    refs.wrDetail.innerHTML = '<p class="wr-detail-empty">Selecione um playbook para ver as etapas guiadas.</p>';
+    return;
+  }
+
+  const { steps } = buildRecipeProgress(recipe, wrStepProgress);
+
+  refs.wrDetail.innerHTML = '';
+
+  const header = document.createElement('div');
+  header.className = 'wr-detail-header';
+  const title = document.createElement('h3');
+  title.className = 'wr-detail-title';
+  title.textContent = recipe.title;
+  const desc = document.createElement('p');
+  desc.className = 'wr-detail-description';
+  desc.textContent = recipe.description;
+  header.append(title, desc);
+
+  const actions = document.createElement('div');
+  actions.className = 'wr-detail-actions';
+  const resetBtn = document.createElement('button');
+  resetBtn.textContent = '↺ Reiniciar progresso';
+  resetBtn.dataset.action = 'reset';
+  actions.append(resetBtn);
+
+  const stepsEl = document.createElement('div');
+  stepsEl.className = 'wr-steps';
+
+  steps.forEach((step, index) => {
+    const item = document.createElement('div');
+    item.className = `wr-step wr-step-${step.status}`;
+    item.dataset.stepId = step.id;
+
+    const icon = document.createElement('div');
+    icon.className = 'wr-step-icon';
+    icon.textContent = step.status === 'done' ? '✓' : step.status === 'skipped' ? '–' : String(index + 1);
+
+    const body = document.createElement('div');
+    body.className = 'wr-step-body';
+
+    const label = document.createElement('strong');
+    label.className = 'wr-step-label';
+    label.textContent = step.label;
+
+    const rationale = document.createElement('p');
+    rationale.className = 'wr-step-rationale';
+    rationale.textContent = step.rationale;
+
+    const footer = document.createElement('div');
+    footer.className = 'wr-step-footer';
+
+    if (step.status === 'current') {
+      if (step.quickAction) {
+        const goBtn = document.createElement('button');
+        goBtn.textContent = '→ Ir para';
+        goBtn.dataset.action = 'go';
+        goBtn.dataset.quickAction = step.quickAction;
+        goBtn.dataset.scrollTarget = step.scrollTarget || '';
+        footer.append(goBtn);
+      }
+      const doneBtn = document.createElement('button');
+      doneBtn.textContent = '✓ Marcar como feito';
+      doneBtn.dataset.action = 'done';
+      footer.append(doneBtn);
+    } else if (step.status === 'done') {
+      const undoBtn = document.createElement('button');
+      undoBtn.textContent = '↩ Desfazer';
+      undoBtn.dataset.action = 'undo';
+      footer.append(undoBtn);
+    }
+
+    body.append(label, rationale, footer);
+    item.append(icon, body);
+    stepsEl.append(item);
+  });
+
+  refs.wrDetail.append(header, actions, stepsEl);
+};
+
+const wrRender = () => {
+  wrRenderRecipeList();
+  wrRenderDetail();
+};
+
+if (refs.wrRecipeList) {
+  refs.wrRecipeList.addEventListener('click', (event) => {
+    const card = event.target.closest('.wr-recipe-card[data-recipe-id]');
+    if (!card) return;
+    wrActiveRecipeId = card.dataset.recipeId;
+    wrRender();
+  });
+}
+
+if (refs.wrDetail) {
+  refs.wrDetail.addEventListener('click', (event) => {
+    const btn = event.target.closest('button[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const step = btn.closest('.wr-step[data-step-id]');
+
+    if (action === 'reset' && wrActiveRecipeId) {
+      wrStepProgress = resetRecipeProgress(wrActiveRecipeId, wrStepProgress);
+      wrRender();
+      return;
+    }
+    if (!step) return;
+    const stepId = step.dataset.stepId;
+    if (action === 'done' && wrActiveRecipeId) {
+      wrStepProgress = markStepDone(wrActiveRecipeId, stepId, wrStepProgress);
+      wrRender();
+    } else if (action === 'undo' && wrActiveRecipeId) {
+      wrStepProgress = wrStepProgress.filter((p) => p.stepId !== stepId);
+      wrRender();
+    } else if (action === 'go') {
+      const quickAction = btn.dataset.quickAction;
+      const scrollTarget = btn.dataset.scrollTarget;
+      if (quickAction) wrRunQuickAction(quickAction);
+      else if (scrollTarget) wrScrollToTarget(scrollTarget);
+    }
+  });
+}
+
+wrRender();
 
 render();
