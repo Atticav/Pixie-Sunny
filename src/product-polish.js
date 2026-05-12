@@ -1,4 +1,4 @@
-const pluralize = (count, singular, plural) => (count === 1 ? singular : plural);
+const selectForm = (count, singular, plural) => (count === 1 ? singular : plural);
 
 export const buildProjectCollectionSummary = ({
   count = 0,
@@ -11,7 +11,7 @@ export const buildProjectCollectionSummary = ({
   if (count <= 0) {
     return `${emptyMessage} Próximo passo: ${nextStepWhenEmpty}`;
   }
-  return `${count} ${pluralize(count, singular, plural)} local-first neste projeto. Próximo passo: ${nextStepWhenPopulated}`;
+  return `${count} ${selectForm(count, singular, plural)} local-first neste projeto. Próximo passo: ${nextStepWhenPopulated}`;
 };
 
 export const buildReviewInboxSummary = ({
