@@ -1,6 +1,55 @@
 const safeArray = (value) => (Array.isArray(value) ? value : []);
 const safeString = (value) => (typeof value === 'string' ? value : '');
 
+export const REVIEW_INBOX_TYPE_LABELS = {
+  human_review: 'Revisão humana',
+  stale_needs_refresh: 'Item stale / refresh',
+  diff_review: 'Comparar variantes / diff',
+  blocked_shot: 'Shot bloqueado',
+  readiness_risk: 'Risco de readiness',
+  automation_confirmation: 'Sinal de automação',
+  decision_follow_up: 'Follow-up editorial',
+  operational_signal: 'Sinal operacional'
+};
+
+export const REVIEW_INBOX_STATUS_LABELS = {
+  pending_review: 'Aguardando review',
+  blocked: 'Bloqueado',
+  needs_refresh: 'Precisa refresh'
+};
+
+export const REVIEW_INBOX_PRIORITY_LABELS = {
+  high: 'alta',
+  medium: 'média',
+  low: 'baixa'
+};
+
+export const REVIEW_INBOX_RISK_LABELS = {
+  high: 'alto',
+  medium: 'médio',
+  low: 'baixo'
+};
+
+export const REVIEW_INBOX_ENTITY_LABELS = {
+  asset: 'asset',
+  scene: 'cena',
+  shot: 'shot',
+  chapter: 'capítulo',
+  sequence: 'sequência',
+  project: 'projeto'
+};
+
+export const REVIEW_INBOX_ACTION_LABELS = {
+  approve: 'Aprovar',
+  reject: 'Rejeitar',
+  defer: 'Adiar',
+  'mark-refresh': 'Marcar refresh',
+  'open-diff': 'Abrir Diff Viewer',
+  'open-lineage': 'Abrir lineage',
+  'open-source-entity': 'Abrir contexto',
+  'navigate-related-context': 'Navegar contexto'
+};
+
 const toTimestamp = (value) => {
   const time = Date.parse(value || '');
   return Number.isFinite(time) ? time : 0;
@@ -320,4 +369,17 @@ export const groupReviewInboxItems = (items, groupBy = 'type') => {
     label: key,
     items: groupedItems
   }));
+};
+
+export const formatReviewInboxGroupLabel = (groupBy, key) => {
+  const value = safeString(key) || 'outros';
+  if ((groupBy || 'type') === 'type') return REVIEW_INBOX_TYPE_LABELS[value] || value;
+  if (groupBy === 'status') return REVIEW_INBOX_STATUS_LABELS[value] || value;
+  if (groupBy === 'priority') return `Prioridade ${REVIEW_INBOX_PRIORITY_LABELS[value] || value}`;
+  if (groupBy === 'risk') return `Risco ${REVIEW_INBOX_RISK_LABELS[value] || value}`;
+  if (groupBy === 'entity') return REVIEW_INBOX_ENTITY_LABELS[value] || value;
+  if (groupBy === 'sceneId') return value === 'outros' ? 'Sem cena vinculada' : `Cena ${value}`;
+  if (groupBy === 'chapterId') return value === 'outros' ? 'Sem capítulo vinculado' : `Capítulo ${value}`;
+  if (groupBy === 'source') return value;
+  return value;
 };

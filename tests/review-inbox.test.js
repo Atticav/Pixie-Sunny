@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildReviewInboxItems, applyReviewInboxFiltersAndSort, groupReviewInboxItems } from '../src/review-inbox.js';
+import {
+  applyReviewInboxFiltersAndSort,
+  buildReviewInboxItems,
+  formatReviewInboxGroupLabel,
+  groupReviewInboxItems
+} from '../src/review-inbox.js';
 
 const baseState = {
   projects: [{ id: 'p1', name: 'Projeto 1' }],
@@ -127,4 +132,10 @@ test('groupReviewInboxItems groups by selected field', () => {
 
   assert.ok(keys.includes('high') || keys.includes('medium') || keys.includes('low'));
   assert.ok(grouped.every((entry) => Array.isArray(entry.items)));
+});
+
+test('formatReviewInboxGroupLabel returns user-facing labels', () => {
+  assert.equal(formatReviewInboxGroupLabel('type', 'diff_review'), 'Comparar variantes / diff');
+  assert.equal(formatReviewInboxGroupLabel('status', 'pending_review'), 'Aguardando review');
+  assert.equal(formatReviewInboxGroupLabel('priority', 'high'), 'Prioridade alta');
 });

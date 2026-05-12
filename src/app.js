@@ -50,7 +50,13 @@ import { buildDiffSummary, buildLineDiff, buildMetadataDiff, buildSemanticHighli
 import {
   applyReviewInboxFiltersAndSort,
   buildReviewInboxItems,
-  groupReviewInboxItems
+  formatReviewInboxGroupLabel,
+  groupReviewInboxItems,
+  REVIEW_INBOX_ACTION_LABELS,
+  REVIEW_INBOX_PRIORITY_LABELS,
+  REVIEW_INBOX_RISK_LABELS,
+  REVIEW_INBOX_STATUS_LABELS,
+  REVIEW_INBOX_TYPE_LABELS
 } from './review-inbox.js';
 import {
   initializeLocalWorkspace,
@@ -68,6 +74,12 @@ import {
   markStepDone,
   resetRecipeProgress
 } from './workflow-recipes.js';
+import {
+  buildPreflightStatusMessage,
+  buildProjectCollectionSummary,
+  buildPromotionGuidance,
+  buildReviewInboxSummary
+} from './product-polish.js';
 
 const store = createStore();
 let state = store.load();
@@ -77,6 +89,10 @@ const newClientId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.floor(Math.random() * 1e9)}-${Math.floor(Math.random() * 1e6)}`;
+
+const scrollToSelector = (selector) => {
+  document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 
 const refs = {
   projectSelect: $('projectSelect'),
@@ -165,6 +181,10 @@ const refs = {
   reviewInboxSaveViewBtn: $('reviewInboxSaveViewBtn'),
   reviewInboxDeleteViewBtn: $('reviewInboxDeleteViewBtn'),
   reviewInboxApplyBtn: $('reviewInboxApplyBtn'),
+  reviewInboxOpenDiffBtn: $('reviewInboxOpenDiffBtn'),
+  reviewInboxOpenReadinessBtn: $('reviewInboxOpenReadinessBtn'),
+  reviewInboxOpenRecipesBtn: $('reviewInboxOpenRecipesBtn'),
+  reviewInboxOpenClosureBtn: $('reviewInboxOpenClosureBtn'),
   reviewInboxSummary: $('reviewInboxSummary'),
   reviewInboxList: $('reviewInboxList'),
   reviewInboxSelectAll: $('reviewInboxSelectAll'),
@@ -187,6 +207,8 @@ const refs = {
   checkpointOpenDecisionsBtn: $('checkpointOpenDecisionsBtn'),
   checkpointOpenReadinessBtn: $('checkpointOpenReadinessBtn'),
   checkpointOpenInboxBtn: $('checkpointOpenInboxBtn'),
+  checkpointOpenSandboxBtn: $('checkpointOpenSandboxBtn'),
+  checkpointOpenRecipesBtn: $('checkpointOpenRecipesBtn'),
   sandboxName: $('sandboxName'),
   sandboxPurpose: $('sandboxPurpose'),
   sandboxStatus: $('sandboxStatus'),
@@ -200,11 +222,14 @@ const refs = {
   sandboxCompareDiff: $('sandboxCompareDiff'),
   sandboxOpenDiffBtn: $('sandboxOpenDiffBtn'),
   sandboxOpenDecisionsBtn: $('sandboxOpenDecisionsBtn'),
+  sandboxOpenReadinessBtn: $('sandboxOpenReadinessBtn'),
   sandboxOpenInboxBtn: $('sandboxOpenInboxBtn'),
   sandboxOpenRecipesBtn: $('sandboxOpenRecipesBtn'),
   sandboxOpenCheckpointsBtn: $('sandboxOpenCheckpointsBtn'),
+  sandboxOpenClosureBtn: $('sandboxOpenClosureBtn'),
   sandboxRefreshBtn: $('sandboxRefreshBtn'),
   pmSandboxSelect: $('pmSandboxSelect'),
+  pmGuidance: $('pmGuidance'),
   pmSummaryPanel: $('pmSummaryPanel'),
   pmSummaryDl: $('pmSummaryDl'),
   pmNotes: $('pmNotes'),
@@ -212,6 +237,10 @@ const refs = {
   pmCancelBtn: $('pmCancelBtn'),
   pmStatus: $('pmStatus'),
   pmHistoryList: $('pmHistoryList'),
+  pmOpenSandboxBtn: $('pmOpenSandboxBtn'),
+  pmOpenInboxBtn: $('pmOpenInboxBtn'),
+  pmOpenCheckpointsBtn: $('pmOpenCheckpointsBtn'),
+  pmOpenClosureBtn: $('pmOpenClosureBtn'),
   pcReadyList: $('pcReadyList'),
   pcWarningList: $('pcWarningList'),
   pcBlockerList: $('pcBlockerList'),
@@ -225,6 +254,7 @@ const refs = {
   pcGenerateBtn: $('pcGenerateBtn'),
   pcDownloadBtn: $('pcDownloadBtn'),
   pcStatus: $('pcStatus'),
+  pcPreflightSummary: $('pcPreflightSummary'),
   pcHistoryList: $('pcHistoryList'),
   pcExportPreview: $('pcExportPreview'),
   pcOpenReadinessBtn: $('pcOpenReadinessBtn'),
@@ -1379,7 +1409,11 @@ const reviewInboxRow = (item, index) => {
   title.textContent = item.title;
   const chips = document.createElement('span');
   chips.className = 'ri-item-chips';
-  chips.textContent = `${item.type} · ${item.priority} · risco ${item.risk} · ${item.status}`;
+  chips.textContent =
+    `${REVIEW_INBOX_TYPE_LABELS[item.type] || item.type}` +
+    ` · prioridade ${REVIEW_INBOX_PRIORITY_LABELS[item.priority] || item.priority}` +
+    ` · risco ${REVIEW_INBOX_RISK_LABELS[item.risk] || item.risk}` +
+    ` · ${REVIEW_INBOX_STATUS_LABELS[item.status] || item.status}`;
   head.append(title, chips);
 
   const reason = document.createElement('p');
@@ -1407,7 +1441,7 @@ const reviewInboxRow = (item, index) => {
     btn.type = 'button';
     btn.dataset.action = action.id;
     btn.dataset.itemId = item.id;
-    btn.textContent = action.label;
+    btn.textContent = REVIEW_INBOX_ACTION_LABELS[action.id] || action.label;
     actions.append(btn);
   });
   if (!(item.entity === 'asset' || item.outputId)) {
@@ -1460,8 +1494,24 @@ const renderReviewInbox = () => {
   const filters = reviewInboxFilters();
   const filtered = applyReviewInboxFiltersAndSort(reviewInboxItems, filters);
   const groups = groupReviewInboxItems(filtered, filters.groupBy || 'type');
+  const hasActiveFilters = Boolean(
+    filters.type ||
+    filters.priority ||
+    filters.risk ||
+    filters.status ||
+    filters.entity ||
+    filters.chapterId ||
+    filters.sceneId ||
+    filters.query
+  );
 
-  refs.reviewInboxSummary.textContent = `${filtered.length}/${reviewInboxItems.length} itens acionáveis · MacBook local-first · sem backend SaaS`;
+  refs.reviewInboxSummary.textContent = buildReviewInboxSummary({
+    filteredCount: filtered.length,
+    totalCount: reviewInboxItems.length,
+    blockedCount: reviewInboxItems.filter((item) => item.status === 'blocked').length,
+    highRiskCount: reviewInboxItems.filter((item) => item.risk === 'high').length,
+    hasActiveFilters
+  });
   refs.reviewInboxList.innerHTML = '';
   reviewInboxSelectedItemIds = new Set([...reviewInboxSelectedItemIds].filter((id) => filtered.some((item) => item.id === id)));
   refs.reviewInboxSelectAll.checked = filtered.length > 0 && filtered.every((item) => reviewInboxSelectedItemIds.has(item.id));
@@ -1477,7 +1527,7 @@ const renderReviewInbox = () => {
     section.className = 'ri-group';
     const header = document.createElement('h4');
     header.className = 'ri-group-title';
-    header.textContent = `${group.label} (${group.items.length})`;
+    header.textContent = `${formatReviewInboxGroupLabel(filters.groupBy || 'type', group.key)} (${group.items.length})`;
     section.append(header);
     group.items.forEach((item) => {
       section.append(reviewInboxRow(item, rowIndex));
@@ -1570,7 +1620,14 @@ const renderWorkspaceSandboxes = () => {
   }
 
   const sandboxes = projectWorkspaceSandboxes();
-  refs.sandboxSummary.textContent = `${sandboxes.length} sandbox(es) local-first neste projeto.`;
+  refs.sandboxSummary.textContent = buildProjectCollectionSummary({
+    count: sandboxes.length,
+    singular: 'sandbox',
+    plural: 'sandboxes',
+    emptyMessage: 'Nenhum sandbox criado ainda neste projeto.',
+    nextStepWhenEmpty: 'crie um sandbox para explorar uma alternativa antes de promover para o workspace principal',
+    nextStepWhenPopulated: 'compare um candidato com o workspace principal, valide o diff e envie para Promote / Merge quando estiver pronto'
+  });
   refs.sandboxList.innerHTML = '';
 
   if (!sandboxes.length) {
@@ -1749,6 +1806,7 @@ let pmSelectedSandboxId = '';
 const renderSandboxPromoteSection = () => {
   if (!refs.pmSandboxSelect || !refs.pmHistoryList) return;
   const projectId = selectedProjectId();
+  const sandboxes = projectWorkspaceSandboxes();
 
   renderOptionsWithBlank(
     refs.pmSandboxSelect,
@@ -1758,7 +1816,14 @@ const renderSandboxPromoteSection = () => {
   );
   pmSelectedSandboxId = refs.pmSandboxSelect?.value || '';
 
-  const sandbox = projectWorkspaceSandboxes().find((entry) => entry.id === pmSelectedSandboxId) || null;
+  const sandbox = sandboxes.find((entry) => entry.id === pmSelectedSandboxId) || null;
+  if (refs.pmGuidance) {
+    refs.pmGuidance.textContent = buildPromotionGuidance({
+      hasProject: Boolean(projectId),
+      sandboxCount: sandboxes.length,
+      selectedSandboxName: sandbox?.name || ''
+    });
+  }
 
   if (!sandbox || !refs.pmSummaryPanel) {
     refs.pmSummaryPanel?.classList.add('pm-hidden');
@@ -1986,6 +2051,7 @@ const renderProductionClosureSection = () => {
     refs.pcCompositionList.innerHTML = '<p class="pc-empty">Sem composição ativa.</p>';
     refs.pcHistoryList.innerHTML = '<p class="pc-empty">Nenhum fechamento registrado.</p>';
     refs.pcExportPreview.textContent = 'Selecione um projeto para gerar o resumo de export.';
+    if (refs.pcPreflightSummary) refs.pcPreflightSummary.textContent = 'Selecione um projeto para rodar o preflight final.';
     return;
   }
 
@@ -1993,6 +2059,7 @@ const renderProductionClosureSection = () => {
   const includes = closureIncludesFromUi();
   const composition = buildProductionClosureComposition(preflight, includes);
   const history = projectProductionClosures();
+  if (refs.pcPreflightSummary) refs.pcPreflightSummary.textContent = buildPreflightStatusMessage(preflight.summary);
 
   const renderList = (target, items, emptyLabel) => {
     if (!target) return;
@@ -2068,7 +2135,14 @@ const renderWorkspaceCheckpoints = () => {
   }
 
   const checkpoints = projectWorkspaceCheckpoints();
-  refs.checkpointSummary.textContent = `${checkpoints.length} checkpoint(s) local-first neste projeto.`;
+  refs.checkpointSummary.textContent = buildProjectCollectionSummary({
+    count: checkpoints.length,
+    singular: 'checkpoint',
+    plural: 'checkpoints',
+    emptyMessage: 'Nenhum checkpoint criado ainda neste projeto.',
+    nextStepWhenEmpty: 'salve um checkpoint antes de mudanças sensíveis ou antes do closure export',
+    nextStepWhenPopulated: 'compare um checkpoint com o estado atual para validar progresso, risco e prontidão do handoff'
+  });
   refs.checkpointList.innerHTML = '';
 
   if (!checkpoints.length) {
@@ -3005,15 +3079,23 @@ refs.sandboxOpenDecisionsBtn?.addEventListener('click', () => {
 });
 
 refs.sandboxOpenInboxBtn?.addEventListener('click', () => {
-  document.querySelector('.ri-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.ri-section');
 });
 
 refs.sandboxOpenRecipesBtn?.addEventListener('click', () => {
-  document.querySelector('.wr-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.wr-section');
 });
 
 refs.sandboxOpenCheckpointsBtn?.addEventListener('click', () => {
-  document.querySelector('.sc-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.sc-section');
+});
+
+refs.sandboxOpenReadinessBtn?.addEventListener('click', () => {
+  scrollToSelector('.ap-section');
+});
+
+refs.sandboxOpenClosureBtn?.addEventListener('click', () => {
+  scrollToSelector('.pc-section');
 });
 
 refs.checkpointList?.addEventListener('click', (event) => {
@@ -3042,11 +3124,19 @@ refs.checkpointOpenDecisionsBtn?.addEventListener('click', () => {
 });
 
 refs.checkpointOpenReadinessBtn?.addEventListener('click', () => {
-  document.querySelector('.ap-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.ap-section');
 });
 
 refs.checkpointOpenInboxBtn?.addEventListener('click', () => {
-  document.querySelector('.ri-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.ri-section');
+});
+
+refs.checkpointOpenSandboxBtn?.addEventListener('click', () => {
+  scrollToSelector('.sb-section');
+});
+
+refs.checkpointOpenRecipesBtn?.addEventListener('click', () => {
+  scrollToSelector('.wr-section');
 });
 
 // =========== Promote / Merge / Commit-to-Main ===========
@@ -3094,6 +3184,40 @@ refs.pmConfirmBtn?.addEventListener('click', () => {
   persist();
 });
 
+refs.pmOpenSandboxBtn?.addEventListener('click', () => {
+  scrollToSelector('.sb-section');
+});
+
+refs.pmOpenInboxBtn?.addEventListener('click', () => {
+  scrollToSelector('.ri-section');
+});
+
+refs.pmOpenCheckpointsBtn?.addEventListener('click', () => {
+  scrollToSelector('.sc-section');
+});
+
+refs.pmOpenClosureBtn?.addEventListener('click', () => {
+  scrollToSelector('.pc-section');
+});
+
+refs.reviewInboxOpenDiffBtn?.addEventListener('click', () => {
+  if (!selectedProjectId()) return;
+  openImageReviewStudio();
+  irsSwitchTab('compare');
+});
+
+refs.reviewInboxOpenReadinessBtn?.addEventListener('click', () => {
+  scrollToSelector('.ap-section');
+});
+
+refs.reviewInboxOpenRecipesBtn?.addEventListener('click', () => {
+  scrollToSelector('.wr-section');
+});
+
+refs.reviewInboxOpenClosureBtn?.addEventListener('click', () => {
+  scrollToSelector('.pc-section');
+});
+
 [
   refs.pcIncludeReadiness,
   refs.pcIncludeInbox,
@@ -3107,23 +3231,23 @@ refs.pmConfirmBtn?.addEventListener('click', () => {
 }));
 
 refs.pcOpenReadinessBtn?.addEventListener('click', () => {
-  document.querySelector('.ap-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.ap-section');
 });
 
 refs.pcOpenInboxBtn?.addEventListener('click', () => {
-  document.querySelector('.ri-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.ri-section');
 });
 
 refs.pcOpenSandboxBtn?.addEventListener('click', () => {
-  document.querySelector('.sb-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.sb-section');
 });
 
 refs.pcOpenPromoteBtn?.addEventListener('click', () => {
-  document.querySelector('.pm-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.pm-section');
 });
 
 refs.pcOpenCheckpointsBtn?.addEventListener('click', () => {
-  document.querySelector('.sc-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToSelector('.sc-section');
 });
 
 refs.pcGenerateBtn?.addEventListener('click', async () => {
@@ -7273,21 +7397,29 @@ const wrScrollToTarget = (selector) => {
 
 const wrRunQuickAction = (action) => {
   if (action === 'scroll-project') {
-    document.querySelector('section:has(#projectSelect)')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSelector('section:has(#projectSelect)');
   } else if (action === 'scroll-characters') {
-    document.querySelector('section:has(#characterSelect)')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSelector('section:has(#characterSelect)');
   } else if (action === 'scroll-lore') {
-    document.querySelector('section:has(#loreSelect)')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSelector('section:has(#loreSelect)');
   } else if (action === 'scroll-scenes') {
-    document.querySelector('section:has(#sceneSelect)')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSelector('section:has(#sceneSelect)');
   } else if (action === 'scroll-review-inbox') {
-    document.querySelector('.ri-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSelector('.ri-section');
   } else if (action === 'scroll-assistive') {
-    document.querySelector('.ap-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSelector('.ap-section');
   } else if (action === 'scroll-diff-viewer') {
-    document.querySelector('.dv-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSelector('.dv-section');
+  } else if (action === 'scroll-sandbox') {
+    scrollToSelector('.sb-section');
+  } else if (action === 'scroll-promote') {
+    scrollToSelector('.pm-section');
+  } else if (action === 'scroll-checkpoints') {
+    scrollToSelector('.sc-section');
+  } else if (action === 'scroll-closure') {
+    scrollToSelector('.pc-section');
   } else if (action === 'open-shot-planner') {
-    document.querySelector('.sp-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSelector('.sp-section');
   } else if (action === 'open-image-gen') {
     openImageGenStudio();
   } else if (action === 'open-image-review') {

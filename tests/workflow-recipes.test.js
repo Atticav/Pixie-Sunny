@@ -13,9 +13,9 @@ import {
 
 // ── constants ──────────────────────────────────────────────────────────────
 
-test('WORKFLOW_RECIPES contains at least 3 recipes', () => {
+test('WORKFLOW_RECIPES contains at least 4 recipes', () => {
   assert.ok(Array.isArray(WORKFLOW_RECIPES));
-  assert.ok(WORKFLOW_RECIPES.length >= 3);
+  assert.ok(WORKFLOW_RECIPES.length >= 4);
 });
 
 test('every recipe has required fields', () => {
@@ -51,6 +51,13 @@ test('getRecipeById returns recipe for known id', () => {
   const recipe = getRecipeById('nova-cena');
   assert.ok(recipe);
   assert.equal(recipe.id, 'nova-cena');
+});
+
+test('getRecipeById returns the sandbox-to-closure playbook', () => {
+  const recipe = getRecipeById('sandbox-closure');
+  assert.ok(recipe);
+  assert.equal(recipe.steps.length, 6);
+  assert.equal(recipe.steps.at(-1).quickAction, 'scroll-closure');
 });
 
 test('getRecipeById returns null for unknown id', () => {

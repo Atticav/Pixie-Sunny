@@ -338,6 +338,15 @@ Este slice fecha o fluxo operacional ponta a ponta no nível MVP:
 Com essa base, evoluções futuras podem adicionar:
 - empacotamento multi-arquivo (assets + manifests)
 - validações mais estritas por tipo de entrega
+
+## Product Polish + UX Consistency Pass
+
+Passo de acabamento focado para deixar as superfícies operacionais mais coesas sem redesenhar o produto:
+
+- naming e labels mais consistentes entre Review Inbox, Scenario Sandbox, Promote / Merge, Checkpoints e Production Closure
+- empty states e mensagens-resumo com indicação explícita do próximo passo
+- navegação rápida entre superfícies operacionais relacionadas
+- playbook adicional cobrindo o fluxo de sandbox até closure final
 - automações de entrega e handoff local.
 
 ## Approval & Decision History Layer
