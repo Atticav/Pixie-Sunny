@@ -476,6 +476,46 @@
         </div>
       </section>
 
+      <section class="sc-section">
+        <h2>State Snapshot / Workspace Checkpoints</h2>
+        <p class="storage-note">
+          Crie checkpoints nomeados do estado operacional do projeto para manter memória explícita e comparar rapidamente com o estado atual.
+        </p>
+        <div class="sc-create">
+          <input id="checkpointName" placeholder="Nome do checkpoint (ex: antes da revisão final)" />
+          <input id="checkpointReason" placeholder="Motivo curto" />
+          <textarea id="checkpointNotes" rows="2" placeholder="Notas / contexto editorial"></textarea>
+          <button id="createCheckpointBtn">Criar checkpoint</button>
+        </div>
+        <pre id="checkpointSummary">Selecione um projeto para criar checkpoints.</pre>
+        <div class="sc-layout">
+          <div id="checkpointList" class="sc-list"></div>
+          <div class="sc-compare">
+            <div class="sc-compare-toolbar">
+              <label>Checkpoint
+                <select id="checkpointCompareSelect">
+                  <option value="">Selecione um checkpoint</option>
+                </select>
+              </label>
+              <div class="sc-quick-actions">
+                <button id="checkpointOpenDiffBtn">Abrir Diff Viewer</button>
+                <button id="checkpointOpenDecisionsBtn">Histórico Editorial</button>
+                <button id="checkpointOpenReadinessBtn">Production Readiness</button>
+                <button id="checkpointOpenInboxBtn">Review Inbox</button>
+              </div>
+            </div>
+            <p id="checkpointCompareSummary" class="sc-compare-summary">Selecione um checkpoint para comparar.</p>
+            <ul id="checkpointCompareHighlights" class="sc-highlights">
+              <li>Sem comparação ativa.</li>
+            </ul>
+            <h4>Diferenças de metadata</h4>
+            <pre id="checkpointCompareMetadata"></pre>
+            <h4>Diff de contexto (readiness/inbox)</h4>
+            <pre id="checkpointCompareDiff"></pre>
+          </div>
+        </div>
+      </section>
+
       <section>
         <h2>Base de vídeo</h2>
         <div class="stack">

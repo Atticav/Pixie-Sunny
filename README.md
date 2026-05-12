@@ -215,6 +215,29 @@ O app agora inclui uma camada operacional de revisão humana para centralizar si
   - navegação por teclado (setas, espaço para seleção, enter para abrir contexto)
 - arquitetura segue **local-first no MacBook**, sem backend SaaS
 
+## State Snapshot / Workspace Checkpoints (MVP)
+
+O app agora inclui uma camada de checkpoints operacionais para memória explícita de trabalho:
+
+- cria checkpoints nomeados por projeto com metadata básica:
+  - nome
+  - timestamp
+  - motivo (`reason`)
+  - notas (`notes`)
+- guarda um snapshot útil e leve do estado operacional (contagens de entidades, sinais de inbox e readiness)
+- lista checkpoints existentes localmente no workspace (sem backend SaaS)
+- compara checkpoint vs estado atual com:
+  - diff de metadata
+  - highlights semânticos
+  - diff textual de contexto para readiness/inbox
+- integrações rápidas no próprio painel:
+  - abrir **Diff Viewer / Context Compare**
+  - abrir **Editorial Timeline / Decision History**
+  - navegar para **Production Readiness Dashboard**
+  - navegar para **Review Inbox / Triage Workspace**
+
+Este MVP estabelece a base para evoluções futuras (restore, branching e fluxos mais avançados) mantendo escopo pequeno e mergeável.
+
 ## Approval & Decision History Layer
 
 O app agora registra e navega decisões editoriais/operacionais por item:
