@@ -7,6 +7,20 @@ MVP executável para uso pessoal focado em:
 - organização por projetos, livros, capítulos, cenas e personagens
 - base de especificações para geração fiel de imagem e vídeo em workflow local/offline
 
+## Comece por aqui (Docs + Demo + Launch Readiness)
+
+Se você está chegando agora, use esta ordem curta:
+
+1. **Início rápido local:** seção [Como rodar localmente](#como-rodar-localmente)
+2. **Fluxo principal + roteiro de demo:** [`docs/demo-quickstart.md`](docs/demo-quickstart.md)
+3. **Configuração de geração local (opcional):** [`docs/image-generation.md`](docs/image-generation.md)
+
+Princípios do produto:
+
+- **local-first no MacBook**
+- **sem backend SaaS obrigatório**
+- **estado e operação rastreáveis** (recipes, checkpoints, sandbox, promote/merge, closure)
+
 ## Como rodar localmente
 
 ### Opção 1 (mais simples)
@@ -452,6 +466,15 @@ O app agora inclui um workspace de comparação pragmático para inspecionar mud
 - fornece highlights semânticos e quick links para revisar/aprofundar as ações no fluxo
 - mantém a base pronta para próximos PRs de review editorial avançado, merge guidance e governança contextual mais forte
 
+## Docs + Demo + Launch Readiness (este pass)
+
+Melhorias aplicadas neste pass focado de lançamento:
+
+- novo guia curto de onboarding + demo em `docs/demo-quickstart.md`
+- documentação concisa do fluxo principal ponta a ponta e das superfícies-chave
+- roteiro recomendado para demonstração (10–15 min) com caminho de navegação claro
+- framing explícito de operação local-first e handoff sem SaaS
+
 ## Estrutura do projeto
 
 - `index.html`: interface inicial utilizável
@@ -463,6 +486,7 @@ O app agora inclui um workspace de comparação pragmático para inspecionar mud
 - `src/asset-lineage.js`: construção local do grafo de lineage/supersession de versões de assets
 - `src/pipelines.js`: integração futura com geradores locais
 - `src/pipelines.md`: guia de extensão de pipeline
+- `docs/demo-quickstart.md`: roteiro curto de onboarding + demo + fluxo principal
 - `tests/store.test.js`: testes focados em persistência e busca de lore
 
 ## Testes
