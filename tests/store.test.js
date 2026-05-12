@@ -14,6 +14,7 @@ import {
   createGenerationOutput,
   createLoreEntry,
   createProject,
+  createProductionClosure,
   createReferenceImage,
   createSandboxPromotion,
   createScene,
@@ -29,6 +30,7 @@ import {
   IMAGE_GEN_TYPES,
   IMAGE_GEN_STATUSES,
   OUTPUT_REVIEW_STATUSES,
+  PRODUCTION_CLOSURE_STATUSES,
   REFERENCE_TYPES,
   SANDBOX_PROMOTION_STATUSES,
   SHOT_STATUSES,
@@ -1737,4 +1739,113 @@ test('store persists sandboxPromotions across save/load', () => {
   assert.equal(loaded.sandboxPromotions[0].notes, 'Aprovado');
   assert.equal(loaded.sandboxPromotions[0].impactSummary, '2 cena(s)');
   assert.equal(loaded.sandboxPromotions[0].status, 'confirmed');
+});
+
+test('PRODUCTION_CLOSURE_STATUSES contains expected values', () => {
+  assert.deepEqual(PRODUCTION_CLOSURE_STATUSES, ['draft', 'generated']);
+});
+
+test('createProductionClosure stores closure summary fields', () => {
+  const project = createProject({ name: 'Closure Project' });
+  const closure = createProductionClosure({
+    projectId: project.id,
+    label: 'Closure final',
+    readinessSummary: { blocked: 1, readyToGenerate: 2 },
+    reviewInboxSummary: { unresolved: 3, blocked: 1 },
+    blockers: ['1 item bloqueado'],
+    warnings: ['3 itens pendentes'],
+    readyItems: ['10 outputs prontos'],
+    includes: { readinessSummary: true, reviewInboxDigest: true },
+    composition: [{ id: 'readiness', label: 'Readiness', status: 'blocked', detail: 'blocked=1' }],
+    packageFileName: 'closure.json',
+    summaryText: 'ready=1 warnings=1 blockers=1'
+  });
+
+  assert.ok(closure.id);
+  assert.equal(closure.projectId, project.id);
+  assert.equal(closure.label, 'Closure final');
+  assert.deepEqual(closure.readinessSummary, { blocked: 1, readyToGenerate: 2 });
+  assert.deepEqual(closure.reviewInboxSummary, { unresolved: 3, blocked: 1 });
+  assert.deepEqual(closure.blockers, ['1 item bloqueado']);
+  assert.deepEqual(closure.warnings, ['3 itens pendentes']);
+  assert.deepEqual(closure.readyItems, ['10 outputs prontos']);
+  assert.equal(closure.packageFileName, 'closure.json');
+  assert.equal(closure.status, 'generated');
+  assert.ok(closure.generatedAt);
+});
+
+test('normalizeState includes productionClosures', () => {
+  const project = createProject({ name: 'P' });
+  const closure = createProductionClosure({
+    projectId: project.id,
+    blockers: ['A'],
+    warnings: ['B'],
+    readyItems: ['C']
+  });
+  const loaded = sanitizeState({
+    projects: [project],
+    productionClosures: [closure]
+  });
+  assert.ok(Array.isArray(loaded.productionClosures));
+  assert.equal(loaded.productionClosures.length, 1);
+  assert.equal(loaded.productionClosures[0].projectId, project.id);
+  assert.deepEqual(loaded.productionClosures[0].blockers, ['A']);
+});
+
+test('deleteEntity removes productionClosures belonging to deleted project', () => {
+  const project = createProject({ name: 'P to delete' });
+  const otherProject = createProject({ name: 'Other' });
+  const closureA = createProductionClosure({ projectId: project.id, blockers: ['A'] });
+  const closureB = createProductionClosure({ projectId: otherProject.id, blockers: ['B'] });
+
+  const result = deleteEntity(
+    {
+      projects: [project, otherProject],
+      books: [],
+      chapters: [],
+      scenes: [],
+      beats: [],
+      shots: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [],
+      canonPromotions: [],
+      decisionHistory: [],
+      workspaceCheckpoints: [],
+      workspaceSandboxes: [],
+      sandboxPromotions: [],
+      productionClosures: [closureA, closureB],
+      settings: {}
+    },
+    'project',
+    project.id
+  );
+
+  assert.equal(result.productionClosures.length, 1);
+  assert.equal(result.productionClosures[0].id, closureB.id);
+});
+
+test('store persists productionClosures across save/load', () => {
+  const storage = fakeStorage();
+  const store = createStore({ key: 'test-closure', storage });
+  const data = store.load();
+  const project = createProject({ name: 'Closure Persist Project' });
+  const closure = createProductionClosure({
+    projectId: project.id,
+    blockers: ['1 bloqueio'],
+    warnings: ['2 warnings'],
+    readyItems: ['3 itens prontos']
+  });
+  data.projects.push(project);
+  data.productionClosures = [closure];
+  store.save(data);
+
+  const loaded = store.load();
+  assert.equal(loaded.productionClosures.length, 1);
+  assert.equal(loaded.productionClosures[0].projectId, project.id);
+  assert.deepEqual(loaded.productionClosures[0].warnings, ['2 warnings']);
+  assert.equal(loaded.productionClosures[0].status, 'generated');
 });

@@ -100,6 +100,7 @@ export const DECISION_RESULT_STATUSES = [
 ];
 export const WORKSPACE_SANDBOX_STATUSES = ['exploratory', 'candidate', 'review-ready'];
 export const SANDBOX_PROMOTION_STATUSES = ['pending', 'confirmed', 'rolled_back'];
+export const PRODUCTION_CLOSURE_STATUSES = ['draft', 'generated'];
 
 const baseImageGenSettings = () => ({
   type: 'mock',
@@ -172,6 +173,7 @@ export const emptyState = () => ({
   workspaceCheckpoints: [],
   workspaceSandboxes: [],
   sandboxPromotions: [],
+  productionClosures: [],
   settings: baseSettings()
 });
 
@@ -588,6 +590,45 @@ export const createSandboxPromotion = ({
   impactSummary: stringValue(impactSummary),
   status: 'confirmed',
   promotedAt: nowUtc()
+});
+
+export const createProductionClosure = ({
+  projectId,
+  label = '',
+  readinessSummary = {},
+  reviewInboxSummary = {},
+  blockers = [],
+  warnings = [],
+  readyItems = [],
+  includes = {},
+  composition = [],
+  packageFileName = '',
+  summaryText = ''
+}) => ({
+  id: newId(),
+  projectId: stringValue(projectId),
+  label: stringValue(label, 'Export / Delivery Closure'),
+  readinessSummary: recordValue(readinessSummary) || {},
+  reviewInboxSummary: recordValue(reviewInboxSummary) || {},
+  blockers: stringList(blockers),
+  warnings: stringList(warnings),
+  readyItems: stringList(readyItems),
+  includes: recordValue(includes) || {},
+  composition: Array.isArray(composition)
+    ? composition
+      .map((entry) => recordValue(entry))
+      .filter(Boolean)
+      .map((entry) => ({
+        id: stringValue(entry.id),
+        label: stringValue(entry.label),
+        status: stringValue(entry.status),
+        detail: stringValue(entry.detail)
+      }))
+    : [],
+  packageFileName: stringValue(packageFileName),
+  summaryText: stringValue(summaryText),
+  status: 'generated',
+  generatedAt: nowUtc()
 });
 
 export const createGenerationJob = ({
@@ -1133,6 +1174,40 @@ const normalizeSandboxPromotion = (promotion) => {
   };
 };
 
+const normalizeProductionClosure = (closure) => {
+  const value = recordValue(closure);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
+  const composition = Array.isArray(value.composition)
+    ? value.composition
+      .map((entry) => recordValue(entry))
+      .filter(Boolean)
+      .map((entry) => ({
+        id: stringValue(entry.id),
+        label: stringValue(entry.label),
+        status: stringValue(entry.status),
+        detail: stringValue(entry.detail)
+      }))
+    : [];
+  return {
+    id: value.id,
+    projectId: stringValue(value.projectId),
+    label: stringValue(value.label, 'Export / Delivery Closure'),
+    readinessSummary: recordValue(value.readinessSummary) || {},
+    reviewInboxSummary: recordValue(value.reviewInboxSummary) || {},
+    blockers: stringList(value.blockers),
+    warnings: stringList(value.warnings),
+    readyItems: stringList(value.readyItems),
+    includes: recordValue(value.includes) || {},
+    composition,
+    packageFileName: stringValue(value.packageFileName),
+    summaryText: stringValue(value.summaryText),
+    status: PRODUCTION_CLOSURE_STATUSES.includes(stringValue(value.status))
+      ? stringValue(value.status)
+      : 'generated',
+    generatedAt: stringValue(value.generatedAt) || nowUtc()
+  };
+};
+
 export const normalizeState = (raw) => {
   const value = recordValue(raw) || {};
   const settingsSource = recordValue(value.settings) || {};
@@ -1197,6 +1272,9 @@ export const normalizeState = (raw) => {
   const sandboxPromotions = (Array.isArray(value.sandboxPromotions) ? value.sandboxPromotions : [])
     .map(normalizeSandboxPromotion)
     .filter((promo) => promo && projectIds.has(promo.projectId));
+  const productionClosures = (Array.isArray(value.productionClosures) ? value.productionClosures : [])
+    .map(normalizeProductionClosure)
+    .filter((closure) => closure && projectIds.has(closure.projectId));
   const beats = (Array.isArray(value.beats) ? value.beats : [])
     .map(normalizeBeat)
     .filter(
@@ -1257,6 +1335,7 @@ export const normalizeState = (raw) => {
     workspaceCheckpoints,
     workspaceSandboxes,
     sandboxPromotions,
+    productionClosures,
     settings: {
       ...baseSettings(),
       ...settingsSource,
@@ -1291,7 +1370,8 @@ export const deleteEntity = (state, entityType, id) => {
       decisionHistory: (current.decisionHistory || []).filter((event) => event.projectId !== id),
       workspaceCheckpoints: (current.workspaceCheckpoints || []).filter((checkpoint) => checkpoint.projectId !== id),
       workspaceSandboxes: (current.workspaceSandboxes || []).filter((sandbox) => sandbox.projectId !== id),
-      sandboxPromotions: (current.sandboxPromotions || []).filter((promo) => promo.projectId !== id)
+      sandboxPromotions: (current.sandboxPromotions || []).filter((promo) => promo.projectId !== id),
+      productionClosures: (current.productionClosures || []).filter((closure) => closure.projectId !== id)
     });
   }
 

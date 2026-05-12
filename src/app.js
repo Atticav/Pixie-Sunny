@@ -11,6 +11,7 @@ import {
   createLoreEntry,
   createPromptDocument,
   createProject,
+  createProductionClosure,
   createReferenceImage,
   createSandboxPromotion,
   createScene,
@@ -210,7 +211,27 @@ const refs = {
   pmConfirmBtn: $('pmConfirmBtn'),
   pmCancelBtn: $('pmCancelBtn'),
   pmStatus: $('pmStatus'),
-  pmHistoryList: $('pmHistoryList')
+  pmHistoryList: $('pmHistoryList'),
+  pcReadyList: $('pcReadyList'),
+  pcWarningList: $('pcWarningList'),
+  pcBlockerList: $('pcBlockerList'),
+  pcIncludeReadiness: $('pcIncludeReadiness'),
+  pcIncludeInbox: $('pcIncludeInbox'),
+  pcIncludeSandboxPromotions: $('pcIncludeSandboxPromotions'),
+  pcIncludeCheckpoints: $('pcIncludeCheckpoints'),
+  pcIncludeDecisions: $('pcIncludeDecisions'),
+  pcIncludeSnapshot: $('pcIncludeSnapshot'),
+  pcCompositionList: $('pcCompositionList'),
+  pcGenerateBtn: $('pcGenerateBtn'),
+  pcDownloadBtn: $('pcDownloadBtn'),
+  pcStatus: $('pcStatus'),
+  pcHistoryList: $('pcHistoryList'),
+  pcExportPreview: $('pcExportPreview'),
+  pcOpenReadinessBtn: $('pcOpenReadinessBtn'),
+  pcOpenInboxBtn: $('pcOpenInboxBtn'),
+  pcOpenSandboxBtn: $('pcOpenSandboxBtn'),
+  pcOpenPromoteBtn: $('pcOpenPromoteBtn'),
+  pcOpenCheckpointsBtn: $('pcOpenCheckpointsBtn')
 };
 
 const SHOT_TEMPLATES = [
@@ -1801,6 +1822,237 @@ const renderSandboxPromoteSection = () => {
   });
 };
 
+const closureIncludesFromUi = () => ({
+  readinessSummary: refs.pcIncludeReadiness?.checked !== false,
+  reviewInboxDigest: refs.pcIncludeInbox?.checked !== false,
+  sandboxPromotions: refs.pcIncludeSandboxPromotions?.checked !== false,
+  workspaceCheckpoints: refs.pcIncludeCheckpoints?.checked !== false,
+  decisionTimeline: refs.pcIncludeDecisions?.checked !== false,
+  snapshotMetrics: refs.pcIncludeSnapshot?.checked !== false
+});
+
+const projectProductionClosures = () =>
+  (state.productionClosures || [])
+    .filter((closure) => closure.projectId === selectedProjectId())
+    .sort((a, b) => Date.parse(b.generatedAt || 0) - Date.parse(a.generatedAt || 0));
+
+const projectDecisionEvents = () =>
+  (state.decisionHistory || [])
+    .filter((event) => event.projectId === selectedProjectId())
+    .slice()
+    .sort((a, b) => Date.parse(b.happenedAt || 0) - Date.parse(a.happenedAt || 0));
+
+const buildProductionClosurePreflight = (projectId) => {
+  const assistiveBundle = buildAssistivePlanningBundle({
+    state,
+    projectId,
+    scopeType: 'project',
+    scopeValue: ''
+  });
+  const reviewItems = buildReviewInboxItems({
+    state,
+    projectId,
+    assistiveBundle
+  });
+  const snapshot = snapshotProjectState(projectId);
+  const unresolvedReview = reviewItems.filter((item) =>
+    ['pending_review', 'blocked', 'needs_refresh'].includes(item.status)
+  );
+  const blockedReview = reviewItems.filter((item) => item.status === 'blocked');
+  const pendingReview = reviewItems.filter((item) => item.status === 'pending_review');
+  const highRiskReview = reviewItems.filter((item) => item.risk === 'high');
+  const needsRefreshReview = reviewItems.filter((item) => item.status === 'needs_refresh');
+  const missingDependencies = assistiveBundle.recommendations.filter((entry) => entry.type === 'missing dependency');
+  const unresolvedDecisionConcerns = reviewItems.filter((item) => item.type === 'decision_follow_up');
+  const latestPromotion = projectSandboxPromotions()[0] || null;
+  const latestCheckpoint = projectWorkspaceCheckpoints()[0] || null;
+
+  const blockers = [];
+  if (assistiveBundle.summary.blocked > 0) {
+    blockers.push(`${assistiveBundle.summary.blocked} item(ns) bloqueado(s) no Production Readiness Dashboard.`);
+  }
+  if (missingDependencies.length > 0) {
+    blockers.push(`${missingDependencies.length} dependência(s) faltante(s) detectada(s) no preflight.`);
+  }
+  if (blockedReview.length > 0) {
+    blockers.push(`${blockedReview.length} item(ns) bloqueado(s) ainda pendentes na Review Inbox.`);
+  }
+
+  const warnings = [];
+  if (pendingReview.length > 0) {
+    warnings.push(`${pendingReview.length} item(ns) aguardando revisão humana.`);
+  }
+  if (needsRefreshReview.length > 0) {
+    warnings.push(`${needsRefreshReview.length} item(ns) stale / needs refresh.`);
+  }
+  if (highRiskReview.length > 0) {
+    warnings.push(`${highRiskReview.length} item(ns) de alto risco operacional.`);
+  }
+  if (unresolvedDecisionConcerns.length > 0) {
+    warnings.push(`${unresolvedDecisionConcerns.length} follow-up(s) editorial(is) sem fechamento.`);
+  }
+
+  const readyItems = [];
+  if (snapshot.scenes > 0) readyItems.push(`${snapshot.scenes} cena(s) mapeada(s) no estado atual.`);
+  if (snapshot.shots > 0) readyItems.push(`${snapshot.shots} shot(s) planejado(s) para produção.`);
+  if (snapshot.promptDocuments > 0) readyItems.push(`${snapshot.promptDocuments} prompt(s) estruturado(s) prontos para export.`);
+  if (snapshot.outputs > 0) readyItems.push(`${snapshot.outputs} output(s) local(is) disponível(is) para pacote.`);
+  if (latestPromotion) readyItems.push(`Última promoção registrada: ${latestPromotion.sandboxName}.`);
+  if (latestCheckpoint) readyItems.push(`Checkpoint recente: ${latestCheckpoint.name}.`);
+  if (!blockers.length && !warnings.length) {
+    readyItems.push('Nenhum bloqueio ou alerta crítico detectado no preflight.');
+  }
+
+  return {
+    assistiveBundle,
+    reviewItems,
+    snapshot,
+    blockers,
+    warnings,
+    readyItems,
+    summary: {
+      ready: readyItems.length,
+      warnings: warnings.length,
+      blockers: blockers.length
+    },
+    readinessSummary: assistiveBundle.summary,
+    reviewInboxSummary: {
+      total: reviewItems.length,
+      unresolved: unresolvedReview.length,
+      blocked: blockedReview.length,
+      pendingReview: pendingReview.length,
+      needsRefresh: needsRefreshReview.length,
+      highRisk: highRiskReview.length
+    }
+  };
+};
+
+const buildProductionClosureComposition = (preflight, includes) => {
+  const readinessStatus = preflight.readinessSummary.blocked > 0 ? 'blocked' : 'ready';
+  const inboxStatus = preflight.reviewInboxSummary.blocked > 0
+    ? 'blocked'
+    : preflight.reviewInboxSummary.unresolved > 0
+      ? 'warning'
+      : 'ready';
+  return [
+    {
+      id: 'readiness-summary',
+      label: 'Production Readiness Dashboard',
+      status: includes.readinessSummary ? readinessStatus : 'excluded',
+      detail: `blocked=${preflight.readinessSummary.blocked || 0}, readyToGenerate=${preflight.readinessSummary.readyToGenerate || 0}, readyToReview=${preflight.readinessSummary.readyToReview || 0}`
+    },
+    {
+      id: 'review-inbox-digest',
+      label: 'Review Inbox / Triage Digest',
+      status: includes.reviewInboxDigest ? inboxStatus : 'excluded',
+      detail: `unresolved=${preflight.reviewInboxSummary.unresolved}, blocked=${preflight.reviewInboxSummary.blocked}, highRisk=${preflight.reviewInboxSummary.highRisk}`
+    },
+    {
+      id: 'sandbox-promotions',
+      label: 'Promote / Merge / Commit History',
+      status: includes.sandboxPromotions ? 'included' : 'excluded',
+      detail: `${projectSandboxPromotions().length} promoção(ões) registrada(s)`
+    },
+    {
+      id: 'workspace-checkpoints',
+      label: 'State Snapshot / Workspace Checkpoints',
+      status: includes.workspaceCheckpoints ? 'included' : 'excluded',
+      detail: `${projectWorkspaceCheckpoints().length} checkpoint(s) disponível(is)`
+    },
+    {
+      id: 'decision-timeline',
+      label: 'Editorial Timeline / Activity Feed',
+      status: includes.decisionTimeline ? 'included' : 'excluded',
+      detail: `${projectDecisionEvents().length} evento(s) de decisão`
+    },
+    {
+      id: 'snapshot-metrics',
+      label: 'Workspace Snapshot Metrics',
+      status: includes.snapshotMetrics ? 'included' : 'excluded',
+      detail: `${preflight.snapshot.scenes} cena(s), ${preflight.snapshot.shots} shot(s), ${preflight.snapshot.outputs} output(s)`
+    }
+  ];
+};
+
+let productionClosureLastExport = { filename: '', content: '', projectId: '' };
+
+const renderProductionClosureSection = () => {
+  if (!refs.pcReadyList || !refs.pcStatus || !refs.pcCompositionList || !refs.pcHistoryList || !refs.pcExportPreview) return;
+  const projectId = selectedProjectId();
+  if (!projectId) {
+    refs.pcReadyList.innerHTML = '<li>Selecione um projeto para iniciar o preflight final.</li>';
+    refs.pcWarningList.innerHTML = '<li>Sem projeto selecionado.</li>';
+    refs.pcBlockerList.innerHTML = '<li>Sem projeto selecionado.</li>';
+    refs.pcCompositionList.innerHTML = '<p class="pc-empty">Sem composição ativa.</p>';
+    refs.pcHistoryList.innerHTML = '<p class="pc-empty">Nenhum fechamento registrado.</p>';
+    refs.pcExportPreview.textContent = 'Selecione um projeto para gerar o resumo de export.';
+    return;
+  }
+
+  const preflight = buildProductionClosurePreflight(projectId);
+  const includes = closureIncludesFromUi();
+  const composition = buildProductionClosureComposition(preflight, includes);
+  const history = projectProductionClosures();
+
+  const renderList = (target, items, emptyLabel) => {
+    if (!target) return;
+    target.innerHTML = '';
+    (items.length ? items : [emptyLabel]).forEach((line) => {
+      const li = document.createElement('li');
+      li.textContent = line;
+      target.append(li);
+    });
+  };
+
+  renderList(refs.pcReadyList, preflight.readyItems, 'Sem itens prontos detectados.');
+  renderList(refs.pcWarningList, preflight.warnings, 'Sem warnings ativos.');
+  renderList(refs.pcBlockerList, preflight.blockers, 'Sem blockers ativos.');
+
+  refs.pcCompositionList.innerHTML = '';
+  composition.forEach((entry) => {
+    const row = document.createElement('article');
+    row.className = `pc-composition-item pc-status-${entry.status}`;
+    const title = document.createElement('strong');
+    title.textContent = `${entry.label} · ${entry.status}`;
+    const detail = document.createElement('p');
+    detail.textContent = entry.detail;
+    row.append(title, detail);
+    refs.pcCompositionList.append(row);
+  });
+
+  refs.pcHistoryList.innerHTML = '';
+  if (!history.length) {
+    refs.pcHistoryList.innerHTML = '<p class="pc-empty">Nenhum fechamento registrado.</p>';
+  } else {
+    history.slice(0, 8).forEach((closure) => {
+      const card = document.createElement('article');
+      card.className = 'pc-history-item';
+      const title = document.createElement('strong');
+      title.textContent = closure.label || 'Export / Delivery Closure';
+      const meta = document.createElement('p');
+      meta.textContent =
+        `${new Date(closure.generatedAt).toLocaleString('pt-BR')} · blockers ${closure.blockers.length} · warnings ${closure.warnings.length}`;
+      card.append(title, meta);
+      refs.pcHistoryList.append(card);
+    });
+  }
+
+  if (!productionClosureLastExport.content || productionClosureLastExport.projectId !== projectId) {
+    refs.pcExportPreview.textContent = JSON.stringify(
+      {
+        preflight: preflight.summary,
+        readiness: preflight.readinessSummary,
+        reviewInbox: preflight.reviewInboxSummary,
+        composition
+      },
+      null,
+      2
+    );
+  } else {
+    refs.pcExportPreview.textContent = productionClosureLastExport.content;
+  }
+};
+
 const renderWorkspaceCheckpoints = () => {
   if (!refs.checkpointList || !refs.checkpointSummary) return;
   const projectId = selectedProjectId();
@@ -1993,6 +2245,7 @@ const render = () => {
   renderReviewInbox();
   renderWorkspaceSandboxes();
   renderSandboxPromoteSection();
+  renderProductionClosureSection();
   renderWorkspaceCheckpoints();
   renderLore();
   renderAssets();
@@ -2008,6 +2261,7 @@ const render = () => {
   setDisabled(['createSandboxBtn'], !selectedProjectId());
   setDisabled(['createCheckpointBtn'], !selectedProjectId());
   setDisabled(['pmConfirmBtn'], !selectedProjectId() || !pmSelectedSandboxId);
+  setDisabled(['pcGenerateBtn', 'pcDownloadBtn'], !selectedProjectId());
 };
 
 const persist = () => {
@@ -2838,6 +3092,147 @@ refs.pmConfirmBtn?.addEventListener('click', () => {
   if (refs.pmNotes) refs.pmNotes.value = '';
   if (refs.pmStatus) refs.pmStatus.textContent = `✓ Sandbox "${promotedName}" promovido com sucesso.`;
   persist();
+});
+
+[
+  refs.pcIncludeReadiness,
+  refs.pcIncludeInbox,
+  refs.pcIncludeSandboxPromotions,
+  refs.pcIncludeCheckpoints,
+  refs.pcIncludeDecisions,
+  refs.pcIncludeSnapshot
+].forEach((checkbox) => checkbox?.addEventListener('change', () => {
+  productionClosureLastExport = { filename: '', content: '', projectId: '' };
+  renderProductionClosureSection();
+}));
+
+refs.pcOpenReadinessBtn?.addEventListener('click', () => {
+  document.querySelector('.ap-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+refs.pcOpenInboxBtn?.addEventListener('click', () => {
+  document.querySelector('.ri-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+refs.pcOpenSandboxBtn?.addEventListener('click', () => {
+  document.querySelector('.sb-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+refs.pcOpenPromoteBtn?.addEventListener('click', () => {
+  document.querySelector('.pm-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+refs.pcOpenCheckpointsBtn?.addEventListener('click', () => {
+  document.querySelector('.sc-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+refs.pcGenerateBtn?.addEventListener('click', async () => {
+  const projectId = selectedProjectId();
+  const project = currentProject();
+  if (!projectId || !project || !refs.pcStatus) return;
+
+  const preflight = buildProductionClosurePreflight(projectId);
+  const includes = closureIncludesFromUi();
+  const composition = buildProductionClosureComposition(preflight, includes);
+  const packageData = {
+    version: 'mvp-export-closure-v1',
+    generatedAt: new Date().toISOString(),
+    project: {
+      id: project.id,
+      name: project.name
+    },
+    preflight: {
+      summary: preflight.summary,
+      blockers: preflight.blockers,
+      warnings: preflight.warnings,
+      readyItems: preflight.readyItems
+    },
+    includes,
+    composition,
+    sections: {
+      readinessSummary: includes.readinessSummary
+        ? {
+          ...preflight.readinessSummary,
+          topBlocked: preflight.assistiveBundle.recommendations
+            .filter((entry) => entry.status === 'blocked')
+            .slice(0, 8)
+            .map((entry) => ({
+              title: entry.title,
+              type: entry.type,
+              score: entry.priorityScore
+            }))
+        }
+        : null,
+      reviewInboxDigest: includes.reviewInboxDigest
+        ? {
+          ...preflight.reviewInboxSummary,
+          unresolvedItems: preflight.reviewItems
+            .filter((item) => ['pending_review', 'blocked', 'needs_refresh'].includes(item.status))
+            .slice(0, 12)
+            .map((item) => ({
+              id: item.id,
+              type: item.type,
+              title: item.title,
+              status: item.status,
+              risk: item.risk,
+              source: item.source
+            }))
+        }
+        : null,
+      sandboxPromotions: includes.sandboxPromotions
+        ? projectSandboxPromotions().slice(0, 12)
+        : null,
+      workspaceCheckpoints: includes.workspaceCheckpoints
+        ? projectWorkspaceCheckpoints().slice(0, 12)
+        : null,
+      decisionTimeline: includes.decisionTimeline
+        ? projectDecisionEvents().slice(0, 20)
+        : null,
+      snapshotMetrics: includes.snapshotMetrics
+        ? preflight.snapshot
+        : null
+    }
+  };
+
+  const filename = `pixie-sunny-${sanitizeFileName(project.name, 'project')}-production-closure-${Date.now()}.json`;
+  const content = JSON.stringify(packageData, null, 2);
+  productionClosureLastExport = { filename, content, projectId };
+
+  if (!state.productionClosures) state.productionClosures = [];
+  state.productionClosures.unshift(
+    createProductionClosure({
+      projectId,
+      label: `Closure ${new Date().toLocaleString('pt-BR')}`,
+      readinessSummary: preflight.readinessSummary,
+      reviewInboxSummary: preflight.reviewInboxSummary,
+      blockers: preflight.blockers,
+      warnings: preflight.warnings,
+      readyItems: preflight.readyItems,
+      includes,
+      composition,
+      packageFileName: filename,
+      summaryText: `ready=${preflight.summary.ready}, warnings=${preflight.summary.warnings}, blockers=${preflight.summary.blockers}`
+    })
+  );
+  state.productionClosures = state.productionClosures.slice(0, 25);
+  persist();
+  refs.pcStatus.textContent = `Resumo de closure gerado: ${filename}`;
+
+  try {
+    const savedPath = await saveExportToWorkspace({ settings: state.settings, filename, content });
+    if (savedPath) setWorkspaceStatus(`Closure export salvo em workspace local: ${savedPath}`);
+  } catch (error) {
+    console.warn('Falha ao salvar closure export no workspace local:', error);
+  }
+});
+
+refs.pcDownloadBtn?.addEventListener('click', () => {
+  if (!productionClosureLastExport.filename || !productionClosureLastExport.content) {
+    if (refs.pcStatus) refs.pcStatus.textContent = 'Gere um closure export antes de baixar.';
+    return;
+  }
+  downloadFile(productionClosureLastExport.filename, productionClosureLastExport.content, 'application/json');
+  if (refs.pcStatus) refs.pcStatus.textContent = `Download iniciado: ${productionClosureLastExport.filename}`;
 });
 
 // =========== Writer Studio ===========

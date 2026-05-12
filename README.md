@@ -295,6 +295,51 @@ Este MVP recovery slice fecha o ciclo decisório básico e estabelece fundação
 - merge com diff assistido entre sandbox e workspace principal
 - governança de branch health e promoções automáticas baseadas em readiness
 
+## Export / Delivery / Production Closure Layer (MVP)
+
+O app agora inclui uma superfície prática de fechamento final de produção, local-first e sem dependência SaaS:
+
+- painel de **preflight/readiness final** com três grupos visíveis:
+  - `ready items`
+  - `warnings`
+  - `blockers`
+- agrega sinais de:
+  - **Production Readiness Dashboard**
+  - **Review Inbox / Triage Workspace**
+  - dependências faltantes e follow-ups editoriais quando detectáveis
+- inclui ações rápidas para navegar direto para:
+  - readiness
+  - inbox
+  - sandbox
+  - promote/merge
+  - checkpoints
+- permite escolher o que entra no fechamento/export (`includes`):
+  - readiness summary
+  - inbox digest
+  - histórico de promoções
+  - checkpoints
+  - timeline editorial
+  - snapshot metrics
+- gera um **closure export summary** estruturado (`.json`) com:
+  - metadados do projeto
+  - resumo de preflight (ready/warnings/blockers)
+  - composição do pacote
+  - seções incluídas
+- salva no workspace local (quando habilitado) e registra histórico em `state.productionClosures`
+
+### Como este MVP se conecta ao roadmap de delivery
+
+Este slice fecha o fluxo operacional ponta a ponta no nível MVP:
+
+```
+[readiness + inbox + branch/promote/checkpoint sinais] → [preflight final] → [seleção de composição] → [closure export local]
+```
+
+Com essa base, evoluções futuras podem adicionar:
+- empacotamento multi-arquivo (assets + manifests)
+- validações mais estritas por tipo de entrega
+- automações de entrega e handoff local.
+
 ## Approval & Decision History Layer
 
 O app agora registra e navega decisões editoriais/operacionais por item:

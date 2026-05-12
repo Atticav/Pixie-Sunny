@@ -556,6 +556,63 @@
         </div>
       </section>
 
+      <section class="pc-section">
+        <h2>Export / Delivery / Production Closure</h2>
+        <p class="storage-note">
+          Preflight final local-first para validar prontidão, revisar blockers/warnings e gerar um pacote estruturado de fechamento de produção.
+        </p>
+        <div class="pc-quick-actions">
+          <button id="pcOpenReadinessBtn">Production Readiness</button>
+          <button id="pcOpenInboxBtn">Review Inbox</button>
+          <button id="pcOpenSandboxBtn">Scenario Sandbox</button>
+          <button id="pcOpenPromoteBtn">Promote / Merge</button>
+          <button id="pcOpenCheckpointsBtn">Workspace Checkpoints</button>
+        </div>
+        <div class="pc-preflight">
+          <article class="pc-column">
+            <h3>Ready items</h3>
+            <ul id="pcReadyList">
+              <li>Selecione um projeto para iniciar o preflight final.</li>
+            </ul>
+          </article>
+          <article class="pc-column">
+            <h3>Warnings</h3>
+            <ul id="pcWarningList">
+              <li>Sem warnings ativos.</li>
+            </ul>
+          </article>
+          <article class="pc-column">
+            <h3>Blockers</h3>
+            <ul id="pcBlockerList">
+              <li>Sem blockers ativos.</li>
+            </ul>
+          </article>
+        </div>
+        <div class="pc-includes">
+          <label class="check-inline"><input id="pcIncludeReadiness" type="checkbox" checked /> Production Readiness summary</label>
+          <label class="check-inline"><input id="pcIncludeInbox" type="checkbox" checked /> Review Inbox digest</label>
+          <label class="check-inline"><input id="pcIncludeSandboxPromotions" type="checkbox" checked /> Promote / Merge history</label>
+          <label class="check-inline"><input id="pcIncludeCheckpoints" type="checkbox" checked /> Workspace checkpoints</label>
+          <label class="check-inline"><input id="pcIncludeDecisions" type="checkbox" checked /> Editorial timeline</label>
+          <label class="check-inline"><input id="pcIncludeSnapshot" type="checkbox" checked /> Snapshot metrics</label>
+        </div>
+        <div class="pc-actions">
+          <button id="pcGenerateBtn">Gerar closure export summary</button>
+          <button id="pcDownloadBtn">Baixar pacote .json</button>
+        </div>
+        <p id="pcStatus" class="pc-status"></p>
+        <h3>Composição do pacote</h3>
+        <div id="pcCompositionList" class="pc-composition-list">
+          <p class="pc-empty">Sem composição ativa.</p>
+        </div>
+        <h3>Pré-visualização do export</h3>
+        <pre id="pcExportPreview">Selecione um projeto para gerar o resumo de export.</pre>
+        <h3>Histórico de closures</h3>
+        <div id="pcHistoryList" class="pc-history-list">
+          <p class="pc-empty">Nenhum fechamento registrado.</p>
+        </div>
+      </section>
+
       <section class="sc-section">
         <h2>State Snapshot / Workspace Checkpoints</h2>
         <p class="storage-note">
