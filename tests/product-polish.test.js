@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildClosureExportStatusMessage,
+  canGenerateClosureExport,
   buildPreflightStatusMessage,
   buildProjectCollectionSummary,
   buildPromotionGuidance,
-  buildReviewInboxSummary
+  buildReviewInboxSummary,
+  isDuplicateSandboxPromotion
 } from '../src/product-polish.js';
 
 test('buildProjectCollectionSummary handles empty and populated collections', () => {
@@ -72,5 +75,47 @@ test('buildPreflightStatusMessage prioritizes blockers, then warnings, then read
   assert.equal(
     buildPreflightStatusMessage({ blockers: 0, warnings: 0, ready: 5 }),
     'Pronto para gerar export de fechamento · 5 sinal(is) positivos no preflight final.'
+  );
+});
+
+test('canGenerateClosureExport requires at least one included section', () => {
+  assert.equal(canGenerateClosureExport({ readinessSummary: false, reviewInboxDigest: false }), false);
+  assert.equal(canGenerateClosureExport({ readinessSummary: true, reviewInboxDigest: false }), true);
+});
+
+test('isDuplicateSandboxPromotion detects repeated confirm action payloads', () => {
+  const lastPromotion = {
+    sandboxId: 'sb-1',
+    notes: 'Notas',
+    impactSummary: '2 cena(s) · 5 shot(s)'
+  };
+  assert.equal(
+    isDuplicateSandboxPromotion({
+      lastPromotion,
+      sandboxId: 'sb-1',
+      notes: 'Notas',
+      impactSummary: '2 cena(s) · 5 shot(s)'
+    }),
+    true
+  );
+  assert.equal(
+    isDuplicateSandboxPromotion({
+      lastPromotion,
+      sandboxId: 'sb-1',
+      notes: 'Notas alteradas',
+      impactSummary: '2 cena(s) · 5 shot(s)'
+    }),
+    false
+  );
+});
+
+test('buildClosureExportStatusMessage reports blockers and warnings count', () => {
+  assert.equal(
+    buildClosureExportStatusMessage({
+      filename: 'closure.json',
+      blockers: 2,
+      warnings: 1
+    }),
+    'Resumo de closure gerado: closure.json (blockers=2 · warnings=1)'
   );
 });

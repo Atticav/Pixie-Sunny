@@ -25,20 +25,43 @@ export const sanitizeState = (raw) => {
 
 export const createStore = ({ key = 'pixieSunnyStudio', storage } = {}) => {
   const db = resolveStorage(storage);
-
-  const load = () => {
-    const raw = db.getItem(key);
-    if (!raw) return emptyState();
+  const backupKey = `${key}:backup`;
+  const parseStoredState = (raw) => {
+    if (!raw) return null;
     try {
       return sanitizeState(JSON.parse(raw));
     } catch {
-      return emptyState();
+      return null;
     }
+  };
+
+  const load = () => {
+    const primary = parseStoredState(db.getItem(key));
+    if (primary) return primary;
+
+    const backup = parseStoredState(db.getItem(backupKey));
+    if (backup) {
+      try {
+        db.setItem(key, JSON.stringify(backup));
+      } catch {
+        // fallback best-effort
+      }
+      return backup;
+    }
+    return emptyState();
   };
 
   const save = (state) => {
     const next = sanitizeState(state);
-    db.setItem(key, JSON.stringify(next));
+    const serialized = JSON.stringify(next);
+    try {
+      db.setItem(key, serialized);
+    } catch {
+    }
+    try {
+      db.setItem(backupKey, serialized);
+    } catch {
+    }
     return next;
   };
 

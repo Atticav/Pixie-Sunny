@@ -51,6 +51,22 @@ const fakeStorage = () => {
   };
 };
 
+const flakyStorage = ({ failOnKeys = [] } = {}) => {
+  const map = new Map();
+  const failures = new Set(failOnKeys);
+  return {
+    getItem(key) {
+      return map.has(key) ? map.get(key) : null;
+    },
+    setItem(key, value) {
+      if (failures.has(key)) {
+        throw new Error(`failed on key ${key}`);
+      }
+      map.set(key, value);
+    }
+  };
+};
+
 test('store persists state in storage', () => {
   const storage = fakeStorage();
   const store = createStore({ key: 'test', storage });
@@ -96,6 +112,37 @@ test('store load ignores unexpected parsed properties', () => {
 
   assert.equal(loaded.projects.length, 1);
   assert.equal(loaded.injected, undefined);
+});
+
+test('store load recovers from backup entry when primary payload is corrupted', () => {
+  const storage = fakeStorage();
+  storage.setItem('recover-key', '{invalid-json');
+  storage.setItem(
+    'recover-key:backup',
+    JSON.stringify({
+      projects: [{ id: 'p1', name: 'Projeto recuperado' }]
+    })
+  );
+  const store = createStore({ key: 'recover-key', storage });
+  const loaded = store.load();
+
+  assert.equal(loaded.projects.length, 1);
+  assert.equal(loaded.projects[0].name, 'Projeto recuperado');
+});
+
+test('store save/load keeps working when primary key write fails', () => {
+  const storage = flakyStorage({ failOnKeys: ['primary-fails'] });
+  const store = createStore({ key: 'primary-fails', storage });
+
+  const next = store.save({
+    ...store.load(),
+    projects: [{ id: 'p1', name: 'Persistência resiliente' }]
+  });
+
+  assert.equal(next.projects[0].name, 'Persistência resiliente');
+  const loaded = store.load();
+  assert.equal(loaded.projects.length, 1);
+  assert.equal(loaded.projects[0].name, 'Persistência resiliente');
 });
 
 test('sanitizeState removes orphaned nested records after import', () => {

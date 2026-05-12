@@ -75,10 +75,13 @@ import {
   resetRecipeProgress
 } from './workflow-recipes.js';
 import {
+  buildClosureExportStatusMessage,
+  canGenerateClosureExport,
   buildPreflightStatusMessage,
   buildProjectCollectionSummary,
   buildPromotionGuidance,
-  buildReviewInboxSummary
+  buildReviewInboxSummary,
+  isDuplicateSandboxPromotion
 } from './product-polish.js';
 
 const store = createStore();
@@ -3058,8 +3061,11 @@ refs.sandboxCompareSelect?.addEventListener('change', () => {
 refs.sandboxRefreshBtn?.addEventListener('click', () => {
   const projectId = selectedProjectId();
   if (!projectId || !sandboxCompareId) return;
-  const sandbox = (state.workspaceSandboxes || []).find((entry) => entry.id === sandboxCompareId);
-  if (!sandbox) return;
+  const sandbox = projectWorkspaceSandboxes().find((entry) => entry.id === sandboxCompareId);
+  if (!sandbox) {
+    refs.sandboxSummary.textContent = 'Sandbox selecionado não pertence ao projeto atual.';
+    return;
+  }
   sandbox.snapshot = snapshotProjectState(projectId);
   sandbox.updatedAt = new Date().toISOString();
   refs.sandboxSummary.textContent = `Snapshot do sandbox "${sandbox.name}" atualizado.`;
@@ -3157,11 +3163,26 @@ refs.pmCancelBtn?.addEventListener('click', () => {
 
 refs.pmConfirmBtn?.addEventListener('click', () => {
   const projectId = selectedProjectId();
-  if (!projectId || !pmSelectedSandboxId) return;
-  const sandbox = (state.workspaceSandboxes || []).find((entry) => entry.id === pmSelectedSandboxId);
-  if (!sandbox) return;
+  if (!projectId || !pmSelectedSandboxId || !refs.pmStatus) return;
+  const sandbox = projectWorkspaceSandboxes().find((entry) => entry.id === pmSelectedSandboxId);
+  if (!sandbox) {
+    refs.pmStatus.textContent = 'Sandbox selecionado não está disponível no projeto atual.';
+    renderSandboxPromoteSection();
+    return;
+  }
   const notes = refs.pmNotes?.value.trim() || '';
   const impactSummary = buildPromotionImpactSummary(sandbox);
+  if (
+    isDuplicateSandboxPromotion({
+      lastPromotion: projectSandboxPromotions()[0] || null,
+      sandboxId: sandbox.id,
+      notes,
+      impactSummary
+    })
+  ) {
+    refs.pmStatus.textContent = 'Promoção já registrada com o mesmo contexto. Ajuste notas/estado antes de confirmar novamente.';
+    return;
+  }
   if (!state.sandboxPromotions) state.sandboxPromotions = [];
   state.sandboxPromotions.push(
     createSandboxPromotion({
@@ -3257,6 +3278,10 @@ refs.pcGenerateBtn?.addEventListener('click', async () => {
 
   const preflight = buildProductionClosurePreflight(projectId);
   const includes = closureIncludesFromUi();
+  if (!canGenerateClosureExport(includes)) {
+    refs.pcStatus.textContent = 'Selecione pelo menos uma seção para compor o closure export.';
+    return;
+  }
   const composition = buildProductionClosureComposition(preflight, includes);
   const packageData = {
     version: 'mvp-export-closure-v1',
@@ -3340,7 +3365,11 @@ refs.pcGenerateBtn?.addEventListener('click', async () => {
   );
   state.productionClosures = state.productionClosures.slice(0, 25);
   persist();
-  refs.pcStatus.textContent = `Resumo de closure gerado: ${filename}`;
+  refs.pcStatus.textContent = buildClosureExportStatusMessage({
+    filename,
+    blockers: preflight.summary.blockers,
+    warnings: preflight.summary.warnings
+  });
 
   try {
     const savedPath = await saveExportToWorkspace({ settings: state.settings, filename, content });
@@ -3351,8 +3380,17 @@ refs.pcGenerateBtn?.addEventListener('click', async () => {
 });
 
 refs.pcDownloadBtn?.addEventListener('click', () => {
+  const projectId = selectedProjectId();
+  if (!projectId) {
+    if (refs.pcStatus) refs.pcStatus.textContent = 'Selecione um projeto antes de baixar o closure export.';
+    return;
+  }
   if (!productionClosureLastExport.filename || !productionClosureLastExport.content) {
     if (refs.pcStatus) refs.pcStatus.textContent = 'Gere um closure export antes de baixar.';
+    return;
+  }
+  if (productionClosureLastExport.projectId && productionClosureLastExport.projectId !== projectId) {
+    if (refs.pcStatus) refs.pcStatus.textContent = 'O último closure export pertence a outro projeto. Gere um export deste projeto antes de baixar.';
     return;
   }
   downloadFile(productionClosureLastExport.filename, productionClosureLastExport.content, 'application/json');
