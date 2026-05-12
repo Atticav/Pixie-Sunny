@@ -17,6 +17,7 @@ import {
   createReferenceImage,
   createScene,
   createShot,
+  createWorkspaceSandbox,
   createWorkspaceCheckpoint,
   deleteEntity,
   CANON_PROMOTION_TYPES,
@@ -28,7 +29,8 @@ import {
   IMAGE_GEN_STATUSES,
   OUTPUT_REVIEW_STATUSES,
   REFERENCE_TYPES,
-  SHOT_STATUSES
+  SHOT_STATUSES,
+  WORKSPACE_SANDBOX_STATUSES
 } from '../src/models.js';
 import { buildCharacterPromptPack, buildScenePromptPack, inferSceneCharactersFromContext, searchLore } from '../src/assistant.js';
 import { buildAssistivePlanningBundle } from '../src/assistive-planning.js';
@@ -1311,6 +1313,101 @@ test('deleteEntity removes workspace checkpoints when project is deleted', () =>
 
   assert.equal(result.workspaceCheckpoints.length, 1);
   assert.equal(result.workspaceCheckpoints[0].id, checkpointB.id);
+});
+
+test('WORKSPACE_SANDBOX_STATUSES contains expected values', () => {
+  assert.deepEqual(WORKSPACE_SANDBOX_STATUSES, ['exploratory', 'candidate', 'review-ready']);
+});
+
+test('createWorkspaceSandbox stores metadata and snapshot payload', () => {
+  const project = createProject({ name: 'Sandbox Project' });
+  const sandbox = createWorkspaceSandbox({
+    projectId: project.id,
+    name: 'Ramo alternativo A',
+    purpose: 'Testar direção mais intimista',
+    status: 'candidate',
+    snapshot: { scenes: 5, reviewInboxPending: 1 }
+  });
+
+  assert.ok(sandbox.id);
+  assert.equal(sandbox.projectId, project.id);
+  assert.equal(sandbox.name, 'Ramo alternativo A');
+  assert.equal(sandbox.purpose, 'Testar direção mais intimista');
+  assert.equal(sandbox.status, 'candidate');
+  assert.deepEqual(sandbox.snapshot, { scenes: 5, reviewInboxPending: 1 });
+  assert.ok(sandbox.createdAt);
+  assert.ok(sandbox.updatedAt);
+});
+
+test('normalizeState keeps valid workspace sandboxes and removes orphan project sandboxes', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'p1', name: 'Projeto' }],
+    workspaceSandboxes: [
+      {
+        id: 'sb1',
+        projectId: 'p1',
+        name: 'Sandbox válido',
+        purpose: 'Explorar caminho alternativo',
+        status: 'review-ready',
+        snapshot: { scenes: 3 },
+        createdAt: '2026-05-12T10:00:00.000Z',
+        updatedAt: '2026-05-12T11:00:00.000Z'
+      },
+      {
+        id: 'sb2',
+        projectId: 'ghost-project',
+        name: 'Sandbox órfão',
+        snapshot: { scenes: 999 }
+      }
+    ]
+  });
+
+  assert.equal(sanitized.workspaceSandboxes.length, 1);
+  assert.equal(sanitized.workspaceSandboxes[0].id, 'sb1');
+  assert.equal(sanitized.workspaceSandboxes[0].status, 'review-ready');
+  assert.deepEqual(sanitized.workspaceSandboxes[0].snapshot, { scenes: 3 });
+});
+
+test('deleteEntity removes workspace sandboxes when project is deleted', () => {
+  const project = createProject({ name: 'Projeto A' });
+  const otherProject = createProject({ name: 'Projeto B' });
+  const sandboxA = createWorkspaceSandbox({
+    projectId: project.id,
+    name: 'Sandbox A',
+    snapshot: { shots: 1 }
+  });
+  const sandboxB = createWorkspaceSandbox({
+    projectId: otherProject.id,
+    name: 'Sandbox B',
+    snapshot: { shots: 3 }
+  });
+
+  const result = deleteEntity(
+    {
+      projects: [project, otherProject],
+      books: [],
+      chapters: [],
+      scenes: [],
+      beats: [],
+      shots: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [],
+      canonPromotions: [],
+      decisionHistory: [],
+      workspaceCheckpoints: [],
+      workspaceSandboxes: [sandboxA, sandboxB],
+      settings: {}
+    },
+    'project',
+    project.id
+  );
+
+  assert.equal(result.workspaceSandboxes.length, 1);
+  assert.equal(result.workspaceSandboxes[0].id, sandboxB.id);
 });
 
 test('createBeat and createShot include planning defaults', () => {

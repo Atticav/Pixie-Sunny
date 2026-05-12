@@ -98,6 +98,7 @@ export const DECISION_RESULT_STATUSES = [
   'needs_revision',
   'archived_deprecated'
 ];
+export const WORKSPACE_SANDBOX_STATUSES = ['exploratory', 'candidate', 'review-ready'];
 
 const baseImageGenSettings = () => ({
   type: 'mock',
@@ -168,6 +169,7 @@ export const emptyState = () => ({
   canonPromotions: [],
   decisionHistory: [],
   workspaceCheckpoints: [],
+  workspaceSandboxes: [],
   settings: baseSettings()
 });
 
@@ -540,6 +542,26 @@ export const createWorkspaceCheckpoint = ({
   snapshot: recordValue(snapshot) || {},
   createdAt: nowUtc()
 });
+
+export const createWorkspaceSandbox = ({
+  projectId,
+  name,
+  purpose = '',
+  status = 'exploratory',
+  snapshot = {}
+}) => {
+  const timestamp = nowUtc();
+  return {
+    id: newId(),
+    projectId,
+    name: stringValue(name, 'Sandbox sem nome'),
+    purpose: stringValue(purpose),
+    status: WORKSPACE_SANDBOX_STATUSES.includes(status) ? status : 'exploratory',
+    snapshot: recordValue(snapshot) || {},
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+};
 
 export const createGenerationJob = ({
   projectId,
@@ -1044,6 +1066,23 @@ const normalizeWorkspaceCheckpoint = (checkpoint) => {
   };
 };
 
+const normalizeWorkspaceSandbox = (sandbox) => {
+  const value = recordValue(sandbox);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    name: stringValue(value.name, 'Sandbox sem nome'),
+    purpose: stringValue(value.purpose),
+    status: WORKSPACE_SANDBOX_STATUSES.includes(stringValue(value.status))
+      ? stringValue(value.status)
+      : 'exploratory',
+    snapshot: recordValue(value.snapshot) || {},
+    createdAt: stringValue(value.createdAt) || nowUtc(),
+    updatedAt: stringValue(value.updatedAt) || stringValue(value.createdAt) || nowUtc()
+  };
+};
+
 export const normalizeState = (raw) => {
   const value = recordValue(raw) || {};
   const settingsSource = recordValue(value.settings) || {};
@@ -1102,6 +1141,9 @@ export const normalizeState = (raw) => {
   const workspaceCheckpoints = (Array.isArray(value.workspaceCheckpoints) ? value.workspaceCheckpoints : [])
     .map(normalizeWorkspaceCheckpoint)
     .filter((checkpoint) => checkpoint && projectIds.has(checkpoint.projectId));
+  const workspaceSandboxes = (Array.isArray(value.workspaceSandboxes) ? value.workspaceSandboxes : [])
+    .map(normalizeWorkspaceSandbox)
+    .filter((sandbox) => sandbox && projectIds.has(sandbox.projectId));
   const beats = (Array.isArray(value.beats) ? value.beats : [])
     .map(normalizeBeat)
     .filter(
@@ -1160,6 +1202,7 @@ export const normalizeState = (raw) => {
     canonPromotions,
     decisionHistory,
     workspaceCheckpoints,
+    workspaceSandboxes,
     settings: {
       ...baseSettings(),
       ...settingsSource,
@@ -1192,7 +1235,8 @@ export const deleteEntity = (state, entityType, id) => {
       generationJobs: current.generationJobs.filter((job) => job.projectId !== id),
       canonPromotions: (current.canonPromotions || []).filter((p) => p.projectId !== id),
       decisionHistory: (current.decisionHistory || []).filter((event) => event.projectId !== id),
-      workspaceCheckpoints: (current.workspaceCheckpoints || []).filter((checkpoint) => checkpoint.projectId !== id)
+      workspaceCheckpoints: (current.workspaceCheckpoints || []).filter((checkpoint) => checkpoint.projectId !== id),
+      workspaceSandboxes: (current.workspaceSandboxes || []).filter((sandbox) => sandbox.projectId !== id)
     });
   }
 

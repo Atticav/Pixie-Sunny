@@ -238,6 +238,30 @@ O app agora inclui uma camada de checkpoints operacionais para memória explíci
 
 Este MVP estabelece a base para evoluções futuras (restore, branching e fluxos mais avançados) mantendo escopo pequeno e mergeável.
 
+## Workspace Branching / Scenario Sandbox (MVP)
+
+O app agora inclui uma superfície local-first para experimentar caminhos alternativos sem contaminar o workspace principal:
+
+- cria sandboxes por projeto com metadata básica:
+  - nome
+  - propósito
+  - status/categoria (`exploratory`, `candidate`, `review-ready`)
+  - timestamps de criação/atualização
+- lista sandboxes existentes no workspace local
+- permite selecionar um sandbox e comparar rapidamente sandbox vs estado principal com:
+  - diff de metadata operacional
+  - highlights semânticos
+  - diff textual de contexto (readiness/inbox)
+- integrações rápidas no painel:
+  - **Diff Viewer / Context Compare**
+  - **Editorial Timeline / Decision History**
+  - **Review Inbox / Triage Workspace**
+  - **Workflow Recipes / Guided Playbooks**
+  - **State Snapshot / Workspace Checkpoints**
+- inclui atualização manual de snapshot do sandbox para registrar progresso exploratório
+
+Este slice entrega valor prático imediato e prepara a fundação para próximos passos de **promote/merge/commit-to-main** sem depender de backend SaaS.
+
 ## Approval & Decision History Layer
 
 O app agora registra e navega decisões editoriais/operacionais por item:
