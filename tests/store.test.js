@@ -1710,3 +1710,31 @@ test('deleteEntity removes sandboxPromotions belonging to deleted project', () =
   assert.equal(result.sandboxPromotions.length, 1);
   assert.equal(result.sandboxPromotions[0].id, promoB.id);
 });
+
+test('store persists sandboxPromotions across save/load', () => {
+  const storage = fakeStorage();
+  const store = createStore({ key: 'test-promote', storage });
+  const data = store.load();
+  const project = createProject({ name: 'Promote Project' });
+  const sandbox = createWorkspaceSandbox({ projectId: project.id, name: 'SB candidate', status: 'review-ready' });
+  const promo = createSandboxPromotion({
+    projectId: project.id,
+    sandboxId: sandbox.id,
+    sandboxName: sandbox.name,
+    sandboxStatus: sandbox.status,
+    sandboxSnapshot: { scenes: 2 },
+    notes: 'Aprovado',
+    impactSummary: '2 cena(s)'
+  });
+  data.projects.push(project);
+  data.workspaceSandboxes.push(sandbox);
+  data.sandboxPromotions = [promo];
+  store.save(data);
+
+  const loaded = store.load();
+  assert.equal(loaded.sandboxPromotions.length, 1);
+  assert.equal(loaded.sandboxPromotions[0].sandboxId, sandbox.id);
+  assert.equal(loaded.sandboxPromotions[0].notes, 'Aprovado');
+  assert.equal(loaded.sandboxPromotions[0].impactSummary, '2 cena(s)');
+  assert.equal(loaded.sandboxPromotions[0].status, 'confirmed');
+});

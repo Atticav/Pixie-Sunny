@@ -937,7 +937,7 @@ select:disabled {
   margin-top: 16px;
 }
 
-.pm-history-title {
+.pm-history-section-title {
   font-size: 0.9rem;
   margin: 0 0 8px;
 }
@@ -956,7 +956,7 @@ select:disabled {
   gap: 4px;
 }
 
-.pm-history-title {
+.pm-history-card-title {
   font-size: 0.88rem;
 }
 

@@ -1746,14 +1746,22 @@ const renderSandboxPromoteSection = () => {
     refs.pmSummaryPanel.classList.remove('pm-hidden');
     if (refs.pmSummaryDl) {
       const impactSummary = buildPromotionImpactSummary(sandbox);
-      refs.pmSummaryDl.innerHTML = `
-        <dt>Sandbox origem</dt><dd>${sandbox.name || '—'}</dd>
-        <dt>Propósito</dt><dd>${sandbox.purpose || '—'}</dd>
-        <dt>Status</dt><dd>${SANDBOX_STATUS_READINESS[sandbox.status] || sandbox.status}</dd>
-        <dt>Target</dt><dd>workspace principal (${projectId})</dd>
-        <dt>Impacto (snapshot)</dt><dd>${impactSummary}</dd>
-        <dt>Snapshot em</dt><dd>${new Date(sandbox.updatedAt || sandbox.createdAt).toLocaleString('pt-BR')}</dd>
-      `;
+      const rows = [
+        ['Sandbox origem', sandbox.name || '—'],
+        ['Propósito', sandbox.purpose || '—'],
+        ['Status', SANDBOX_STATUS_READINESS[sandbox.status] || sandbox.status],
+        ['Target', `workspace principal (${projectId})`],
+        ['Impacto (snapshot)', impactSummary],
+        ['Snapshot em', new Date(sandbox.updatedAt || sandbox.createdAt).toLocaleString('pt-BR')]
+      ];
+      refs.pmSummaryDl.innerHTML = '';
+      rows.forEach(([label, value]) => {
+        const dt = document.createElement('dt');
+        dt.textContent = label;
+        const dd = document.createElement('dd');
+        dd.textContent = value;
+        refs.pmSummaryDl.append(dt, dd);
+      });
     }
   }
 
@@ -1769,7 +1777,7 @@ const renderSandboxPromoteSection = () => {
     card.className = 'pm-history-card';
 
     const title = document.createElement('strong');
-    title.className = 'pm-history-title';
+    title.className = 'pm-history-card-title';
     title.textContent = promo.sandboxName || 'Sandbox sem nome';
 
     const meta = document.createElement('p');
