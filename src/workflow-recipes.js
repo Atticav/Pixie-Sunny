@@ -11,6 +11,7 @@
  *   1. nova-cena     – Create a new scene from scratch
  *   2. review-inbox  – Review Inbox resolution flow
  *   3. pre-export    – Pre-export readiness flow
+ *   4. sandbox-closure – Guided operational handoff from sandbox to closure export
  *
  * Future recipes can be added to WORKFLOW_RECIPES without touching any
  * other file.
@@ -188,6 +189,62 @@ export const WORKFLOW_RECIPES = [
         rationale:
           'Gere o export JSON completo como snapshot final antes do handoff ou publicação.',
         quickAction: 'export-json'
+      }
+    ]
+  },
+  {
+    id: 'sandbox-closure',
+    title: 'Do sandbox ao closure final',
+    description:
+      'Playbook operacional para revisar uma hipótese, promover a decisão e fechar o pacote final com rastreabilidade.',
+    steps: [
+      {
+        id: 'sandbox-closure-1',
+        label: 'Revisar o sandbox candidato',
+        rationale:
+          'Comece pelo Scenario Sandbox para validar propósito, status e snapshot antes de comparar com o workspace principal.',
+        scrollTarget: '.sb-section',
+        quickAction: 'scroll-sandbox'
+      },
+      {
+        id: 'sandbox-closure-2',
+        label: 'Comparar contexto no Diff Viewer',
+        rationale:
+          'Use o Diff Viewer / Context Compare para entender diferenças relevantes e reduzir ambiguidade antes da promoção.',
+        scrollTarget: '.dv-section',
+        quickAction: 'scroll-diff-viewer'
+      },
+      {
+        id: 'sandbox-closure-3',
+        label: 'Confirmar Promote / Merge / Commit',
+        rationale:
+          'Revise o impacto resumido, registre notas e confirme a promoção do candidato escolhido.',
+        scrollTarget: '.pm-section',
+        quickAction: 'scroll-promote'
+      },
+      {
+        id: 'sandbox-closure-4',
+        label: 'Salvar um Workspace Checkpoint',
+        rationale:
+          'Crie um checkpoint antes do fechamento para registrar o estado operacional aprovado.',
+        scrollTarget: '.sc-section',
+        quickAction: 'scroll-checkpoints'
+      },
+      {
+        id: 'sandbox-closure-5',
+        label: 'Resolver Review Inbox e validar readiness',
+        rationale:
+          'Limpe bloqueios pendentes e confirme o Production Readiness Dashboard antes do export final.',
+        scrollTarget: '.ri-section',
+        quickAction: 'scroll-review-inbox'
+      },
+      {
+        id: 'sandbox-closure-6',
+        label: 'Gerar Export / Delivery / Production Closure',
+        rationale:
+          'Finalize o handoff gerando o resumo estruturado de closure com as seções necessárias do pacote.',
+        scrollTarget: '.pc-section',
+        quickAction: 'scroll-closure'
       }
     ]
   }

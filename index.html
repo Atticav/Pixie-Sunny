@@ -355,53 +355,59 @@
         <p class="storage-note">
           Centro operacional local-first no MacBook para consolidar conflitos, riscos, itens stale e pendências que exigem decisão humana no pipeline.
         </p>
+        <div class="surface-links">
+          <button id="reviewInboxOpenDiffBtn">Diff Viewer / Context Compare</button>
+          <button id="reviewInboxOpenReadinessBtn">Production Readiness Dashboard</button>
+          <button id="reviewInboxOpenRecipesBtn">Workflow Recipes / Playbooks</button>
+          <button id="reviewInboxOpenClosureBtn">Export / Delivery / Fechamento</button>
+        </div>
         <div class="ri-controls">
           <label>Tipo
             <select id="reviewInboxTypeFilter">
               <option value="">Todos</option>
-              <option value="human_review">human review</option>
-              <option value="stale_needs_refresh">stale / needs refresh</option>
-              <option value="diff_review">diff review</option>
-              <option value="blocked_shot">blocked shot</option>
-              <option value="readiness_risk">readiness risk</option>
-              <option value="automation_confirmation">automation confirmation</option>
-              <option value="decision_follow_up">decision follow-up</option>
-              <option value="operational_signal">operational signal</option>
+              <option value="human_review">Revisão humana</option>
+              <option value="stale_needs_refresh">Item stale / needs refresh</option>
+              <option value="diff_review">Comparar variantes / diff</option>
+              <option value="blocked_shot">Shot bloqueado</option>
+              <option value="readiness_risk">Risco de readiness</option>
+              <option value="automation_confirmation">Sinal de automação</option>
+              <option value="decision_follow_up">Follow-up editorial</option>
+              <option value="operational_signal">Sinal operacional</option>
             </select>
           </label>
           <label>Prioridade
             <select id="reviewInboxPriorityFilter">
               <option value="">Todas</option>
-              <option value="high">high</option>
-              <option value="medium">medium</option>
-              <option value="low">low</option>
+              <option value="high">Alta</option>
+              <option value="medium">Média</option>
+              <option value="low">Baixa</option>
             </select>
           </label>
           <label>Risco
             <select id="reviewInboxRiskFilter">
               <option value="">Todos</option>
-              <option value="high">high</option>
-              <option value="medium">medium</option>
-              <option value="low">low</option>
+              <option value="high">Alto</option>
+              <option value="medium">Médio</option>
+              <option value="low">Baixo</option>
             </select>
           </label>
           <label>Status
             <select id="reviewInboxStatusFilter">
               <option value="">Todos</option>
-              <option value="pending_review">pending review</option>
-              <option value="blocked">blocked</option>
-              <option value="needs_refresh">needs refresh</option>
+              <option value="pending_review">Aguardando review</option>
+              <option value="blocked">Bloqueado</option>
+              <option value="needs_refresh">Precisa refresh</option>
             </select>
           </label>
           <label>Entidade
             <select id="reviewInboxEntityFilter">
               <option value="">Todas</option>
               <option value="asset">asset</option>
-              <option value="scene">scene</option>
+              <option value="scene">cena</option>
               <option value="shot">shot</option>
-              <option value="chapter">chapter</option>
-              <option value="sequence">sequence</option>
-              <option value="project">project</option>
+              <option value="chapter">capítulo</option>
+              <option value="sequence">sequência</option>
+              <option value="project">projeto</option>
             </select>
           </label>
           <label>Capítulo
@@ -451,10 +457,10 @@
           </label>
           <select id="reviewInboxBatchAction">
             <option value="">Ação em lote</option>
-            <option value="approve">approve</option>
-            <option value="reject">reject</option>
-            <option value="defer">defer</option>
-            <option value="mark-refresh">mark for refresh</option>
+            <option value="approve">Aprovar</option>
+            <option value="reject">Rejeitar</option>
+            <option value="defer">Adiar</option>
+            <option value="mark-refresh">Marcar para refresh</option>
           </select>
           <button id="reviewInboxRunBatchBtn">Executar lote</button>
         </div>
@@ -505,11 +511,13 @@
               </label>
               <div class="sb-quick-actions">
                 <button id="sandboxRefreshBtn">Atualizar snapshot</button>
-                <button id="sandboxOpenDiffBtn">Abrir Diff Viewer</button>
-                <button id="sandboxOpenDecisionsBtn">Editorial Timeline</button>
+                <button id="sandboxOpenDiffBtn">Diff Viewer / Context Compare</button>
+                <button id="sandboxOpenDecisionsBtn">Editorial Timeline / Activity Feed</button>
+                <button id="sandboxOpenReadinessBtn">Production Readiness Dashboard</button>
                 <button id="sandboxOpenInboxBtn">Review Inbox</button>
-                <button id="sandboxOpenRecipesBtn">Workflow Recipes</button>
+                <button id="sandboxOpenRecipesBtn">Workflow Recipes / Playbooks</button>
                 <button id="sandboxOpenCheckpointsBtn">Workspace Checkpoints</button>
+                <button id="sandboxOpenClosureBtn">Export / Delivery / Fechamento</button>
               </div>
             </div>
             <p id="sandboxCompareSummary" class="sb-compare-summary">Selecione um sandbox para comparar.</p>
@@ -529,6 +537,13 @@
         <p class="storage-note">
           Promova um sandbox candidato para o workspace principal: revise o resumo de impacto, confirme a promoção e registre a decisão.
         </p>
+        <div class="surface-links">
+          <button id="pmOpenSandboxBtn">Scenario Sandbox</button>
+          <button id="pmOpenInboxBtn">Review Inbox</button>
+          <button id="pmOpenCheckpointsBtn">Workspace Checkpoints</button>
+          <button id="pmOpenClosureBtn">Export / Delivery / Fechamento</button>
+        </div>
+        <p id="pmGuidance" class="surface-guidance">Selecione um projeto para revisar candidatos à promoção.</p>
         <div class="pm-flow">
           <div class="pm-selector">
             <label>Sandbox candidato
@@ -562,12 +577,13 @@
           Preflight final local-first para validar prontidão, revisar blockers/warnings e gerar um pacote estruturado de fechamento de produção.
         </p>
         <div class="pc-quick-actions">
-          <button id="pcOpenReadinessBtn">Production Readiness</button>
+          <button id="pcOpenReadinessBtn">Production Readiness Dashboard</button>
           <button id="pcOpenInboxBtn">Review Inbox</button>
           <button id="pcOpenSandboxBtn">Scenario Sandbox</button>
           <button id="pcOpenPromoteBtn">Promote / Merge</button>
           <button id="pcOpenCheckpointsBtn">Workspace Checkpoints</button>
         </div>
+        <p id="pcPreflightSummary" class="surface-guidance">Selecione um projeto para rodar o preflight final.</p>
         <div class="pc-preflight">
           <article class="pc-column">
             <h3>Ready items</h3>
@@ -597,8 +613,8 @@
           <label class="check-inline"><input id="pcIncludeSnapshot" type="checkbox" checked /> Snapshot metrics</label>
         </div>
         <div class="pc-actions">
-          <button id="pcGenerateBtn">Gerar closure export summary</button>
-          <button id="pcDownloadBtn">Baixar pacote .json</button>
+          <button id="pcGenerateBtn">Gerar resumo de fechamento (.json)</button>
+          <button id="pcDownloadBtn">Baixar pacote de fechamento (.json)</button>
         </div>
         <p id="pcStatus" class="pc-status"></p>
         <h3>Composição do pacote</h3>
@@ -635,10 +651,12 @@
                 </select>
               </label>
               <div class="sc-quick-actions">
-                <button id="checkpointOpenDiffBtn">Abrir Diff Viewer</button>
-                <button id="checkpointOpenDecisionsBtn">Histórico Editorial</button>
-                <button id="checkpointOpenReadinessBtn">Production Readiness</button>
+                <button id="checkpointOpenDiffBtn">Diff Viewer / Context Compare</button>
+                <button id="checkpointOpenDecisionsBtn">Editorial Timeline / Activity Feed</button>
+                <button id="checkpointOpenReadinessBtn">Production Readiness Dashboard</button>
                 <button id="checkpointOpenInboxBtn">Review Inbox</button>
+                <button id="checkpointOpenSandboxBtn">Scenario Sandbox</button>
+                <button id="checkpointOpenRecipesBtn">Workflow Recipes / Playbooks</button>
               </div>
             </div>
             <p id="checkpointCompareSummary" class="sc-compare-summary">Selecione um checkpoint para comparar.</p>

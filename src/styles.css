@@ -31,6 +31,25 @@ header p {
   line-height: 1.5;
 }
 
+.surface-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.surface-links button {
+  font-size: 0.74rem;
+  padding: 4px 8px;
+}
+
+.surface-guidance {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
 .header-actions {
   display: flex;
   gap: 10px;
