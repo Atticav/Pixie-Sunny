@@ -44,7 +44,7 @@ export const createStore = ({ key = 'pixieSunnyStudio', storage } = {}) => {
       try {
         db.setItem(key, JSON.stringify(backup));
       } catch {
-        // fallback best-effort
+        // Could fail due quota/restricted storage; keep in-memory recovered state.
       }
       return backup;
     }
@@ -57,10 +57,12 @@ export const createStore = ({ key = 'pixieSunnyStudio', storage } = {}) => {
     try {
       db.setItem(key, serialized);
     } catch {
+      // Keep app state usable even when browser storage write fails.
     }
     try {
       db.setItem(backupKey, serialized);
     } catch {
+      // Backup persistence is best-effort and should not interrupt user flow.
     }
     return next;
   };
