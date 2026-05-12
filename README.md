@@ -11,7 +11,7 @@ MVP executável para uso pessoal focado em:
 
 Se você está chegando agora, use esta ordem curta:
 
-1. **Quick start local:** seção [Como rodar localmente](#como-rodar-localmente)
+1. **Início rápido local:** seção [Como rodar localmente](#como-rodar-localmente)
 2. **Fluxo principal + roteiro de demo:** [`docs/demo-quickstart.md`](docs/demo-quickstart.md)
 3. **Configuração de geração local (opcional):** [`docs/image-generation.md`](docs/image-generation.md)
 

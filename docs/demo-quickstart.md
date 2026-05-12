@@ -50,7 +50,7 @@ Use este mapa para entender como os módulos se conectam:
 
 ### Caminho B — pré-export rápido
 
-1. Abra o playbook `Preflight para export final`
+1. Abra o playbook `Fluxo de prontidão pré-export`
 2. Revise blockers/warnings
 3. Gere o export JSON final com as seções necessárias
 
