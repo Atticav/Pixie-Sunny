@@ -1869,24 +1869,24 @@ const buildProductionClosurePreflight = (projectId) => {
 
   const blockers = [];
   if (assistiveBundle.summary.blocked > 0) {
-    blockers.push(`${assistiveBundle.summary.blocked} item(ns) bloqueado(s) no Production Readiness Dashboard.`);
+    blockers.push(`${assistiveBundle.summary.blocked} itens bloqueados no Production Readiness Dashboard.`);
   }
   if (missingDependencies.length > 0) {
     blockers.push(`${missingDependencies.length} dependência(s) faltante(s) detectada(s) no preflight.`);
   }
   if (blockedReview.length > 0) {
-    blockers.push(`${blockedReview.length} item(ns) bloqueado(s) ainda pendentes na Review Inbox.`);
+    blockers.push(`${blockedReview.length} itens bloqueados ainda pendentes na Review Inbox.`);
   }
 
   const warnings = [];
   if (pendingReview.length > 0) {
-    warnings.push(`${pendingReview.length} item(ns) aguardando revisão humana.`);
+    warnings.push(`${pendingReview.length} itens aguardando revisão humana.`);
   }
   if (needsRefreshReview.length > 0) {
-    warnings.push(`${needsRefreshReview.length} item(ns) stale / needs refresh.`);
+    warnings.push(`${needsRefreshReview.length} itens stale / needs refresh.`);
   }
   if (highRiskReview.length > 0) {
-    warnings.push(`${highRiskReview.length} item(ns) de alto risco operacional.`);
+    warnings.push(`${highRiskReview.length} itens de alto risco operacional.`);
   }
   if (unresolvedDecisionConcerns.length > 0) {
     warnings.push(`${unresolvedDecisionConcerns.length} follow-up(s) editorial(is) sem fechamento.`);
