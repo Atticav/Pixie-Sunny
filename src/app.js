@@ -2354,7 +2354,6 @@ refs.createCheckpointBtn?.addEventListener('click', () => {
     refs.checkpointSummary.textContent = 'Informe um nome para o checkpoint.';
     return;
   }
-  if (!state.workspaceCheckpoints) state.workspaceCheckpoints = [];
   state.workspaceCheckpoints.push(
     createWorkspaceCheckpoint({
       projectId,
