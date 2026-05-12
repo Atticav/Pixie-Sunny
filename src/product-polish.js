@@ -22,7 +22,7 @@ export const buildReviewInboxSummary = ({
   hasActiveFilters = false
 }) => {
   if (totalCount <= 0) {
-    return 'Inbox limpa neste projeto. Próximo passo: confirme o Production Readiness Dashboard ou gere um checkpoint antes do closure export.';
+    return 'Inbox limpa neste projeto. Próximo passo: confirme o Production Readiness Dashboard ou gere um checkpoint antes do export de fechamento.';
   }
   const visibleSummary = hasActiveFilters
     ? `${filteredCount}/${totalCount} itens visíveis com os filtros atuais`
@@ -53,10 +53,10 @@ export const buildPreflightStatusMessage = ({
   ready = 0
 }) => {
   if (blockers > 0) {
-    return `Export bloqueado no momento · ${blockers} blocker(s) · ${warnings} warning(s).`;
+    return `Export bloqueado no momento · ${blockers} bloqueador(es) · ${warnings} aviso(s).`;
   }
   if (warnings > 0) {
-    return `Pronto com alertas · ${warnings} warning(s) antes do closure export.`;
+    return `Pronto com alertas · ${warnings} aviso(s) antes do export de fechamento.`;
   }
-  return `Pronto para gerar closure export · ${ready} sinal(is) positivos no preflight.`;
+  return `Pronto para gerar export de fechamento · ${ready} sinal(is) positivos no preflight final.`;
 };

@@ -63,14 +63,14 @@ test('buildPromotionGuidance reflects project, sandbox and selection state', () 
 test('buildPreflightStatusMessage prioritizes blockers, then warnings, then ready state', () => {
   assert.equal(
     buildPreflightStatusMessage({ blockers: 2, warnings: 1, ready: 4 }),
-    'Export bloqueado no momento · 2 blocker(s) · 1 warning(s).'
+    'Export bloqueado no momento · 2 bloqueador(es) · 1 aviso(s).'
   );
   assert.equal(
     buildPreflightStatusMessage({ blockers: 0, warnings: 3, ready: 4 }),
-    'Pronto com alertas · 3 warning(s) antes do closure export.'
+    'Pronto com alertas · 3 aviso(s) antes do export de fechamento.'
   );
   assert.equal(
     buildPreflightStatusMessage({ blockers: 0, warnings: 0, ready: 5 }),
-    'Pronto para gerar closure export · 5 sinal(is) positivos no preflight.'
+    'Pronto para gerar export de fechamento · 5 sinal(is) positivos no preflight final.'
   );
 });

@@ -373,7 +373,7 @@ export const groupReviewInboxItems = (items, groupBy = 'type') => {
 
 export const formatReviewInboxGroupLabel = (groupBy, key) => {
   const value = safeString(key) || 'outros';
-  if ((groupBy || 'type') === 'type') return REVIEW_INBOX_TYPE_LABELS[value] || value;
+  if (!groupBy || groupBy === 'type') return REVIEW_INBOX_TYPE_LABELS[value] || value;
   if (groupBy === 'status') return REVIEW_INBOX_STATUS_LABELS[value] || value;
   if (groupBy === 'priority') return `Prioridade ${REVIEW_INBOX_PRIORITY_LABELS[value] || value}`;
   if (groupBy === 'risk') return `Risco ${REVIEW_INBOX_RISK_LABELS[value] || value}`;
