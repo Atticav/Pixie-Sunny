@@ -167,6 +167,7 @@ export const emptyState = () => ({
   generationJobs: [],
   canonPromotions: [],
   decisionHistory: [],
+  workspaceCheckpoints: [],
   settings: baseSettings()
 });
 
@@ -522,6 +523,22 @@ export const createDecisionEvent = ({
   notes: stringValue(notes),
   resultingStatus: DECISION_RESULT_STATUSES.includes(resultingStatus) ? resultingStatus : 'pending_review',
   happenedAt: stringValue(happenedAt) || nowUtc()
+});
+
+export const createWorkspaceCheckpoint = ({
+  projectId,
+  name,
+  reason = '',
+  notes = '',
+  snapshot = {}
+}) => ({
+  id: newId(),
+  projectId,
+  name: stringValue(name, 'Checkpoint sem nome'),
+  reason: stringValue(reason),
+  notes: stringValue(notes),
+  snapshot: recordValue(snapshot) || {},
+  createdAt: nowUtc()
 });
 
 export const createGenerationJob = ({
@@ -1013,6 +1030,20 @@ const normalizeDecisionEvent = (event) => {
   };
 };
 
+const normalizeWorkspaceCheckpoint = (checkpoint) => {
+  const value = recordValue(checkpoint);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId'])) return null;
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    name: stringValue(value.name, 'Checkpoint sem nome'),
+    reason: stringValue(value.reason),
+    notes: stringValue(value.notes),
+    snapshot: recordValue(value.snapshot) || {},
+    createdAt: stringValue(value.createdAt) || nowUtc()
+  };
+};
+
 export const normalizeState = (raw) => {
   const value = recordValue(raw) || {};
   const settingsSource = recordValue(value.settings) || {};
@@ -1068,6 +1099,9 @@ export const normalizeState = (raw) => {
   const decisionHistory = (Array.isArray(value.decisionHistory) ? value.decisionHistory : [])
     .map(normalizeDecisionEvent)
     .filter((event) => event && projectIds.has(event.projectId));
+  const workspaceCheckpoints = (Array.isArray(value.workspaceCheckpoints) ? value.workspaceCheckpoints : [])
+    .map(normalizeWorkspaceCheckpoint)
+    .filter((checkpoint) => checkpoint && projectIds.has(checkpoint.projectId));
   const beats = (Array.isArray(value.beats) ? value.beats : [])
     .map(normalizeBeat)
     .filter(
@@ -1125,6 +1159,7 @@ export const normalizeState = (raw) => {
     generationJobs,
     canonPromotions,
     decisionHistory,
+    workspaceCheckpoints,
     settings: {
       ...baseSettings(),
       ...settingsSource,
@@ -1156,7 +1191,8 @@ export const deleteEntity = (state, entityType, id) => {
       promptDocuments: current.promptDocuments.filter((promptDocument) => promptDocument.projectId !== id),
       generationJobs: current.generationJobs.filter((job) => job.projectId !== id),
       canonPromotions: (current.canonPromotions || []).filter((p) => p.projectId !== id),
-      decisionHistory: (current.decisionHistory || []).filter((event) => event.projectId !== id)
+      decisionHistory: (current.decisionHistory || []).filter((event) => event.projectId !== id),
+      workspaceCheckpoints: (current.workspaceCheckpoints || []).filter((checkpoint) => checkpoint.projectId !== id)
     });
   }
 

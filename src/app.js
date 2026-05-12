@@ -14,6 +14,7 @@ import {
   createReferenceImage,
   createScene,
   createShot,
+  createWorkspaceCheckpoint,
   deleteEntity,
   CANON_PROMOTION_TYPES,
   DECISION_RESULT_STATUSES,
@@ -166,7 +167,22 @@ const refs = {
   reviewInboxBatchAction: $('reviewInboxBatchAction'),
   reviewInboxRunBatchBtn: $('reviewInboxRunBatchBtn'),
   wrRecipeList: $('wrRecipeList'),
-  wrDetail: $('wrDetail')
+  wrDetail: $('wrDetail'),
+  checkpointName: $('checkpointName'),
+  checkpointReason: $('checkpointReason'),
+  checkpointNotes: $('checkpointNotes'),
+  createCheckpointBtn: $('createCheckpointBtn'),
+  checkpointSummary: $('checkpointSummary'),
+  checkpointList: $('checkpointList'),
+  checkpointCompareSelect: $('checkpointCompareSelect'),
+  checkpointCompareSummary: $('checkpointCompareSummary'),
+  checkpointCompareHighlights: $('checkpointCompareHighlights'),
+  checkpointCompareMetadata: $('checkpointCompareMetadata'),
+  checkpointCompareDiff: $('checkpointCompareDiff'),
+  checkpointOpenDiffBtn: $('checkpointOpenDiffBtn'),
+  checkpointOpenDecisionsBtn: $('checkpointOpenDecisionsBtn'),
+  checkpointOpenReadinessBtn: $('checkpointOpenReadinessBtn'),
+  checkpointOpenInboxBtn: $('checkpointOpenInboxBtn')
 };
 
 const SHOT_TEMPLATES = [
@@ -1422,6 +1438,212 @@ const renderReviewInbox = () => {
   });
 };
 
+let checkpointCompareId = '';
+
+const snapshotProjectState = (projectId) => {
+  const books = state.books.filter((book) => book.projectId === projectId);
+  const chapters = state.chapters.filter((chapter) => chapter.projectId === projectId);
+  const scenes = state.scenes.filter((scene) => scene.projectId === projectId);
+  const beats = (state.beats || []).filter((beat) => beat.projectId === projectId);
+  const shots = (state.shots || []).filter((shot) => shot.projectId === projectId);
+  const characters = state.characters.filter((character) => character.projectId === projectId);
+  const loreEntries = state.loreEntries.filter((entry) => entry.projectId === projectId);
+  const promptDocuments = state.promptDocuments.filter((promptDocument) => promptDocument.projectId === projectId);
+  const generationJobs = (state.generationJobs || []).filter((job) => job.projectId === projectId);
+  const canonPromotions = (state.canonPromotions || []).filter((promotion) => promotion.projectId === projectId);
+  const decisionHistory = (state.decisionHistory || []).filter((event) => event.projectId === projectId);
+  const outputs = generationJobs.reduce((acc, job) => acc + (job.outputs || []).length, 0);
+  const reviewItems = buildReviewInboxItems({ state, projectId });
+  const readiness = buildAssistivePlanningBundle({
+    state,
+    projectId,
+    scopeType: 'project',
+    scopeValue: ''
+  }).summary;
+  return {
+    books: books.length,
+    chapters: chapters.length,
+    scenes: scenes.length,
+    beats: beats.length,
+    shots: shots.length,
+    characters: characters.length,
+    loreEntries: loreEntries.length,
+    promptDocuments: promptDocuments.length,
+    generationJobs: generationJobs.length,
+    outputs,
+    canonPromotions: canonPromotions.length,
+    decisionEvents: decisionHistory.length,
+    reviewInboxTotal: reviewItems.length,
+    reviewInboxPending: reviewItems.filter((item) => item.status === 'pending_review').length,
+    reviewInboxBlocked: reviewItems.filter((item) => item.status === 'blocked').length,
+    reviewInboxHighRisk: reviewItems.filter((item) => item.risk === 'high').length,
+    readinessBlocked: readiness.blocked || 0,
+    readinessReadyToGenerate: readiness.readyToGenerate || 0,
+    readinessReadyToReview: readiness.readyToReview || 0
+  };
+};
+
+const projectWorkspaceCheckpoints = () =>
+  (state.workspaceCheckpoints || [])
+    .filter((checkpoint) => checkpoint.projectId === selectedProjectId())
+    .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
+
+const checkpointSelectOptions = () =>
+  projectWorkspaceCheckpoints().map((checkpoint) => ({
+    id: checkpoint.id,
+    name: `${checkpoint.name} · ${new Date(checkpoint.createdAt).toLocaleString('pt-BR')}`
+  }));
+
+const renderWorkspaceCheckpoints = () => {
+  if (!refs.checkpointList || !refs.checkpointSummary) return;
+  const projectId = selectedProjectId();
+  if (!projectId) {
+    refs.checkpointSummary.textContent = 'Selecione um projeto para criar checkpoints.';
+    refs.checkpointList.innerHTML = '<div class="sc-empty">Sem projeto selecionado.</div>';
+    if (refs.checkpointCompareSelect) refs.checkpointCompareSelect.innerHTML = '<option value="">Selecione um checkpoint</option>';
+    if (refs.checkpointCompareSummary) refs.checkpointCompareSummary.textContent = 'Selecione um checkpoint para comparar.';
+    if (refs.checkpointCompareHighlights) refs.checkpointCompareHighlights.innerHTML = '<li>Sem comparação ativa.</li>';
+    if (refs.checkpointCompareMetadata) refs.checkpointCompareMetadata.textContent = '';
+    if (refs.checkpointCompareDiff) refs.checkpointCompareDiff.textContent = '';
+    return;
+  }
+
+  const checkpoints = projectWorkspaceCheckpoints();
+  refs.checkpointSummary.textContent = `${checkpoints.length} checkpoint(s) local-first neste projeto.`;
+  refs.checkpointList.innerHTML = '';
+
+  if (!checkpoints.length) {
+    refs.checkpointList.innerHTML = '<div class="sc-empty">Nenhum checkpoint criado ainda.</div>';
+  } else {
+    checkpoints.forEach((checkpoint) => {
+      const card = document.createElement('article');
+      card.className = 'sc-checkpoint-card';
+      card.dataset.checkpointId = checkpoint.id;
+
+      const title = document.createElement('strong');
+      title.className = 'sc-checkpoint-title';
+      title.textContent = checkpoint.name || 'Checkpoint sem nome';
+
+      const meta = document.createElement('p');
+      meta.className = 'sc-checkpoint-meta';
+      meta.textContent = `${new Date(checkpoint.createdAt).toLocaleString('pt-BR')} · ${checkpoint.reason || 'sem motivo informado'}`;
+
+      const notes = document.createElement('p');
+      notes.className = 'sc-checkpoint-notes';
+      notes.textContent = checkpoint.notes || 'Sem notas adicionais.';
+
+      const compareBtn = document.createElement('button');
+      compareBtn.type = 'button';
+      compareBtn.dataset.action = 'compare';
+      compareBtn.dataset.checkpointId = checkpoint.id;
+      compareBtn.textContent = 'Comparar com estado atual';
+
+      card.append(title, meta, notes, compareBtn);
+      refs.checkpointList.append(card);
+    });
+  }
+
+  renderOptionsWithBlank(
+    refs.checkpointCompareSelect,
+    checkpointSelectOptions(),
+    checkpoints.some((checkpoint) => checkpoint.id === checkpointCompareId) ? checkpointCompareId : '',
+    'Selecione um checkpoint'
+  );
+
+  checkpointCompareId = refs.checkpointCompareSelect?.value || '';
+  const checkpoint = checkpoints.find((entry) => entry.id === checkpointCompareId) || null;
+  if (!checkpoint) {
+    refs.checkpointCompareSummary.textContent = 'Selecione um checkpoint para comparar.';
+    refs.checkpointCompareHighlights.innerHTML = '<li>Sem comparação ativa.</li>';
+    refs.checkpointCompareMetadata.textContent = '';
+    refs.checkpointCompareDiff.textContent = '';
+    return;
+  }
+
+  const current = snapshotProjectState(projectId);
+  const metadataDiff = buildMetadataDiff(checkpoint.snapshot || {}, current);
+  const sectionDiffs = [
+    {
+      label: 'Readiness',
+      diff: buildLineDiff(
+        JSON.stringify(
+          {
+            blocked: checkpoint.snapshot?.readinessBlocked || 0,
+            readyToGenerate: checkpoint.snapshot?.readinessReadyToGenerate || 0,
+            readyToReview: checkpoint.snapshot?.readinessReadyToReview || 0
+          },
+          null,
+          2
+        ),
+        JSON.stringify(
+          {
+            blocked: current.readinessBlocked,
+            readyToGenerate: current.readinessReadyToGenerate,
+            readyToReview: current.readinessReadyToReview
+          },
+          null,
+          2
+        )
+      )
+    },
+    {
+      label: 'Review Inbox',
+      diff: buildLineDiff(
+        JSON.stringify(
+          {
+            total: checkpoint.snapshot?.reviewInboxTotal || 0,
+            pending: checkpoint.snapshot?.reviewInboxPending || 0,
+            blocked: checkpoint.snapshot?.reviewInboxBlocked || 0,
+            highRisk: checkpoint.snapshot?.reviewInboxHighRisk || 0
+          },
+          null,
+          2
+        ),
+        JSON.stringify(
+          {
+            total: current.reviewInboxTotal,
+            pending: current.reviewInboxPending,
+            blocked: current.reviewInboxBlocked,
+            highRisk: current.reviewInboxHighRisk
+          },
+          null,
+          2
+        )
+      )
+    }
+  ];
+  const diffSummary = buildDiffSummary({ metadataDiff, sectionDiffs });
+  const highlights = buildSemanticHighlights({ metadataDiff, sectionDiffs });
+
+  refs.checkpointCompareSummary.textContent =
+    `${checkpoint.name} (${new Date(checkpoint.createdAt).toLocaleString('pt-BR')})` +
+    ` · metadata alterada: ${diffSummary.metadataChanged + diffSummary.metadataAdded + diffSummary.metadataRemoved}` +
+    ` · operações de texto: ${diffSummary.textOps}`;
+  refs.checkpointCompareHighlights.innerHTML = '';
+  (highlights.length ? highlights : ['Mudanças detectadas no workspace desde o checkpoint.']).forEach((line) => {
+    const li = document.createElement('li');
+    li.textContent = line;
+    refs.checkpointCompareHighlights.append(li);
+  });
+
+  const changedRows = metadataDiff.rows.filter((row) => row.type !== 'equal');
+  refs.checkpointCompareMetadata.textContent = changedRows.length
+    ? changedRows
+      .map((row) => `${row.key} [${row.type}] ${row.before || '∅'} → ${row.after || '∅'}`)
+      .join('\n')
+    : 'Nenhuma diferença de metadata detectada.';
+
+  refs.checkpointCompareDiff.textContent = sectionDiffs
+    .map((section) => {
+      const lines = section.diff.rows
+        .filter((row) => row.type !== 'equal')
+        .map((row) => `${row.type === 'added' ? '+' : '-'} ${row.text}`);
+      if (!lines.length) return `${section.label}: sem alterações.`;
+      return `${section.label}:\n${lines.join('\n')}`;
+    })
+    .join('\n\n');
+};
+
 const render = () => {
   renderOptions(refs.projectSelect, state.projects, selectedProjectId(), 'Crie seu primeiro projeto');
 
@@ -1462,6 +1684,7 @@ const render = () => {
   renderWorkspaceSettings();
   renderAssistivePlanning();
   renderReviewInbox();
+  renderWorkspaceCheckpoints();
   renderLore();
   renderAssets();
 
@@ -1473,6 +1696,7 @@ const render = () => {
     !selectedProjectId()
   );
   setDisabled(['openImageGenStudioBtn'], !selectedProjectId());
+  setDisabled(['createCheckpointBtn'], !selectedProjectId());
 };
 
 const persist = () => {
@@ -2120,6 +2344,62 @@ refs.reviewInboxList?.addEventListener('keydown', (event) => {
     const item = reviewInboxItems.find((entry) => entry.id === itemId);
     reviewInboxRunQuickAction('navigate-related-context', item);
   }
+});
+
+refs.createCheckpointBtn?.addEventListener('click', () => {
+  const projectId = selectedProjectId();
+  if (!projectId) return;
+  const name = refs.checkpointName.value.trim();
+  if (!name) {
+    refs.checkpointSummary.textContent = 'Informe um nome para o checkpoint.';
+    return;
+  }
+  state.workspaceCheckpoints.push(
+    createWorkspaceCheckpoint({
+      projectId,
+      name,
+      reason: refs.checkpointReason.value.trim(),
+      notes: refs.checkpointNotes.value.trim(),
+      snapshot: snapshotProjectState(projectId)
+    })
+  );
+  checkpointCompareId = '';
+  refs.checkpointName.value = '';
+  refs.checkpointSummary.textContent = `Checkpoint "${name}" criado com sucesso.`;
+  persist();
+});
+
+refs.checkpointList?.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-action="compare"][data-checkpoint-id]');
+  if (!button || !refs.checkpointCompareSelect) return;
+  refs.checkpointCompareSelect.value = button.dataset.checkpointId || '';
+  checkpointCompareId = refs.checkpointCompareSelect.value;
+  renderWorkspaceCheckpoints();
+});
+
+refs.checkpointCompareSelect?.addEventListener('change', () => {
+  checkpointCompareId = refs.checkpointCompareSelect.value || '';
+  renderWorkspaceCheckpoints();
+});
+
+refs.checkpointOpenDiffBtn?.addEventListener('click', () => {
+  if (!selectedProjectId()) return;
+  openImageReviewStudio();
+  irsSwitchTab('compare');
+});
+
+refs.checkpointOpenDecisionsBtn?.addEventListener('click', () => {
+  if (!selectedProjectId()) return;
+  openImageReviewStudio();
+  irsSwitchTab('decisions');
+});
+
+refs.checkpointOpenReadinessBtn?.addEventListener('click', () => {
+  document.querySelector('.ap-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+refs.checkpointOpenInboxBtn?.addEventListener('click', () => {
+  document.querySelector('.ri-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 // =========== Writer Studio ===========

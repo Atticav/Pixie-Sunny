@@ -659,6 +659,103 @@ select:disabled {
   }
 }
 
+/* =========== State Snapshot / Workspace Checkpoints =========== */
+.sc-section {
+  grid-column: 1 / -1;
+}
+
+.sc-create {
+  display: grid;
+  gap: 8px;
+}
+
+.sc-layout {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.sc-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sc-checkpoint-card {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.sc-checkpoint-title {
+  font-size: 0.9rem;
+}
+
+.sc-checkpoint-meta,
+.sc-checkpoint-notes {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.sc-empty {
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.sc-compare {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.sc-compare-toolbar {
+  display: grid;
+  gap: 8px;
+}
+
+.sc-quick-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sc-quick-actions button {
+  font-size: 0.74rem;
+  padding: 4px 8px;
+}
+
+.sc-compare-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.sc-highlights {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  display: grid;
+  gap: 3px;
+}
+
+@media (max-width: 900px) {
+  .sc-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* =========== Writer Studio =========== */
 .ws-overlay {
   position: fixed;

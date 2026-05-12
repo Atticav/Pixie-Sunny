@@ -17,6 +17,7 @@ import {
   createReferenceImage,
   createScene,
   createShot,
+  createWorkspaceCheckpoint,
   deleteEntity,
   CANON_PROMOTION_TYPES,
   CHAPTER_STATUSES,
@@ -1223,6 +1224,93 @@ test('deleteEntity removes decisionHistory records when generation output is del
   );
 
   assert.equal(result.decisionHistory.length, 0);
+});
+
+test('createWorkspaceCheckpoint stores metadata and snapshot payload', () => {
+  const project = createProject({ name: 'Checkpoint Project' });
+  const checkpoint = createWorkspaceCheckpoint({
+    projectId: project.id,
+    name: 'Antes da revisão final',
+    reason: 'baseline',
+    notes: 'estado antes de abrir triagem',
+    snapshot: { shots: 4, reviewInboxPending: 2 }
+  });
+
+  assert.ok(checkpoint.id);
+  assert.equal(checkpoint.projectId, project.id);
+  assert.equal(checkpoint.name, 'Antes da revisão final');
+  assert.equal(checkpoint.reason, 'baseline');
+  assert.equal(checkpoint.notes, 'estado antes de abrir triagem');
+  assert.deepEqual(checkpoint.snapshot, { shots: 4, reviewInboxPending: 2 });
+  assert.ok(checkpoint.createdAt);
+});
+
+test('normalizeState keeps valid workspace checkpoints and removes orphan project checkpoints', () => {
+  const sanitized = sanitizeState({
+    projects: [{ id: 'p1', name: 'Projeto' }],
+    workspaceCheckpoints: [
+      {
+        id: 'cp1',
+        projectId: 'p1',
+        name: 'Checkpoint válido',
+        reason: 'milestone',
+        notes: 'ok',
+        snapshot: { scenes: 2 },
+        createdAt: '2026-05-10T10:00:00.000Z'
+      },
+      {
+        id: 'cp2',
+        projectId: 'ghost-project',
+        name: 'Checkpoint órfão',
+        snapshot: { scenes: 999 }
+      }
+    ]
+  });
+
+  assert.equal(sanitized.workspaceCheckpoints.length, 1);
+  assert.equal(sanitized.workspaceCheckpoints[0].id, 'cp1');
+  assert.deepEqual(sanitized.workspaceCheckpoints[0].snapshot, { scenes: 2 });
+});
+
+test('deleteEntity removes workspace checkpoints when project is deleted', () => {
+  const project = createProject({ name: 'Projeto A' });
+  const otherProject = createProject({ name: 'Projeto B' });
+  const checkpointA = createWorkspaceCheckpoint({
+    projectId: project.id,
+    name: 'Checkpoint A',
+    snapshot: { shots: 1 }
+  });
+  const checkpointB = createWorkspaceCheckpoint({
+    projectId: otherProject.id,
+    name: 'Checkpoint B',
+    snapshot: { shots: 3 }
+  });
+
+  const result = deleteEntity(
+    {
+      projects: [project, otherProject],
+      books: [],
+      chapters: [],
+      scenes: [],
+      beats: [],
+      shots: [],
+      characters: [],
+      loreEntries: [],
+      assets: [],
+      referenceImages: [],
+      promptDocuments: [],
+      generationJobs: [],
+      canonPromotions: [],
+      decisionHistory: [],
+      workspaceCheckpoints: [checkpointA, checkpointB],
+      settings: {}
+    },
+    'project',
+    project.id
+  );
+
+  assert.equal(result.workspaceCheckpoints.length, 1);
+  assert.equal(result.workspaceCheckpoints[0].id, checkpointB.id);
 });
 
 test('createBeat and createShot include planning defaults', () => {
