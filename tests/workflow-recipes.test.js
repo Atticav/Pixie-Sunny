@@ -165,7 +165,7 @@ test('buildRecipesSummary returns one entry per recipe', () => {
   assert.equal(summary.length, WORKFLOW_RECIPES.length);
 });
 
-test('buildRecipesSummary shows not_started when no progress', () => {
+test('buildRecipesSummary shows in_progress when no stored progress', () => {
   const summary = buildRecipesSummary([]);
   // With no stored progress, first step is 'current' -> in_progress
   // (because buildRecipeProgress marks first step as current by default)

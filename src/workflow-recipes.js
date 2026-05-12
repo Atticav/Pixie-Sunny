@@ -251,11 +251,6 @@ export const buildRecipeProgress = (recipe, stepProgress = []) => {
     return { ...step, status };
   });
 
-  // Re-derive if all have explicit progress stored
-  if (progressMap.size > 0) {
-    // Respect stored statuses; just figure out recipe-level status
-  }
-
   const allDone = steps.every((s) => s.status === 'done' || s.status === 'skipped');
   const anyProgress = steps.some((s) => s.status === 'done' || s.status === 'current');
   const recipeStatus = allDone ? 'complete' : anyProgress ? 'in_progress' : 'not_started';
