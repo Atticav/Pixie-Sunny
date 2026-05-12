@@ -55,6 +55,14 @@ python -m http.server 8080
 - exportação/importação de backup JSON
 - limpeza automática de dados órfãos ao importar backups ou remover entidades relacionadas
 
+### QA / Hardening pass (focado)
+
+- guardrails adicionais para ações inválidas em Promote / Merge e Export / Closure
+- prevenção de duplicidade acidental na confirmação de promoções de sandbox
+- validação explícita para evitar gerar closure export sem seções incluídas
+- mensagens de status mais claras no fechamento de export (blockers/warnings)
+- persistência local mais resiliente com recuperação via backup quando o payload principal estiver corrompido
+
 ## Arquitetura local-first
 
 - Frontend: HTML/CSS/JS vanilla (sem dependências)

@@ -60,3 +60,30 @@ export const buildPreflightStatusMessage = ({
   }
   return `Pronto para gerar export de fechamento · ${ready} sinal(is) positivos no preflight final.`;
 };
+
+export const canGenerateClosureExport = (includes = {}) =>
+  Object.values(includes || {}).some((value) => value === true);
+
+export const isDuplicateSandboxPromotion = ({
+  lastPromotion = null,
+  sandboxId = '',
+  notes = '',
+  impactSummary = ''
+}) => {
+  if (!lastPromotion || !sandboxId) return false;
+  return (
+    lastPromotion.sandboxId === sandboxId &&
+    (lastPromotion.notes || '') === notes &&
+    (lastPromotion.impactSummary || '') === impactSummary
+  );
+};
+
+export const buildClosureExportStatusMessage = ({
+  filename = '',
+  blockers = 0,
+  warnings = 0
+}) => {
+  const suffix = `bloqueadores=${blockers} · avisos=${warnings}`;
+  if (!filename) return `Resumo de closure gerado (${suffix})`;
+  return `Resumo de closure gerado: ${filename} (${suffix})`;
+};
