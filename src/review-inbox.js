@@ -3,7 +3,7 @@ const safeString = (value) => (typeof value === 'string' ? value : '');
 
 export const REVIEW_INBOX_TYPE_LABELS = {
   human_review: 'Revisão humana',
-  stale_needs_refresh: 'Item stale / refresh',
+  stale_needs_refresh: 'Item stale / needs refresh',
   diff_review: 'Comparar variantes / diff',
   blocked_shot: 'Shot bloqueado',
   readiness_risk: 'Risco de readiness',
