@@ -524,6 +524,38 @@
         </div>
       </section>
 
+      <section class="pm-section">
+        <h2>Promote / Merge / Commit-to-Main</h2>
+        <p class="storage-note">
+          Promova um sandbox candidato para o workspace principal: revise o resumo de impacto, confirme a promoção e registre a decisão.
+        </p>
+        <div class="pm-flow">
+          <div class="pm-selector">
+            <label>Sandbox candidato
+              <select id="pmSandboxSelect">
+                <option value="">Selecione um sandbox</option>
+              </select>
+            </label>
+          </div>
+          <div id="pmSummaryPanel" class="pm-summary-panel pm-hidden">
+            <h3 class="pm-summary-title">Resumo da promoção</h3>
+            <dl class="pm-summary-dl" id="pmSummaryDl"></dl>
+            <textarea id="pmNotes" class="pm-notes" rows="2" placeholder="Notas sobre esta promoção (opcional)"></textarea>
+            <div class="pm-actions">
+              <button id="pmConfirmBtn" class="pm-confirm-btn">Confirmar promoção →</button>
+              <button id="pmCancelBtn" class="pm-cancel-btn">Cancelar</button>
+            </div>
+          </div>
+          <p id="pmStatus" class="pm-status"></p>
+        </div>
+        <div class="pm-history">
+          <h3 class="pm-history-section-title">Histórico de promoções</h3>
+          <div id="pmHistoryList" class="pm-history-list">
+            <p class="pm-empty">Nenhuma promoção registrada ainda.</p>
+          </div>
+        </div>
+      </section>
+
       <section class="sc-section">
         <h2>State Snapshot / Workspace Checkpoints</h2>
         <p class="storage-note">

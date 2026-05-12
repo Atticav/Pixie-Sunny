@@ -99,6 +99,7 @@ export const DECISION_RESULT_STATUSES = [
   'archived_deprecated'
 ];
 export const WORKSPACE_SANDBOX_STATUSES = ['exploratory', 'candidate', 'review-ready'];
+export const SANDBOX_PROMOTION_STATUSES = ['pending', 'confirmed', 'rolled_back'];
 
 const baseImageGenSettings = () => ({
   type: 'mock',
@@ -170,6 +171,7 @@ export const emptyState = () => ({
   decisionHistory: [],
   workspaceCheckpoints: [],
   workspaceSandboxes: [],
+  sandboxPromotions: [],
   settings: baseSettings()
 });
 
@@ -562,6 +564,31 @@ export const createWorkspaceSandbox = ({
     updatedAt: timestamp
   };
 };
+
+export const createSandboxPromotion = ({
+  projectId,
+  sandboxId,
+  sandboxName = '',
+  sandboxPurpose = '',
+  sandboxStatus = 'exploratory',
+  sandboxSnapshot = {},
+  targetLabel = 'workspace principal',
+  notes = '',
+  impactSummary = ''
+}) => ({
+  id: newId(),
+  projectId,
+  sandboxId: stringValue(sandboxId),
+  sandboxName: stringValue(sandboxName, 'Sandbox sem nome'),
+  sandboxPurpose: stringValue(sandboxPurpose),
+  sandboxStatus: WORKSPACE_SANDBOX_STATUSES.includes(sandboxStatus) ? sandboxStatus : 'exploratory',
+  sandboxSnapshot: recordValue(sandboxSnapshot) || {},
+  targetLabel: stringValue(targetLabel, 'workspace principal'),
+  notes: stringValue(notes),
+  impactSummary: stringValue(impactSummary),
+  status: 'confirmed',
+  promotedAt: nowUtc()
+});
 
 export const createGenerationJob = ({
   projectId,
@@ -1083,6 +1110,29 @@ const normalizeWorkspaceSandbox = (sandbox) => {
   };
 };
 
+const normalizeSandboxPromotion = (promotion) => {
+  const value = recordValue(promotion);
+  if (!value || !hasRequiredFields(value, ['id', 'projectId', 'sandboxId'])) return null;
+  return {
+    id: value.id,
+    projectId: value.projectId,
+    sandboxId: stringValue(value.sandboxId),
+    sandboxName: stringValue(value.sandboxName, 'Sandbox sem nome'),
+    sandboxPurpose: stringValue(value.sandboxPurpose),
+    sandboxStatus: WORKSPACE_SANDBOX_STATUSES.includes(stringValue(value.sandboxStatus))
+      ? stringValue(value.sandboxStatus)
+      : 'exploratory',
+    sandboxSnapshot: recordValue(value.sandboxSnapshot) || {},
+    targetLabel: stringValue(value.targetLabel, 'workspace principal'),
+    notes: stringValue(value.notes),
+    impactSummary: stringValue(value.impactSummary),
+    status: SANDBOX_PROMOTION_STATUSES.includes(stringValue(value.status))
+      ? stringValue(value.status)
+      : 'confirmed',
+    promotedAt: stringValue(value.promotedAt) || nowUtc()
+  };
+};
+
 export const normalizeState = (raw) => {
   const value = recordValue(raw) || {};
   const settingsSource = recordValue(value.settings) || {};
@@ -1144,6 +1194,9 @@ export const normalizeState = (raw) => {
   const workspaceSandboxes = (Array.isArray(value.workspaceSandboxes) ? value.workspaceSandboxes : [])
     .map(normalizeWorkspaceSandbox)
     .filter((sandbox) => sandbox && projectIds.has(sandbox.projectId));
+  const sandboxPromotions = (Array.isArray(value.sandboxPromotions) ? value.sandboxPromotions : [])
+    .map(normalizeSandboxPromotion)
+    .filter((promo) => promo && projectIds.has(promo.projectId));
   const beats = (Array.isArray(value.beats) ? value.beats : [])
     .map(normalizeBeat)
     .filter(
@@ -1203,6 +1256,7 @@ export const normalizeState = (raw) => {
     decisionHistory,
     workspaceCheckpoints,
     workspaceSandboxes,
+    sandboxPromotions,
     settings: {
       ...baseSettings(),
       ...settingsSource,
@@ -1236,7 +1290,8 @@ export const deleteEntity = (state, entityType, id) => {
       canonPromotions: (current.canonPromotions || []).filter((p) => p.projectId !== id),
       decisionHistory: (current.decisionHistory || []).filter((event) => event.projectId !== id),
       workspaceCheckpoints: (current.workspaceCheckpoints || []).filter((checkpoint) => checkpoint.projectId !== id),
-      workspaceSandboxes: (current.workspaceSandboxes || []).filter((sandbox) => sandbox.projectId !== id)
+      workspaceSandboxes: (current.workspaceSandboxes || []).filter((sandbox) => sandbox.projectId !== id),
+      sandboxPromotions: (current.sandboxPromotions || []).filter((promo) => promo.projectId !== id)
     });
   }
 
