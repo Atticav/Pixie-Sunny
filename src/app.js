@@ -3063,7 +3063,7 @@ refs.sandboxRefreshBtn?.addEventListener('click', () => {
   if (!projectId || !sandboxCompareId) return;
   const sandbox = projectWorkspaceSandboxes().find((entry) => entry.id === sandboxCompareId);
   if (!sandbox) {
-    refs.sandboxSummary.textContent = 'Sandbox selecionado não pertence ao projeto atual. Selecione um sandbox deste projeto ou troque o projeto ativo.';
+    refs.sandboxSummary.textContent = 'Sandbox não pertence ao projeto atual. Selecione um sandbox válido ou altere o projeto.';
     return;
   }
   sandbox.snapshot = snapshotProjectState(projectId);
@@ -3180,7 +3180,7 @@ refs.pmConfirmBtn?.addEventListener('click', () => {
       impactSummary
     })
   ) {
-    refs.pmStatus.textContent = 'Promoção já registrada com o mesmo resumo e notas. Atualize as notas ou o conteúdo do sandbox antes de confirmar novamente.';
+    refs.pmStatus.textContent = 'Promoção duplicada detectada. Modifique as notas ou atualize o sandbox antes de confirmar.';
     return;
   }
   if (!state.sandboxPromotions) state.sandboxPromotions = [];
