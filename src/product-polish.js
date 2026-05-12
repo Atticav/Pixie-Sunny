@@ -11,7 +11,7 @@ export const buildProjectCollectionSummary = ({
   if (count <= 0) {
     return `${emptyMessage} Próximo passo: ${nextStepWhenEmpty}`;
   }
-  return `${count} ${selectPluralForm(count, singular, plural)} local-first neste projeto. Próximo passo: ${nextStepWhenPopulated}`;
+  return `${count} ${selectPluralForm(count, singular, plural)} salvos localmente neste projeto. Próximo passo: ${nextStepWhenPopulated}`;
 };
 
 export const buildReviewInboxSummary = ({

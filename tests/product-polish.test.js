@@ -29,7 +29,7 @@ test('buildProjectCollectionSummary handles empty and populated collections', ()
       nextStepWhenEmpty: 'salve um checkpoint',
       nextStepWhenPopulated: 'compare um checkpoint'
     }),
-    '2 checkpoints local-first neste projeto. Próximo passo: compare um checkpoint'
+    '2 checkpoints salvos localmente neste projeto. Próximo passo: compare um checkpoint'
   );
 });
 
