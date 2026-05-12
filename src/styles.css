@@ -660,6 +660,96 @@ select:disabled {
 }
 
 /* =========== State Snapshot / Workspace Checkpoints =========== */
+.sb-section {
+  grid-column: 1 / -1;
+}
+
+.sb-create {
+  display: grid;
+  gap: 8px;
+}
+
+.sb-layout {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.sb-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sb-sandbox-card {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.sb-sandbox-title {
+  font-size: 0.9rem;
+}
+
+.sb-sandbox-meta,
+.sb-sandbox-purpose {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.sb-empty {
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.sb-compare {
+  background: #111722;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.sb-compare-toolbar {
+  display: grid;
+  gap: 8px;
+}
+
+.sb-quick-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sb-quick-actions button {
+  font-size: 0.74rem;
+  padding: 4px 8px;
+}
+
+.sb-compare-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.sb-highlights {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  display: grid;
+  gap: 3px;
+}
+
 .sc-section {
   grid-column: 1 / -1;
 }
@@ -751,6 +841,10 @@ select:disabled {
 }
 
 @media (max-width: 900px) {
+  .sb-layout {
+    grid-template-columns: 1fr;
+  }
+
   .sc-layout {
     grid-template-columns: 1fr;
   }

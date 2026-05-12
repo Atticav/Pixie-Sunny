@@ -14,6 +14,7 @@ import {
   createReferenceImage,
   createScene,
   createShot,
+  createWorkspaceSandbox,
   createWorkspaceCheckpoint,
   deleteEntity,
   CANON_PROMOTION_TYPES,
@@ -182,7 +183,24 @@ const refs = {
   checkpointOpenDiffBtn: $('checkpointOpenDiffBtn'),
   checkpointOpenDecisionsBtn: $('checkpointOpenDecisionsBtn'),
   checkpointOpenReadinessBtn: $('checkpointOpenReadinessBtn'),
-  checkpointOpenInboxBtn: $('checkpointOpenInboxBtn')
+  checkpointOpenInboxBtn: $('checkpointOpenInboxBtn'),
+  sandboxName: $('sandboxName'),
+  sandboxPurpose: $('sandboxPurpose'),
+  sandboxStatus: $('sandboxStatus'),
+  createSandboxBtn: $('createSandboxBtn'),
+  sandboxSummary: $('sandboxSummary'),
+  sandboxList: $('sandboxList'),
+  sandboxCompareSelect: $('sandboxCompareSelect'),
+  sandboxCompareSummary: $('sandboxCompareSummary'),
+  sandboxCompareHighlights: $('sandboxCompareHighlights'),
+  sandboxCompareMetadata: $('sandboxCompareMetadata'),
+  sandboxCompareDiff: $('sandboxCompareDiff'),
+  sandboxOpenDiffBtn: $('sandboxOpenDiffBtn'),
+  sandboxOpenDecisionsBtn: $('sandboxOpenDecisionsBtn'),
+  sandboxOpenInboxBtn: $('sandboxOpenInboxBtn'),
+  sandboxOpenRecipesBtn: $('sandboxOpenRecipesBtn'),
+  sandboxOpenCheckpointsBtn: $('sandboxOpenCheckpointsBtn'),
+  sandboxRefreshBtn: $('sandboxRefreshBtn')
 };
 
 const SHOT_TEMPLATES = [
@@ -1439,6 +1457,13 @@ const renderReviewInbox = () => {
 };
 
 let checkpointCompareId = '';
+let sandboxCompareId = '';
+
+const SANDBOX_STATUS_LABELS = {
+  exploratory: 'Exploratory',
+  candidate: 'Candidate',
+  'review-ready': 'Review-ready'
+};
 
 const snapshotProjectState = (projectId) => {
   const books = state.books.filter((book) => book.projectId === projectId);
@@ -1487,6 +1512,169 @@ const projectWorkspaceCheckpoints = () =>
   (state.workspaceCheckpoints || [])
     .filter((checkpoint) => checkpoint.projectId === selectedProjectId())
     .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
+
+const projectWorkspaceSandboxes = () =>
+  (state.workspaceSandboxes || [])
+    .filter((sandbox) => sandbox.projectId === selectedProjectId())
+    .sort((a, b) => Date.parse(b.updatedAt || b.createdAt || 0) - Date.parse(a.updatedAt || a.createdAt || 0));
+
+const sandboxSelectOptions = () =>
+  projectWorkspaceSandboxes().map((sandbox) => ({
+    id: sandbox.id,
+    name: `${sandbox.name} · ${SANDBOX_STATUS_LABELS[sandbox.status] || sandbox.status}`
+  }));
+
+const renderWorkspaceSandboxes = () => {
+  if (!refs.sandboxList || !refs.sandboxSummary) return;
+  const projectId = selectedProjectId();
+  if (!projectId) {
+    refs.sandboxSummary.textContent = 'Selecione um projeto para criar sandboxes.';
+    refs.sandboxList.innerHTML = '<div class="sb-empty">Sem projeto selecionado.</div>';
+    if (refs.sandboxCompareSelect) refs.sandboxCompareSelect.innerHTML = '<option value="">Selecione um sandbox</option>';
+    if (refs.sandboxCompareSummary) refs.sandboxCompareSummary.textContent = 'Selecione um sandbox para comparar.';
+    if (refs.sandboxCompareHighlights) refs.sandboxCompareHighlights.innerHTML = '<li>Sem comparação ativa.</li>';
+    if (refs.sandboxCompareMetadata) refs.sandboxCompareMetadata.textContent = '';
+    if (refs.sandboxCompareDiff) refs.sandboxCompareDiff.textContent = '';
+    return;
+  }
+
+  const sandboxes = projectWorkspaceSandboxes();
+  refs.sandboxSummary.textContent = `${sandboxes.length} sandbox(es) local-first neste projeto.`;
+  refs.sandboxList.innerHTML = '';
+
+  if (!sandboxes.length) {
+    refs.sandboxList.innerHTML = '<div class="sb-empty">Nenhum sandbox criado ainda.</div>';
+  } else {
+    sandboxes.forEach((sandbox) => {
+      const card = document.createElement('article');
+      card.className = 'sb-sandbox-card';
+      card.dataset.sandboxId = sandbox.id;
+
+      const title = document.createElement('strong');
+      title.className = 'sb-sandbox-title';
+      title.textContent = sandbox.name || 'Sandbox sem nome';
+
+      const meta = document.createElement('p');
+      meta.className = 'sb-sandbox-meta';
+      meta.textContent =
+        `${SANDBOX_STATUS_LABELS[sandbox.status] || sandbox.status} · criado ${new Date(sandbox.createdAt).toLocaleString('pt-BR')}` +
+        ` · atualizado ${new Date(sandbox.updatedAt || sandbox.createdAt).toLocaleString('pt-BR')}`;
+
+      const purpose = document.createElement('p');
+      purpose.className = 'sb-sandbox-purpose';
+      purpose.textContent = sandbox.purpose || 'Sem propósito descrito.';
+
+      const compareBtn = document.createElement('button');
+      compareBtn.type = 'button';
+      compareBtn.dataset.action = 'compare';
+      compareBtn.dataset.sandboxId = sandbox.id;
+      compareBtn.textContent = 'Comparar com workspace principal';
+
+      card.append(title, meta, purpose, compareBtn);
+      refs.sandboxList.append(card);
+    });
+  }
+
+  renderOptionsWithBlank(
+    refs.sandboxCompareSelect,
+    sandboxSelectOptions(),
+    sandboxes.some((sandbox) => sandbox.id === sandboxCompareId) ? sandboxCompareId : '',
+    'Selecione um sandbox'
+  );
+
+  sandboxCompareId = refs.sandboxCompareSelect?.value || '';
+  const sandbox = sandboxes.find((entry) => entry.id === sandboxCompareId) || null;
+  if (!sandbox) {
+    refs.sandboxCompareSummary.textContent = 'Selecione um sandbox para comparar.';
+    refs.sandboxCompareHighlights.innerHTML = '<li>Sem comparação ativa.</li>';
+    refs.sandboxCompareMetadata.textContent = '';
+    refs.sandboxCompareDiff.textContent = '';
+    return;
+  }
+
+  const current = snapshotProjectState(projectId);
+  const metadataDiff = buildMetadataDiff(sandbox.snapshot || {}, current);
+  const sectionDiffs = [
+    {
+      label: 'Readiness',
+      diff: buildLineDiff(
+        JSON.stringify(
+          {
+            blocked: sandbox.snapshot?.readinessBlocked || 0,
+            readyToGenerate: sandbox.snapshot?.readinessReadyToGenerate || 0,
+            readyToReview: sandbox.snapshot?.readinessReadyToReview || 0
+          },
+          null,
+          2
+        ),
+        JSON.stringify(
+          {
+            blocked: current.readinessBlocked,
+            readyToGenerate: current.readinessReadyToGenerate,
+            readyToReview: current.readinessReadyToReview
+          },
+          null,
+          2
+        )
+      )
+    },
+    {
+      label: 'Review Inbox',
+      diff: buildLineDiff(
+        JSON.stringify(
+          {
+            total: sandbox.snapshot?.reviewInboxTotal || 0,
+            pending: sandbox.snapshot?.reviewInboxPending || 0,
+            blocked: sandbox.snapshot?.reviewInboxBlocked || 0,
+            highRisk: sandbox.snapshot?.reviewInboxHighRisk || 0
+          },
+          null,
+          2
+        ),
+        JSON.stringify(
+          {
+            total: current.reviewInboxTotal,
+            pending: current.reviewInboxPending,
+            blocked: current.reviewInboxBlocked,
+            highRisk: current.reviewInboxHighRisk
+          },
+          null,
+          2
+        )
+      )
+    }
+  ];
+  const diffSummary = buildDiffSummary({ metadataDiff, sectionDiffs });
+  const highlights = buildSemanticHighlights({ metadataDiff, sectionDiffs });
+
+  refs.sandboxCompareSummary.textContent =
+    `${sandbox.name} · ${SANDBOX_STATUS_LABELS[sandbox.status] || sandbox.status}` +
+    ` · metadata alterada: ${diffSummary.metadataChanged + diffSummary.metadataAdded + diffSummary.metadataRemoved}` +
+    ` · operações de texto: ${diffSummary.textOps}`;
+  refs.sandboxCompareHighlights.innerHTML = '';
+  (highlights.length ? highlights : ['Mudanças detectadas em relação ao workspace principal.']).forEach((line) => {
+    const li = document.createElement('li');
+    li.textContent = line;
+    refs.sandboxCompareHighlights.append(li);
+  });
+
+  const changedRows = metadataDiff.rows.filter((row) => row.type !== 'equal');
+  refs.sandboxCompareMetadata.textContent = changedRows.length
+    ? changedRows
+      .map((row) => `${row.key} [${row.type}] ${row.before || '∅'} → ${row.after || '∅'}`)
+      .join('\n')
+    : 'Nenhuma diferença de metadata detectada.';
+
+  refs.sandboxCompareDiff.textContent = sectionDiffs
+    .map((section) => {
+      const lines = section.diff.rows
+        .filter((row) => row.type !== 'equal')
+        .map((row) => `${row.type === 'added' ? '+' : '-'} ${row.text}`);
+      if (!lines.length) return `${section.label}: sem alterações.`;
+      return `${section.label}:\n${lines.join('\n')}`;
+    })
+    .join('\n\n');
+};
 
 const checkpointSelectOptions = () =>
   projectWorkspaceCheckpoints().map((checkpoint) => ({
@@ -1684,6 +1872,7 @@ const render = () => {
   renderWorkspaceSettings();
   renderAssistivePlanning();
   renderReviewInbox();
+  renderWorkspaceSandboxes();
   renderWorkspaceCheckpoints();
   renderLore();
   renderAssets();
@@ -1696,6 +1885,7 @@ const render = () => {
     !selectedProjectId()
   );
   setDisabled(['openImageGenStudioBtn'], !selectedProjectId());
+  setDisabled(['createSandboxBtn'], !selectedProjectId());
   setDisabled(['createCheckpointBtn'], !selectedProjectId());
 };
 
@@ -2367,6 +2557,78 @@ refs.createCheckpointBtn?.addEventListener('click', () => {
   refs.checkpointName.value = '';
   refs.checkpointSummary.textContent = `Checkpoint "${name}" criado com sucesso.`;
   persist();
+});
+
+refs.createSandboxBtn?.addEventListener('click', () => {
+  const projectId = selectedProjectId();
+  if (!projectId) return;
+  const name = refs.sandboxName.value.trim();
+  if (!name) {
+    refs.sandboxSummary.textContent = 'Informe um nome para o sandbox.';
+    return;
+  }
+  if (!state.workspaceSandboxes) state.workspaceSandboxes = [];
+  state.workspaceSandboxes.push(
+    createWorkspaceSandbox({
+      projectId,
+      name,
+      purpose: refs.sandboxPurpose.value.trim(),
+      status: refs.sandboxStatus.value || 'exploratory',
+      snapshot: snapshotProjectState(projectId)
+    })
+  );
+  sandboxCompareId = '';
+  refs.sandboxName.value = '';
+  refs.sandboxSummary.textContent = `Sandbox "${name}" criado com sucesso.`;
+  persist();
+});
+
+refs.sandboxList?.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-action="compare"][data-sandbox-id]');
+  if (!button || !refs.sandboxCompareSelect) return;
+  refs.sandboxCompareSelect.value = button.dataset.sandboxId || '';
+  sandboxCompareId = refs.sandboxCompareSelect.value;
+  renderWorkspaceSandboxes();
+});
+
+refs.sandboxCompareSelect?.addEventListener('change', () => {
+  sandboxCompareId = refs.sandboxCompareSelect.value || '';
+  renderWorkspaceSandboxes();
+});
+
+refs.sandboxRefreshBtn?.addEventListener('click', () => {
+  const projectId = selectedProjectId();
+  if (!projectId || !sandboxCompareId) return;
+  const sandbox = (state.workspaceSandboxes || []).find((entry) => entry.id === sandboxCompareId);
+  if (!sandbox) return;
+  sandbox.snapshot = snapshotProjectState(projectId);
+  sandbox.updatedAt = new Date().toISOString();
+  refs.sandboxSummary.textContent = `Snapshot do sandbox "${sandbox.name}" atualizado.`;
+  persist();
+});
+
+refs.sandboxOpenDiffBtn?.addEventListener('click', () => {
+  if (!selectedProjectId()) return;
+  openImageReviewStudio();
+  irsSwitchTab('compare');
+});
+
+refs.sandboxOpenDecisionsBtn?.addEventListener('click', () => {
+  if (!selectedProjectId()) return;
+  openImageReviewStudio();
+  irsSwitchTab('decisions');
+});
+
+refs.sandboxOpenInboxBtn?.addEventListener('click', () => {
+  document.querySelector('.ri-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+refs.sandboxOpenRecipesBtn?.addEventListener('click', () => {
+  document.querySelector('.wr-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+refs.sandboxOpenCheckpointsBtn?.addEventListener('click', () => {
+  document.querySelector('.sc-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 refs.checkpointList?.addEventListener('click', (event) => {

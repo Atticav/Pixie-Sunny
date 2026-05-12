@@ -476,6 +476,54 @@
         </div>
       </section>
 
+      <section class="sb-section">
+        <h2>Workspace Branching / Scenario Sandbox</h2>
+        <p class="storage-note">
+          Crie sandboxes locais para explorar direções alternativas sem perder o contexto do workspace principal.
+        </p>
+        <div class="sb-create">
+          <input id="sandboxName" placeholder="Nome do sandbox (ex: variação de ritmo capítulo 3)" />
+          <input id="sandboxPurpose" placeholder="Propósito (ex: testar direção visual mais sombria)" />
+          <label>Status
+            <select id="sandboxStatus">
+              <option value="exploratory">exploratory</option>
+              <option value="candidate">candidate</option>
+              <option value="review-ready">review-ready</option>
+            </select>
+          </label>
+          <button id="createSandboxBtn">Criar sandbox</button>
+        </div>
+        <pre id="sandboxSummary">Selecione um projeto para criar sandboxes.</pre>
+        <div class="sb-layout">
+          <div id="sandboxList" class="sb-list"></div>
+          <div class="sb-compare">
+            <div class="sb-compare-toolbar">
+              <label>Sandbox
+                <select id="sandboxCompareSelect">
+                  <option value="">Selecione um sandbox</option>
+                </select>
+              </label>
+              <div class="sb-quick-actions">
+                <button id="sandboxRefreshBtn">Atualizar snapshot</button>
+                <button id="sandboxOpenDiffBtn">Abrir Diff Viewer</button>
+                <button id="sandboxOpenDecisionsBtn">Editorial Timeline</button>
+                <button id="sandboxOpenInboxBtn">Review Inbox</button>
+                <button id="sandboxOpenRecipesBtn">Workflow Recipes</button>
+                <button id="sandboxOpenCheckpointsBtn">Workspace Checkpoints</button>
+              </div>
+            </div>
+            <p id="sandboxCompareSummary" class="sb-compare-summary">Selecione um sandbox para comparar.</p>
+            <ul id="sandboxCompareHighlights" class="sb-highlights">
+              <li>Sem comparação ativa.</li>
+            </ul>
+            <h4>Diferenças de metadata</h4>
+            <pre id="sandboxCompareMetadata"></pre>
+            <h4>Diff de contexto (readiness/inbox)</h4>
+            <pre id="sandboxCompareDiff"></pre>
+          </div>
+        </div>
+      </section>
+
       <section class="sc-section">
         <h2>State Snapshot / Workspace Checkpoints</h2>
         <p class="storage-note">
