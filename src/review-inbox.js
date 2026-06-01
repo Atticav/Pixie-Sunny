@@ -2,52 +2,52 @@ const safeArray = (value) => (Array.isArray(value) ? value : []);
 const safeString = (value) => (typeof value === 'string' ? value : '');
 
 export const REVIEW_INBOX_TYPE_LABELS = {
-  human_review: 'Revisão humana',
+  human_review: 'Human review',
   stale_needs_refresh: 'Item stale / needs refresh',
-  diff_review: 'Comparar variantes / diff',
-  blocked_shot: 'Shot bloqueado',
-  readiness_risk: 'Risco de readiness',
-  automation_confirmation: 'Sinal de automação',
-  decision_follow_up: 'Follow-up editorial',
-  operational_signal: 'Sinal operacional'
+  diff_review: 'Compare variants / diff',
+  blocked_shot: 'Blocked shot',
+  readiness_risk: 'Readiness risk',
+  automation_confirmation: 'Automation signal',
+  decision_follow_up: 'Editorial follow-up',
+  operational_signal: 'Operational signal'
 };
 
 export const REVIEW_INBOX_STATUS_LABELS = {
-  pending_review: 'Aguardando review',
-  blocked: 'Bloqueado',
-  needs_refresh: 'Precisa refresh'
+  pending_review: 'Awaiting review',
+  blocked: 'Blocked',
+  needs_refresh: 'Needs refresh'
 };
 
 export const REVIEW_INBOX_PRIORITY_LABELS = {
-  high: 'alta',
-  medium: 'média',
-  low: 'baixa'
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low'
 };
 
 export const REVIEW_INBOX_RISK_LABELS = {
-  high: 'alto',
-  medium: 'médio',
-  low: 'baixo'
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low'
 };
 
 export const REVIEW_INBOX_ENTITY_LABELS = {
   asset: 'asset',
-  scene: 'cena',
+  scene: 'scene',
   shot: 'shot',
-  chapter: 'capítulo',
-  sequence: 'sequência',
-  project: 'projeto'
+  chapter: 'chapter',
+  sequence: 'sequence',
+  project: 'project'
 };
 
 export const REVIEW_INBOX_ACTION_LABELS = {
-  approve: 'Aprovar',
-  reject: 'Rejeitar',
-  defer: 'Adiar',
-  'mark-refresh': 'Marcar refresh',
-  'open-diff': 'Abrir Diff Viewer',
-  'open-lineage': 'Abrir lineage',
-  'open-source-entity': 'Abrir contexto',
-  'navigate-related-context': 'Navegar contexto'
+  approve: 'Approve',
+  reject: 'Reject',
+  defer: 'Defer',
+  'mark-refresh': 'Mark refresh',
+  'open-diff': 'Open Diff Viewer',
+  'open-lineage': 'Open lineage',
+  'open-source-entity': 'Open context',
+  'navigate-related-context': 'Navigate context'
 };
 
 const toTimestamp = (value) => {
@@ -80,8 +80,8 @@ const pushItem = (bucket, raw) => {
   bucket.push({
     id: raw.id,
     type: raw.type,
-    title: raw.title || 'Item de revisão',
-    reason: raw.reason || 'Requer atenção humana.',
+    title: raw.title || 'Review item',
+    reason: raw.reason || 'Requires human attention.',
     priority: raw.priority || 'medium',
     risk: raw.risk || 'medium',
     status: raw.status || 'pending_review',
@@ -136,7 +136,7 @@ export const buildReviewInboxItems = ({ state, projectId, assistiveBundle, now =
       id: `assistive:${entry.id}`,
       type: assistiveItemType(entry.type),
       title: entry.title,
-      reason: `${entry.description} (via dashboard de readiness e rules engine local).`,
+      reason: `${entry.description} (via the readiness dashboard and local rules engine).`,
       priority: priorityFromScore(entry.priorityScore),
       risk: entry.status === 'blocked' ? 'high' : entry.status === 'ready-to-review' ? 'medium' : 'low',
       status: entry.status === 'blocked' ? 'blocked' : 'pending_review',
@@ -162,8 +162,8 @@ export const buildReviewInboxItems = ({ state, projectId, assistiveBundle, now =
       pushItem(items, {
         id: `review:${output.id}`,
         type: 'human_review',
-        title: `${outputLabel(output)} aguardando decisão`,
-        reason: 'Output gerado/local que ainda depende de confirmação humana para aprovação, rejeição ou deferimento.',
+        title: `${outputLabel(output)} awaiting decision`,
+        reason: 'Generated/local output that still depends on human confirmation for approval, rejection, or deferral.',
         priority: output.reviewStatus === 'candidate' ? 'high' : 'medium',
         risk: output.isCanonical ? 'high' : 'medium',
         status: 'pending_review',
@@ -183,8 +183,8 @@ export const buildReviewInboxItems = ({ state, projectId, assistiveBundle, now =
       pushItem(items, {
         id: `stale:${output.id}`,
         type: 'stale_needs_refresh',
-        title: `${outputLabel(output)} precisa refresh`,
-        reason: 'Item está em revisão há muito tempo e deve ser revalidado no contexto atual do pipeline.',
+        title: `${outputLabel(output)} needs refresh`,
+        reason: 'This item has been under review for too long and should be revalidated in the current pipeline context.',
         priority: 'medium',
         risk: 'medium',
         status: 'needs_refresh',
@@ -218,8 +218,8 @@ export const buildReviewInboxItems = ({ state, projectId, assistiveBundle, now =
     pushItem(items, {
       id: `diff:${key}`,
       type: 'diff_review',
-      title: `Comparar variantes antes de decidir`,
-      reason: `Existem múltiplos candidatos semelhantes (${outputLabel(a)} vs ${outputLabel(b)}) pedindo aprovação editorial.`,
+      title: `Compare variants before deciding`,
+      reason: `There are multiple similar candidates (${outputLabel(a)} vs ${outputLabel(b)}) requesting editorial approval.`,
       priority: 'high',
       risk: 'medium',
       status: 'pending_review',
@@ -247,12 +247,12 @@ export const buildReviewInboxItems = ({ state, projectId, assistiveBundle, now =
       pushItem(items, {
         id: `shot:${shot.id}`,
         type: 'blocked_shot',
-        title: `Shot bloqueado: ${shot.title}`,
+        title: `Blocked shot: ${shot.title}`,
         reason: blocked
-          ? 'Shot marcado como needs redo e requer decisão humana para destravar sequência.'
+          ? 'Shot is marked as needs redo and requires a human decision to unblock the sequence.'
           : missingContinuityReferences
-            ? 'Shot exige continuidade, mas sem referência canônica vinculada.'
-            : `Riscos de continuidade detectados: ${risks.slice(0, 2).join(', ')}`,
+            ? 'Shot requires continuity but has no linked canonical reference.'
+            : `Continuity risks detected: ${risks.slice(0, 2).join(', ')}`,
         priority: blocked ? 'high' : 'medium',
         risk: blocked || risks.length > 1 ? 'high' : 'medium',
         status: blocked ? 'blocked' : 'pending_review',
@@ -281,7 +281,7 @@ export const buildReviewInboxItems = ({ state, projectId, assistiveBundle, now =
         id: `decision:${event.id}`,
         type: 'decision_follow_up',
         title: `Follow-up editorial: ${event.resultingStatus}`,
-        reason: event.rationale || 'Evento crítico recente na trilha de decisão exige verificação operacional.',
+        reason: event.rationale || 'A recent critical event in the decision trail requires an operational check.',
         priority: event.resultingStatus === 'superseded' ? 'high' : 'medium',
         risk: event.resultingStatus === 'rejected' ? 'medium' : 'high',
         status: 'pending_review',
@@ -341,7 +341,7 @@ export const applyReviewInboxFiltersAndSort = (items, filters = {}) => {
       return toTimestamp(b.createdAt) - toTimestamp(a.createdAt);
     }
     if (sortBy === 'type') {
-      const typeDelta = safeString(a.type).localeCompare(safeString(b.type), 'pt-BR');
+      const typeDelta = safeString(a.type).localeCompare(safeString(b.type), 'en-US');
       if (typeDelta !== 0) return typeDelta;
       return toTimestamp(b.createdAt) - toTimestamp(a.createdAt);
     }
@@ -359,7 +359,7 @@ export const groupReviewInboxItems = (items, groupBy = 'type') => {
   const keyField = safeString(groupBy) || 'type';
   const groups = new Map();
   safeArray(items).forEach((item) => {
-    const key = safeString(item[keyField]) || 'outros';
+    const key = safeString(item[keyField]) || 'other';
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(item);
   });
@@ -372,14 +372,14 @@ export const groupReviewInboxItems = (items, groupBy = 'type') => {
 };
 
 export const formatReviewInboxGroupLabel = (groupBy, key) => {
-  const value = safeString(key) || 'outros';
+  const value = safeString(key) || 'other';
   if (!groupBy || groupBy === 'type') return REVIEW_INBOX_TYPE_LABELS[value] || value;
   if (groupBy === 'status') return REVIEW_INBOX_STATUS_LABELS[value] || value;
-  if (groupBy === 'priority') return `Prioridade ${REVIEW_INBOX_PRIORITY_LABELS[value] || value}`;
-  if (groupBy === 'risk') return `Risco ${REVIEW_INBOX_RISK_LABELS[value] || value}`;
+  if (groupBy === 'priority') return `Priority ${REVIEW_INBOX_PRIORITY_LABELS[value] || value}`;
+  if (groupBy === 'risk') return `Risk ${REVIEW_INBOX_RISK_LABELS[value] || value}`;
   if (groupBy === 'entity') return REVIEW_INBOX_ENTITY_LABELS[value] || value;
-  if (groupBy === 'sceneId') return value === 'outros' ? 'Sem cena vinculada' : `Cena ${value}`;
-  if (groupBy === 'chapterId') return value === 'outros' ? 'Sem capítulo vinculado' : `Capítulo ${value}`;
+  if (groupBy === 'sceneId') return value === 'other' ? 'No linked scene' : `Scene ${value}`;
+  if (groupBy === 'chapterId') return value === 'other' ? 'No linked chapter' : `Chapter ${value}`;
   if (groupBy === 'source') return value;
   return value;
 };

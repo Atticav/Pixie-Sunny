@@ -74,8 +74,8 @@ test('buildReviewInboxItems consolidates critical review signals', () => {
       {
         id: 'rec1',
         type: 'review required',
-        title: 'Review requerido para Cena 1',
-        description: '2 outputs aguardando triagem.',
+        title: 'Review required for Scene 1',
+        description: '2 outputs awaiting triage.',
         status: 'ready-to-review',
         priorityScore: 82,
         sceneId: 's1',
@@ -111,7 +111,7 @@ test('applyReviewInboxFiltersAndSort filters by status/type and query', () => {
   const filtered = applyReviewInboxFiltersAndSort(items, {
     type: 'diff_review',
     status: 'pending_review',
-    query: 'comparar',
+    query: 'compare',
     sortBy: 'newest'
   });
 
@@ -135,7 +135,7 @@ test('groupReviewInboxItems groups by selected field', () => {
 });
 
 test('formatReviewInboxGroupLabel returns user-facing labels', () => {
-  assert.equal(formatReviewInboxGroupLabel('type', 'diff_review'), 'Comparar variantes / diff');
-  assert.equal(formatReviewInboxGroupLabel('status', 'pending_review'), 'Aguardando review');
-  assert.equal(formatReviewInboxGroupLabel('priority', 'high'), 'Prioridade alta');
+  assert.equal(formatReviewInboxGroupLabel('type', 'diff_review'), 'Compare variants / diff');
+  assert.equal(formatReviewInboxGroupLabel('status', 'pending_review'), 'Awaiting review');
+  assert.equal(formatReviewInboxGroupLabel('priority', 'high'), 'Priority High');
 });

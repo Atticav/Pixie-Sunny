@@ -1,9 +1,9 @@
 const safeArray = (value) => (Array.isArray(value) ? value : []);
 
 const scoreToPriority = (score) => {
-  if (score >= 80) return 'alta';
-  if (score >= 55) return 'média';
-  return 'baixa';
+  if (score >= 80) return 'high';
+  if (score >= 55) return 'medium';
+  return 'low';
 };
 
 const computePriorityScore = ({ blocking = false, impact = 0.5, completeness = 0.5, inconsistencyRisk = 0.5 }) => {
@@ -153,15 +153,15 @@ export const buildAssistivePlanningBundle = ({
       const sequenceId = sceneBeats[0]?.id || '';
 
       if (!hasShots || !hasPrompt) {
-        const gaps = [!hasShots ? 'shot planning incompleto' : '', !hasPrompt ? 'prompt grounding ausente' : '']
+        const gaps = [!hasShots ? 'incomplete shot planning' : '', !hasPrompt ? 'missing prompt grounding' : '']
           .filter(Boolean)
           .join(' + ');
         recommendations.push(
           recommendation({
             id: `missing:${scene.id}`,
             type: 'missing dependency',
-            title: `Dependência faltante em "${scene.title}"`,
-            description: `A cena está bloqueada por ${gaps}.`,
+            title: `Missing dependency in "${scene.title}"`,
+            description: `The scene is blocked by ${gaps}.`,
             status: 'blocked',
             projectId,
             chapterId,
@@ -172,8 +172,8 @@ export const buildAssistivePlanningBundle = ({
             inconsistencyRisk,
             blocking: true,
             quickAction: !hasShots
-              ? { id: 'open-shot-planner', label: 'Abrir Shot Planner' }
-              : { id: 'open-prompt-builder', label: 'Abrir Prompt Builder' }
+              ? { id: 'open-shot-planner', label: 'Open Shot Planner' }
+              : { id: 'open-prompt-builder', label: 'Open Prompt Builder' }
           })
         );
       }
@@ -183,8 +183,8 @@ export const buildAssistivePlanningBundle = ({
           recommendation({
             id: `canon-conflict:${scene.id}`,
             type: 'canon conflict to resolve',
-            title: `Conflito canônico em "${scene.title}"`,
-            description: `Há sinais de inconsistência (canon fraco/conflitante ou riscos de continuidade).`,
+            title: `Canonical conflict in "${scene.title}"`,
+            description: `There are signs of inconsistency (weak/conflicting canon or continuity risks).`,
             status: 'blocked',
             projectId,
             chapterId,
@@ -194,7 +194,7 @@ export const buildAssistivePlanningBundle = ({
             completeness,
             inconsistencyRisk: Math.max(0.55, inconsistencyRisk),
             blocking: true,
-            quickAction: { id: 'open-image-review', label: 'Revisar no Image Review' }
+            quickAction: { id: 'open-image-review', label: 'Review in Image Review' }
           })
         );
       }
@@ -204,8 +204,8 @@ export const buildAssistivePlanningBundle = ({
           recommendation({
             id: `review:${scene.id}`,
             type: 'review required',
-            title: `Review requerido para "${scene.title}"`,
-            description: `${unreviewed.length} output(s) aguardando triagem/revisão canônica.`,
+            title: `Review required for "${scene.title}"`,
+            description: `${unreviewed.length} output(s) awaiting triage/canonical review.`,
             status: 'ready-to-review',
             projectId,
             chapterId,
@@ -214,7 +214,7 @@ export const buildAssistivePlanningBundle = ({
             impact,
             completeness,
             inconsistencyRisk,
-            quickAction: { id: 'open-image-review', label: 'Abrir revisão' }
+            quickAction: { id: 'open-image-review', label: 'Open review' }
           })
         );
       }
@@ -224,8 +224,8 @@ export const buildAssistivePlanningBundle = ({
           recommendation({
             id: `asset:${scene.id}`,
             type: 'recommended asset to generate',
-            title: `Gerar asset recomendado para "${scene.title}"`,
-            description: `Contexto pronto sem output gerado. Próximo passo: gerar primeiro lote de imagens.`,
+            title: `Generate recommended asset for "${scene.title}"`,
+            description: `Context is ready but no output has been generated. Next step: generate the first batch of images.`,
             status: 'ready-to-generate',
             projectId,
             chapterId,
@@ -234,28 +234,28 @@ export const buildAssistivePlanningBundle = ({
             impact,
             completeness,
             inconsistencyRisk,
-            quickAction: { id: 'open-image-gen', label: 'Abrir gerador' }
+            quickAction: { id: 'open-image-gen', label: 'Open generator' }
           })
         );
       }
 
       const nextActionDescription = !hasShots
-        ? 'Estruturar beats/shots para destravar a produção.'
+        ? 'Structure beats/shots to unblock production.'
         : !hasPrompt
-          ? 'Montar prompt grounding oficial antes da geração.'
+          ? 'Build the official grounding prompt before generation.'
           : unreviewed.length
-            ? 'Priorizar revisão para aprovar canon e reduzir retrabalho.'
+            ? 'Prioritize review to approve canon and reduce rework.'
             : !hasCanonical
-              ? 'Promover o melhor output ao canon para estabilizar continuidade.'
+              ? 'Promote the best output to canon to stabilize continuity.'
               : sceneReferences.length
-                ? 'Seguir para geração de variações e pack de export.'
-                : 'Adicionar referências visuais para fortalecer consistência.';
+                ? 'Proceed to variation generation and export packaging.'
+                : 'Add visual references to strengthen consistency.';
 
       recommendations.push(
         recommendation({
           id: `next:${scene.id}`,
           type: 'next best action',
-          title: `Próxima melhor ação · "${scene.title}"`,
+          title: `Next best action · "${scene.title}"`,
           description: nextActionDescription,
           status: !hasShots || !hasPrompt ? 'blocked' : unreviewed.length ? 'ready-to-review' : 'ready-to-generate',
           projectId,
@@ -267,10 +267,10 @@ export const buildAssistivePlanningBundle = ({
           inconsistencyRisk,
           blocking: !hasShots || !hasPrompt,
           quickAction: !hasShots
-            ? { id: 'open-shot-planner', label: 'Planejar shots' }
+            ? { id: 'open-shot-planner', label: 'Plan shots' }
             : !hasPrompt
-              ? { id: 'open-prompt-builder', label: 'Montar prompt' }
-              : { id: 'open-image-gen', label: 'Executar geração' }
+              ? { id: 'open-prompt-builder', label: 'Build prompt' }
+              : { id: 'open-image-gen', label: 'Run generation' }
         })
       );
 
@@ -279,8 +279,8 @@ export const buildAssistivePlanningBundle = ({
           recommendation({
             id: `prod-ready:${scene.id}`,
             type: 'scene not production-ready',
-            title: `Cena ainda não pronta para produção: "${scene.title}"`,
-            description: `Completude atual ${Math.round(completeness * 100)}%. Falta fechar dependências/revisão para liberar produção.`,
+            title: `Scene not yet production-ready: "${scene.title}"`,
+            description: `Current completeness ${Math.round(completeness * 100)}%. Dependencies and review still need to be closed before production can proceed.`,
             status: 'blocked',
             projectId,
             chapterId,
@@ -290,14 +290,14 @@ export const buildAssistivePlanningBundle = ({
             completeness,
             inconsistencyRisk,
             blocking: true,
-            quickAction: { id: 'open-shot-planner', label: 'Verificar pipeline da cena' }
+            quickAction: { id: 'open-shot-planner', label: 'Check scene pipeline' }
           })
         );
       }
     });
 
   const sorted = recommendations
-    .sort((a, b) => b.priorityScore - a.priorityScore || a.title.localeCompare(b.title, 'pt-BR'))
+    .sort((a, b) => b.priorityScore - a.priorityScore || a.title.localeCompare(b.title, 'en-US'))
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
   return {

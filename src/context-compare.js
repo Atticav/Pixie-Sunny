@@ -92,23 +92,23 @@ export const buildSemanticHighlights = ({ metadataDiff, sectionDiffs }) => {
   const highlights = [];
 
   if (keys.has('reviewStatus') || keys.has('resultingStatus') || keys.has('isCanonical')) {
-    highlights.push('Mudança editorial/canônica relevante.');
+    highlights.push('Relevant editorial/canonical change.');
   }
   if (keys.has('sceneId') || keys.has('chapterId') || keys.has('beatId') || keys.has('characterId') || keys.has('targetId')) {
-    highlights.push('Contexto narrativo/escopo alterado.');
+    highlights.push('Narrative context/scope changed.');
   }
   if (keys.has('score') || keys.has('status') || keys.has('readiness')) {
-    highlights.push('Sinal de prontidão de produção mudou.');
+    highlights.push('Production readiness signal changed.');
   }
   if ([...sectionLabels].some((label) => PROMPT_SECTION_PATTERN.test(label))) {
-    highlights.push('Prompt/briefing sofreu mudança semântica.');
+    highlights.push('Prompt/brief changed semantically.');
   }
   if ([...sectionLabels].some((label) => CONTINUITY_SECTION_PATTERN.test(label))) {
-    highlights.push('Riscos de continuidade devem ser revisados.');
+    highlights.push('Continuity risks should be reviewed.');
   }
 
   if (!highlights.length && ((metadataDiff?.changed || 0) > 0 || (metadataDiff?.added || 0) > 0 || (metadataDiff?.removed || 0) > 0)) {
-    highlights.push('Metadata alterada com impacto potencial no pipeline.');
+    highlights.push('Metadata changed with potential pipeline impact.');
   }
 
   return highlights;

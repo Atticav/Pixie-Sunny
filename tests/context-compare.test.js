@@ -54,7 +54,7 @@ test('buildDiffSummary and semantic highlights expose useful compare signals', (
   assert.ok(summary.textOps > 0);
 
   const highlights = buildSemanticHighlights({ metadataDiff, sectionDiffs });
-  assert.ok(highlights.some((entry) => entry.includes('editorial/canônica')));
-  assert.ok(highlights.some((entry) => entry.includes('Prompt/briefing')));
-  assert.ok(highlights.some((entry) => entry.includes('continuidade')));
+  assert.ok(highlights.some((entry) => entry.includes('editorial/canonical')));
+  assert.ok(highlights.some((entry) => entry.includes('Prompt/brief')));
+  assert.ok(highlights.some((entry) => entry.includes('Continuity')));
 });

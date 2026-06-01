@@ -83,9 +83,12 @@ import {
   buildReviewInboxSummary,
   isDuplicateSandboxPromotion
 } from './product-polish.js';
+import { installEnglishUi, localizeDom, translateUserFacingText } from './i18n.js';
 
 const store = createStore();
 let state = store.load();
+
+installEnglishUi();
 
 const $ = (id) => document.getElementById(id);
 const newClientId = () =>
@@ -374,7 +377,7 @@ const workspaceSettings = () => state.settings?.localWorkspace || {};
 const assistiveScopeType = () => refs.assistiveScopeType?.value || 'project';
 
 const setWorkspaceStatus = (message) => {
-  if (refs.workspaceStatus) refs.workspaceStatus.textContent = message;
+  if (refs.workspaceStatus) refs.workspaceStatus.textContent = translateUserFacingText(message);
 };
 
 const renderOptions = (select, options, selectedId, emptyLabel = 'Nenhum item cadastrado') => {
@@ -382,7 +385,7 @@ const renderOptions = (select, options, selectedId, emptyLabel = 'Nenhum item ca
   if (!options.length) {
     const option = document.createElement('option');
     option.value = '';
-    option.textContent = emptyLabel;
+    option.textContent = translateUserFacingText(emptyLabel);
     select.append(option);
     select.value = '';
     return;
@@ -391,7 +394,7 @@ const renderOptions = (select, options, selectedId, emptyLabel = 'Nenhum item ca
   options.forEach((item) => {
     const option = document.createElement('option');
     option.value = item.id;
-    option.textContent = item.name || item.title;
+    option.textContent = translateUserFacingText(item.name || item.title);
     if (selectedId && selectedId === item.id) option.selected = true;
     select.append(option);
   });
@@ -593,12 +596,12 @@ const renderOptionsWithBlank = (select, options, selectedId, blankLabel = 'Nenhu
   select.innerHTML = '';
   const blankOption = document.createElement('option');
   blankOption.value = '';
-  blankOption.textContent = blankLabel;
+  blankOption.textContent = translateUserFacingText(blankLabel);
   select.append(blankOption);
   options.forEach((item) => {
     const option = document.createElement('option');
     option.value = item.id;
-    option.textContent = item.name || item.title;
+    option.textContent = translateUserFacingText(item.name || item.title);
     if (selectedId && selectedId === item.id) option.selected = true;
     select.append(option);
   });
@@ -651,7 +654,7 @@ const plannerVisibleScenes = () => {
   const chapterId = refs.shotFilterChapter.value || '';
   return projectScenesAll()
     .filter((scene) => !chapterId || scene.chapterId === chapterId)
-    .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+    .sort((a, b) => a.title.localeCompare(b.title, 'en-US'));
 };
 
 const plannerCurrentSceneId = () => refs.shotFilterScene.value || plannerVisibleScenes()[0]?.id || '';
@@ -688,7 +691,7 @@ const plannerFilteredShots = () => {
     if (a.sceneId !== b.sceneId) {
       const sceneA = state.scenes.find((scene) => scene.id === a.sceneId)?.title || '';
       const sceneB = state.scenes.find((scene) => scene.id === b.sceneId)?.title || '';
-      return sceneA.localeCompare(sceneB, 'pt-BR');
+      return sceneA.localeCompare(sceneB, 'en-US');
     }
     return shotOrderSorter(a, b);
   });
@@ -718,7 +721,7 @@ const renderChecklist = (container, items, selectedIds, emptyText) => {
   if (!items.length) {
     const empty = document.createElement('div');
     empty.className = 'sp-empty';
-    empty.textContent = emptyText;
+    empty.textContent = translateUserFacingText(emptyText);
     container.append(empty);
     return;
   }
@@ -737,7 +740,7 @@ const renderChecklist = (container, items, selectedIds, emptyText) => {
     text.append(title);
     if (item.meta) {
       const meta = document.createElement('small');
-      meta.textContent = item.meta;
+      meta.textContent = translateUserFacingText(item.meta);
       text.append(meta);
     }
     if (item.detail) {
@@ -803,7 +806,7 @@ const renderShotPlanner = () => {
         .concat(SHOT_TEMPLATES.map((template) => template.defaults.shotType))
         .filter(Boolean)
     )
-  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  ).sort((a, b) => a.localeCompare(b, 'en-US'));
   renderOptionsWithBlank(
     refs.shotFilterType,
     shotTypes.map((type) => ({ id: type, name: type })),
@@ -1342,7 +1345,7 @@ const reviewInboxApplyOutputDecision = (item, action) => {
     });
   } else if (action === 'mark-refresh') {
     output.reviewStatus = 'candidate';
-    output.notes = `${output.notes ? `${output.notes}\n` : ''}[refresh] marcado na review inbox em ${new Date().toLocaleString('pt-BR')}`;
+    output.notes = `${output.notes ? `${output.notes}\n` : ''}[refresh] marcado na review inbox em ${new Date().toLocaleString('en-US')}`;
     irsRecordDecision({
       output,
       job,
@@ -1425,7 +1428,7 @@ const reviewInboxRow = (item, index) => {
 
   const meta = document.createElement('p');
   meta.className = 'ri-item-meta';
-  meta.textContent = `${item.source} · ${new Date(item.createdAt).toLocaleString('pt-BR')}`;
+  meta.textContent = `${item.source} · ${new Date(item.createdAt).toLocaleString('en-US')}`;
 
   const actions = document.createElement('div');
   actions.className = 'ri-item-actions';
@@ -1648,8 +1651,8 @@ const renderWorkspaceSandboxes = () => {
       const meta = document.createElement('p');
       meta.className = 'sb-sandbox-meta';
       meta.textContent =
-        `${SANDBOX_STATUS_LABELS[sandbox.status] || sandbox.status} · criado ${new Date(sandbox.createdAt).toLocaleString('pt-BR')}` +
-        ` · atualizado ${new Date(sandbox.updatedAt || sandbox.createdAt).toLocaleString('pt-BR')}`;
+        `${SANDBOX_STATUS_LABELS[sandbox.status] || sandbox.status} · criado ${new Date(sandbox.createdAt).toLocaleString('en-US')}` +
+        ` · atualizado ${new Date(sandbox.updatedAt || sandbox.createdAt).toLocaleString('en-US')}`;
 
       const purpose = document.createElement('p');
       purpose.className = 'sb-sandbox-purpose';
@@ -1777,7 +1780,7 @@ const renderWorkspaceSandboxes = () => {
 const checkpointSelectOptions = () =>
   projectWorkspaceCheckpoints().map((checkpoint) => ({
     id: checkpoint.id,
-    name: `${checkpoint.name} · ${new Date(checkpoint.createdAt).toLocaleString('pt-BR')}`
+    name: `${checkpoint.name} · ${new Date(checkpoint.createdAt).toLocaleString('en-US')}`
   }));
 
 const projectSandboxPromotions = () =>
@@ -1841,7 +1844,7 @@ const renderSandboxPromoteSection = () => {
         ['Status', SANDBOX_STATUS_READINESS[sandbox.status] || sandbox.status],
         ['Target', `workspace principal (${projectId})`],
         ['Impacto (snapshot)', impactSummary],
-        ['Snapshot em', new Date(sandbox.updatedAt || sandbox.createdAt).toLocaleString('pt-BR')]
+        ['Snapshot em', new Date(sandbox.updatedAt || sandbox.createdAt).toLocaleString('en-US')]
       ];
       refs.pmSummaryDl.innerHTML = '';
       rows.forEach(([label, value]) => {
@@ -1872,7 +1875,7 @@ const renderSandboxPromoteSection = () => {
     const meta = document.createElement('p');
     meta.className = 'pm-history-meta';
     meta.textContent =
-      `${SANDBOX_STATUS_READINESS[promo.sandboxStatus] || promo.sandboxStatus} · promovido em ${new Date(promo.promotedAt).toLocaleString('pt-BR')}`;
+      `${SANDBOX_STATUS_READINESS[promo.sandboxStatus] || promo.sandboxStatus} · promovido em ${new Date(promo.promotedAt).toLocaleString('en-US')}`;
 
     const impact = document.createElement('p');
     impact.className = 'pm-history-impact';
@@ -2101,7 +2104,7 @@ const renderProductionClosureSection = () => {
       title.textContent = closure.label || 'Export / Delivery Closure';
       const meta = document.createElement('p');
       meta.textContent =
-        `${new Date(closure.generatedAt).toLocaleString('pt-BR')} · blockers ${closure.blockers.length} · warnings ${closure.warnings.length}`;
+        `${new Date(closure.generatedAt).toLocaleString('en-US')} · blockers ${closure.blockers.length} · warnings ${closure.warnings.length}`;
       card.append(title, meta);
       refs.pcHistoryList.append(card);
     });
@@ -2162,7 +2165,7 @@ const renderWorkspaceCheckpoints = () => {
 
       const meta = document.createElement('p');
       meta.className = 'sc-checkpoint-meta';
-      meta.textContent = `${new Date(checkpoint.createdAt).toLocaleString('pt-BR')} · ${checkpoint.reason || 'sem motivo informado'}`;
+      meta.textContent = `${new Date(checkpoint.createdAt).toLocaleString('en-US')} · ${checkpoint.reason || 'sem motivo informado'}`;
 
       const notes = document.createElement('p');
       notes.className = 'sc-checkpoint-notes';
@@ -2252,7 +2255,7 @@ const renderWorkspaceCheckpoints = () => {
   const highlights = buildSemanticHighlights({ metadataDiff, sectionDiffs });
 
   refs.checkpointCompareSummary.textContent =
-    `${checkpoint.name} (${new Date(checkpoint.createdAt).toLocaleString('pt-BR')})` +
+    `${checkpoint.name} (${new Date(checkpoint.createdAt).toLocaleString('en-US')})` +
     ` · metadata alterada: ${diffSummary.metadataChanged + diffSummary.metadataAdded + diffSummary.metadataRemoved}` +
     ` · operações de texto: ${diffSummary.textOps}`;
   refs.checkpointCompareHighlights.innerHTML = '';
@@ -2339,6 +2342,7 @@ const render = () => {
   setDisabled(['createCheckpointBtn'], !selectedProjectId());
   setDisabled(['pmConfirmBtn'], !selectedProjectId() || !pmSelectedSandboxId);
   setDisabled(['pcGenerateBtn', 'pcDownloadBtn'], !selectedProjectId());
+  localizeDom(document.body);
 };
 
 const persist = () => {
@@ -3351,7 +3355,7 @@ refs.pcGenerateBtn?.addEventListener('click', async () => {
   state.productionClosures.unshift(
     createProductionClosure({
       projectId,
-      label: `Closure ${new Date().toLocaleString('pt-BR')}`,
+      label: `Closure ${new Date().toLocaleString('en-US')}`,
       readinessSummary: preflight.readinessSummary,
       reviewInboxSummary: preflight.reviewInboxSummary,
       blockers: preflight.blockers,
@@ -3442,7 +3446,7 @@ const countWords = (text) => {
 };
 
 const formatTime = () =>
-  new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
 const wsSetAutosaveStatus = (status) => {
   wsRefs.autosaveIndicator.className = `ws-autosave ${status}`;
@@ -3454,13 +3458,13 @@ const wsUpdateWordCount = () => {
   const text = wsRefs.content.value;
   const words = countWords(text);
   const chars = text.length;
-  wsRefs.wordCountDisplay.textContent = `${words.toLocaleString('pt-BR')} palavras · ${chars.toLocaleString('pt-BR')} caracteres`;
+  wsRefs.wordCountDisplay.textContent = `${words.toLocaleString('en-US')} palavras · ${chars.toLocaleString('en-US')} caracteres`;
   const chapter = currentChapter();
   const goal = chapter?.wordGoal || 0;
   if (goal > 0) {
     const percent = Math.min(100, Math.round((words / goal) * 100));
     wsRefs.progressFill.style.width = `${percent}%`;
-    wsRefs.goalDisplay.textContent = `${percent}% da meta (${goal.toLocaleString('pt-BR')} palavras)`;
+    wsRefs.goalDisplay.textContent = `${percent}% da meta (${goal.toLocaleString('en-US')} palavras)`;
   } else {
     wsRefs.progressFill.style.width = '0%';
     wsRefs.goalDisplay.textContent = '';
@@ -4250,7 +4254,7 @@ const psRenderVersionList = (promptDocument) => {
     .forEach((version) => {
       const button = document.createElement('button');
       button.className = `ps-version-btn${version.id === promptDocument.activeVersionId ? ' active' : ''}`;
-      button.textContent = `${version.label} · ${new Date(version.createdAt).toLocaleString('pt-BR')}`;
+      button.textContent = `${version.label} · ${new Date(version.createdAt).toLocaleString('en-US')}`;
       button.addEventListener('click', () => {
         const documentToUpdate = psCurrentDocument();
         if (!documentToUpdate) return;
@@ -4972,7 +4976,7 @@ const igsRenderJobList = () => {
     titleEl.append(statusBadge);
     const metaEl = document.createElement('div');
     metaEl.className = 'igs-job-item-meta';
-    metaEl.textContent = `${new Date(job.createdAt).toLocaleString('pt-BR')} · ${job.providerLabel}`;
+    metaEl.textContent = `${new Date(job.createdAt).toLocaleString('en-US')} · ${job.providerLabel}`;
     item.append(titleEl, metaEl);
     item.addEventListener('click', () => {
       igsSelectedJobId = job.id;
@@ -6119,7 +6123,7 @@ const irsBuildContextCatalog = () => {
     if (event.targetType === 'generationOutput' && event.targetId && event.relatedItemType === 'generationOutput' && event.relatedItemId) {
       pushLink(
         `decision:${event.id}`,
-        `${irsDecisionTypeLabels[event.decisionType] || event.decisionType} · ${new Date(event.happenedAt).toLocaleDateString('pt-BR')}`,
+        `${irsDecisionTypeLabels[event.decisionType] || event.decisionType} · ${new Date(event.happenedAt).toLocaleDateString('en-US')}`,
         `output:${event.targetId}`,
         `output:${event.relatedItemId}`,
         'Approval & Decision History Layer'
@@ -6135,7 +6139,7 @@ const irsBuildContextCatalog = () => {
   lineageGraph.edges.forEach((edge) => {
     pushLink(
       `lineage:${edge.from}->${edge.to}:${edge.relation}`,
-      `${edge.relation === 'supersedes' ? 'supersession' : 'derived variant'} · ${new Date(edge.happenedAt).toLocaleDateString('pt-BR')}`,
+      `${edge.relation === 'supersedes' ? 'supersession' : 'derived variant'} · ${new Date(edge.happenedAt).toLocaleDateString('en-US')}`,
       `output:${edge.from}`,
       `output:${edge.to}`,
       'Asset Version Lineage / Supersession Graph'
@@ -6155,7 +6159,7 @@ const irsPopulateContextCompareSelectors = () => {
   irsContextCatalog = catalog;
   irsContextConnections = links;
 
-  const options = [...catalog.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  const options = [...catalog.values()].sort((a, b) => a.label.localeCompare(b.label, 'en-US'));
   irsRefs.compareCatalogCount.textContent = `${options.length} entradas comparáveis · ${links.length} conexões sugeridas`;
   const baseOption = '<option value="">Selecione</option>';
   irsRefs.compareEntityA.innerHTML = baseOption;
@@ -6429,7 +6433,7 @@ const irsRenderLineageGraph = () => {
     title.textContent = node.label;
     const titleMeta = document.createElement('span');
     titleMeta.className = 'irs-lineage-meta';
-    titleMeta.textContent = `${node.output.generationType || 'asset'} · ${new Date(node.output.createdAt).toLocaleString('pt-BR')}`;
+    titleMeta.textContent = `${node.output.generationType || 'asset'} · ${new Date(node.output.createdAt).toLocaleString('en-US')}`;
     header.append(title, titleMeta);
 
     const badges = document.createElement('div');
@@ -6498,7 +6502,7 @@ const irsPopulateSupersedeTargets = () => {
   all.forEach((output) => {
     const option = document.createElement('option');
     option.value = output.id;
-    option.textContent = `${irsOutputDisplayName(output)} · ${output.generationType} · ${new Date(output.createdAt).toLocaleDateString('pt-BR')}`;
+    option.textContent = `${irsOutputDisplayName(output)} · ${output.generationType} · ${new Date(output.createdAt).toLocaleDateString('en-US')}`;
     irsRefs.supersedeTarget.append(option);
   });
 };
@@ -6560,7 +6564,7 @@ const irsSelectOutput = (outputId) => {
     `Seed: ${output.seed >= 0 ? output.seed : 'aleatório'}`,
     output.fileName ? `Arquivo: ${output.fileName}` : '',
     `Job: ${job.id.substring(0, 8)}`,
-    `${new Date(output.createdAt).toLocaleString('pt-BR')}`
+    `${new Date(output.createdAt).toLocaleString('en-US')}`
   ].filter(Boolean).join('\n');
 
   irsUpdateStatusButtonStates(output);
@@ -6911,7 +6915,7 @@ irsRefs.canonConfirmBtn.addEventListener('click', () => {
       }
       return '';
     })();
-    const refName = `Canon ${canonType}${targetName ? ` · ${targetName}` : ''} · ${new Date().toLocaleDateString('pt-BR')}`;
+    const refName = `Canon ${canonType}${targetName ? ` · ${targetName}` : ''} · ${new Date().toLocaleDateString('en-US')}`;
     const ref = createReferenceImage({
       projectId: selectedProjectId(),
       characterId: canonType === 'character' ? targetId : '',
@@ -7073,7 +7077,7 @@ const irsRenderPromotionsList = () => {
 
     const dateEl = document.createElement('div');
     dateEl.className = 'irs-promotion-date';
-    dateEl.textContent = new Date(promotion.promotedAt).toLocaleString('pt-BR');
+    dateEl.textContent = new Date(promotion.promotedAt).toLocaleString('en-US');
 
     if (promotion.notes) {
       const notesEl = document.createElement('div');
@@ -7131,7 +7135,7 @@ const irsPopulateDecisionItemFilter = () => {
   });
   irsRefs.decisionItemFilter.innerHTML = '<option value="">Todos os itens</option>';
   [...catalog.values()]
-    .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+    .sort((a, b) => a.label.localeCompare(b.label, 'en-US'))
     .forEach((entry) => {
       const option = document.createElement('option');
       option.value = entry.key;
@@ -7211,7 +7215,7 @@ const irsRenderDecisionHistory = () => {
 
     const timestamp = document.createElement('div');
     timestamp.className = 'irs-decision-time';
-    timestamp.textContent = new Date(event.happenedAt).toLocaleString('pt-BR');
+    timestamp.textContent = new Date(event.happenedAt).toLocaleString('en-US');
 
     row.append(header, meta, rationale);
     if (relation.textContent) row.append(relation);
