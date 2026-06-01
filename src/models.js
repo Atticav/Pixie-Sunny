@@ -558,7 +558,7 @@ export const createWorkspaceSandbox = ({
   return {
     id: newId(),
     projectId,
-    name: stringValue(name, 'Sandbox sem nome'),
+    name: stringValue(name, 'Untitled sandbox'),
     purpose: stringValue(purpose),
     status: WORKSPACE_SANDBOX_STATUSES.includes(status) ? status : 'exploratory',
     snapshot: recordValue(snapshot) || {},
@@ -581,7 +581,7 @@ export const createSandboxPromotion = ({
   id: newId(),
   projectId,
   sandboxId: stringValue(sandboxId),
-  sandboxName: stringValue(sandboxName, 'Sandbox sem nome'),
+  sandboxName: stringValue(sandboxName, 'Untitled sandbox'),
   sandboxPurpose: stringValue(sandboxPurpose),
   sandboxStatus: WORKSPACE_SANDBOX_STATUSES.includes(sandboxStatus) ? sandboxStatus : 'exploratory',
   sandboxSnapshot: recordValue(sandboxSnapshot) || {},
@@ -665,7 +665,7 @@ export const createGenerationJob = ({
 
 const createPromptVersion = ({
   id = newId(),
-  label = 'Versão inicial',
+  label = 'Initial version',
   source = 'manual',
   preserve = [],
   vary = [],
@@ -752,7 +752,7 @@ const normalizeProject = (project) => {
   const createdAt = stringValue(value.createdAt) || nowUtc();
   return {
     id: value.id,
-    name: stringValue(value.name, 'Projeto sem nome'),
+    name: stringValue(value.name, 'Untitled project'),
     tone: stringValue(value.tone),
     description: stringValue(value.description),
     createdAt,
@@ -767,7 +767,7 @@ const normalizeBook = (book) => {
   return {
     id: value.id,
     projectId: value.projectId,
-    title: stringValue(value.title, 'Livro sem título'),
+    title: stringValue(value.title, 'Untitled book'),
     synopsis: stringValue(value.synopsis),
     createdAt,
     updatedAt: stringValue(value.updatedAt) || createdAt
@@ -783,7 +783,7 @@ const normalizeChapter = (chapter) => {
     id: value.id,
     projectId: value.projectId,
     bookId: value.bookId,
-    title: stringValue(value.title, 'Capítulo sem título'),
+    title: stringValue(value.title, 'Untitled chapter'),
     summary: stringValue(value.summary),
     content: stringValue(value.content),
     status: CHAPTER_STATUSES.includes(rawStatus) ? rawStatus : 'rascunho',
@@ -805,7 +805,7 @@ const normalizeCharacter = (character) => {
   return {
     id: value.id,
     projectId: value.projectId,
-    name: stringValue(value.name, 'Personagem sem nome'),
+    name: stringValue(value.name, 'Unnamed character'),
     notes: stringValue(value.notes),
     canonTraits: stringList(value.canonTraits),
     fixedTraits: stringList(value.fixedTraits),
@@ -844,7 +844,7 @@ const normalizeReferenceImage = (ref) => {
     id: value.id,
     projectId: value.projectId,
     characterId: stringValue(value.characterId),
-    name: stringValue(value.name, 'Referência sem nome'),
+    name: stringValue(value.name, 'Unnamed reference'),
     type: REFERENCE_TYPES.includes(rawType) ? rawType : 'character',
     dataUrl: stringValue(value.dataUrl),
     localPath: stringValue(value.localPath),
@@ -866,7 +866,7 @@ const normalizeLoreEntry = (entry) => {
   return {
     id: value.id,
     projectId: value.projectId,
-    title: stringValue(value.title, 'Lore sem título'),
+    title: stringValue(value.title, 'Untitled lore entry'),
     content: stringValue(value.content),
     tags: stringList(value.tags),
     createdAt,
@@ -882,7 +882,7 @@ const normalizeScene = (scene) => {
     id: value.id,
     projectId: value.projectId,
     chapterId: stringValue(value.chapterId, UNASSIGNED_CHAPTER_ID),
-    title: stringValue(value.title, 'Cena sem título'),
+    title: stringValue(value.title, 'Untitled scene'),
     description: stringValue(value.description),
     location: stringValue(value.location),
     createdAt,
@@ -899,7 +899,7 @@ const normalizeBeat = (beat) => {
     projectId: value.projectId,
     chapterId: stringValue(value.chapterId, UNASSIGNED_CHAPTER_ID),
     sceneId: value.sceneId,
-    title: stringValue(value.title, 'Beat sem título'),
+    title: stringValue(value.title, 'Untitled beat'),
     summary: stringValue(value.summary),
     order: normalizeOrderIndex(value.order),
     createdAt,
@@ -918,7 +918,7 @@ const normalizeShot = (shot) => {
     chapterId: stringValue(value.chapterId, UNASSIGNED_CHAPTER_ID),
     sceneId: value.sceneId,
     beatId: stringValue(value.beatId),
-    title: stringValue(value.title, 'Shot sem título'),
+    title: stringValue(value.title, 'Untitled shot'),
     order: normalizeOrderIndex(value.order),
     status: SHOT_STATUSES.includes(rawStatus) ? rawStatus : 'idea',
     shotType: stringValue(value.shotType),
@@ -1027,7 +1027,7 @@ const normalizePromptVersion = (version) => {
   const createdAt = stringValue(value.createdAt) || nowUtc();
   return {
     id: value.id,
-    label: stringValue(value.label, 'Versão'),
+    label: stringValue(value.label, 'Version'),
     source: stringValue(value.source, 'manual'),
     preserve: stringList(value.preserve),
     vary: stringList(value.vary),
@@ -1058,7 +1058,7 @@ const normalizePromptDocument = (promptDocument) => {
   return {
     id: value.id,
     projectId: value.projectId,
-    title: stringValue(value.title, 'Prompt sem título'),
+    title: stringValue(value.title, 'Untitled prompt'),
     targetType: stringValue(value.targetType) === 'scene' ? 'scene' : 'character',
     targetId: stringValue(value.targetId),
     promptMedium: stringValue(value.promptMedium) === 'video' ? 'video' : 'image',
@@ -1140,7 +1140,7 @@ const normalizeWorkspaceSandbox = (sandbox) => {
   return {
     id: value.id,
     projectId: value.projectId,
-    name: stringValue(value.name, 'Sandbox sem nome'),
+    name: stringValue(value.name, 'Untitled sandbox'),
     purpose: stringValue(value.purpose),
     status: WORKSPACE_SANDBOX_STATUSES.includes(stringValue(value.status))
       ? stringValue(value.status)
@@ -1158,7 +1158,7 @@ const normalizeSandboxPromotion = (promotion) => {
     id: value.id,
     projectId: value.projectId,
     sandboxId: stringValue(value.sandboxId),
-    sandboxName: stringValue(value.sandboxName, 'Sandbox sem nome'),
+    sandboxName: stringValue(value.sandboxName, 'Untitled sandbox'),
     sandboxPurpose: stringValue(value.sandboxPurpose),
     sandboxStatus: WORKSPACE_SANDBOX_STATUSES.includes(stringValue(value.sandboxStatus))
       ? stringValue(value.sandboxStatus)

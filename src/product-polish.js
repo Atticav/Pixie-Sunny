@@ -9,9 +9,9 @@ export const buildProjectCollectionSummary = ({
   nextStepWhenPopulated
 }) => {
   if (count <= 0) {
-    return `${emptyMessage} Próximo passo: ${nextStepWhenEmpty}`;
+    return `${emptyMessage} Next step: ${nextStepWhenEmpty}`;
   }
-  return `${count} ${selectPluralForm(count, singular, plural)} salvos localmente neste projeto. Próximo passo: ${nextStepWhenPopulated}`;
+  return `${count} ${selectPluralForm(count, singular, plural)} saved locally in this project. Next step: ${nextStepWhenPopulated}`;
 };
 
 export const buildReviewInboxSummary = ({
@@ -22,12 +22,12 @@ export const buildReviewInboxSummary = ({
   hasActiveFilters = false
 }) => {
   if (totalCount <= 0) {
-    return 'Inbox limpa neste projeto. Próximo passo: confirme o Production Readiness Dashboard ou gere um checkpoint antes do export de fechamento.';
+    return 'Inbox is clear for this project. Next step: confirm the Production Readiness Dashboard or create a checkpoint before the closure export.';
   }
   const visibleSummary = hasActiveFilters
-    ? `${filteredCount}/${totalCount} itens visíveis com os filtros atuais`
-    : `${totalCount} itens acionáveis`;
-  return `${visibleSummary} · ${blockedCount} bloqueado(s) · ${highRiskCount} de alto risco. Próximo passo: resolva os bloqueios e use o Diff Viewer / Context Compare para decidir os casos ambíguos.`;
+    ? `${filteredCount}/${totalCount} visible items with the current filters`
+    : `${totalCount} actionable items`;
+  return `${visibleSummary} · ${blockedCount} blocked · ${highRiskCount} high risk. Next step: resolve the blockers and use Diff Viewer / Context Compare to decide ambiguous cases.`;
 };
 
 export const buildPromotionGuidance = ({
@@ -36,15 +36,15 @@ export const buildPromotionGuidance = ({
   selectedSandboxName = ''
 }) => {
   if (!hasProject) {
-    return 'Selecione um projeto para revisar candidatos e registrar promoções com rastreabilidade.';
+    return 'Select a project to review candidates and record promotions with traceability.';
   }
   if (sandboxCount <= 0) {
-    return 'Nenhum sandbox disponível. Próximo passo: crie um sandbox ou atualize um candidato para review-ready antes de promover.';
+    return 'No sandbox available. Next step: create a sandbox or update a candidate to review-ready before promoting.';
   }
   if (!selectedSandboxName) {
-    return 'Selecione um sandbox candidato para revisar impacto, adicionar notas e confirmar a promoção.';
+    return 'Select a candidate sandbox to review impact, add notes, and confirm the promotion.';
   }
-  return `Candidato "${selectedSandboxName}" pronto para revisão. Próximo passo: valide o impacto, registre contexto editorial e confirme a promoção.`;
+  return `Candidate "${selectedSandboxName}" is ready for review. Next step: validate the impact, record editorial context, and confirm the promotion.`;
 };
 
 export const buildPreflightStatusMessage = ({
@@ -53,12 +53,12 @@ export const buildPreflightStatusMessage = ({
   ready = 0
 }) => {
   if (blockers > 0) {
-    return `Export bloqueado no momento · ${blockers} bloqueador(es) · ${warnings} aviso(s).`;
+    return `Export currently blocked · ${blockers} blocker(s) · ${warnings} warning(s).`;
   }
   if (warnings > 0) {
-    return `Pronto com alertas · ${warnings} aviso(s) antes do export de fechamento.`;
+    return `Ready with alerts · ${warnings} warning(s) before the closure export.`;
   }
-  return `Pronto para gerar export de fechamento · ${ready} sinal(is) positivos no preflight final.`;
+  return `Ready to generate closure export · ${ready} positive signal(s) in the final preflight.`;
 };
 
 export const canGenerateClosureExport = (includes = {}) =>
@@ -83,7 +83,7 @@ export const buildClosureExportStatusMessage = ({
   blockers = 0,
   warnings = 0
 }) => {
-  const suffix = `bloqueadores=${blockers} · avisos=${warnings}`;
-  if (!filename) return `Resumo de closure gerado (${suffix})`;
-  return `Resumo de closure gerado: ${filename} (${suffix})`;
+  const suffix = `blockers=${blockers} · warnings=${warnings}`;
+  if (!filename) return `Closure summary generated (${suffix})`;
+  return `Closure summary generated: ${filename} (${suffix})`;
 };

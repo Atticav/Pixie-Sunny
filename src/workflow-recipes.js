@@ -38,109 +38,109 @@ export const RECIPE_STATUSES = ['not_started', 'in_progress', 'complete'];
 export const WORKFLOW_RECIPES = [
   {
     id: 'nova-cena',
-    title: 'Criar nova cena do zero',
+    title: 'Create a new scene from scratch',
     description:
-      'Guia completo para iniciar uma nova cena: estrutura, personagens, shots e geração de imagem.',
+      'Complete guide to start a new scene: structure, characters, shots, and image generation.',
     steps: [
       {
         id: 'nova-cena-1',
-        label: 'Selecionar ou criar um projeto',
+        label: 'Select or create a project',
         rationale:
-          'Todo conteúdo precisa de um projeto-pai. Verifique se o projeto correto está selecionado antes de continuar.',
+          'All content needs a parent project. Make sure the correct project is selected before continuing.',
         scrollTarget: 'section:has(#projectSelect)',
         quickAction: 'scroll-project'
       },
       {
         id: 'nova-cena-2',
-        label: 'Criar ou confirmar personagem principal',
+        label: 'Create or confirm the main character',
         rationale:
-          'A cena é mais rica quando vinculada a um personagem com traços canônicos definidos.',
+          'A scene is stronger when linked to a character with defined canonical traits.',
         scrollTarget: 'section:has(#characterSelect)',
         quickAction: 'scroll-characters'
       },
       {
         id: 'nova-cena-3',
-        label: 'Adicionar entradas de lore relevantes',
+        label: 'Add relevant lore entries',
         rationale:
-          'Regras de universo e notas de lore ajudam o gerador de prompts a manter consistência.',
+          'World rules and lore notes help the prompt generator maintain consistency.',
         scrollTarget: 'section:has(#loreSelect)',
         quickAction: 'scroll-lore'
       },
       {
         id: 'nova-cena-4',
-        label: 'Criar a cena e preencher briefing',
+        label: 'Create the scene and fill in the brief',
         rationale:
-          'Defina localização, objetivo narrativo e tom visual da cena.',
+          'Define the scene’s location, narrative objective, and visual tone.',
         scrollTarget: 'section:has(#sceneSelect)',
         quickAction: 'scroll-scenes'
       },
       {
         id: 'nova-cena-5',
-        label: 'Planejar shots no Shot Planner',
+        label: 'Plan shots in Shot Planner',
         rationale:
-          'Divida a cena em shots planejados com direção visual, continuidade e referências.',
+          'Break the scene into planned shots with visual direction, continuity, and references.',
         scrollTarget: '.sp-section',
         quickAction: 'open-shot-planner'
       },
       {
         id: 'nova-cena-6',
-        label: 'Gerar imagens no Estúdio de Geração',
+        label: 'Generate images in Generation Studio',
         rationale:
-          'Gere outputs de imagem localmente para cada shot planejado.',
+          'Generate image outputs locally for each planned shot.',
         quickAction: 'open-image-gen'
       },
       {
         id: 'nova-cena-7',
-        label: 'Revisar e canonizar outputs na Revisão de Imagens',
+        label: 'Review and canonize outputs in Image Review',
         rationale:
-          'Selecione os melhores outputs, marque como canon e resolva conflicts de continuidade.',
+          'Select the best outputs, mark them as canon, and resolve continuity conflicts.',
         quickAction: 'open-image-review'
       }
     ]
   },
   {
     id: 'review-inbox',
-    title: 'Fluxo de resolução da Review Inbox',
+    title: 'Review Inbox resolution flow',
     description:
-      'Passo a passo para triar, priorizar e resolver os itens pendentes na inbox de revisão.',
+      'Step-by-step flow to triage, prioritize, and resolve pending items in the review inbox.',
     steps: [
       {
         id: 'review-inbox-1',
-        label: 'Abrir a Review Inbox e verificar pendências',
+        label: 'Open Review Inbox and check pending items',
         rationale:
-          'A inbox consolida conflitos, riscos e itens stale que precisam de decisão humana.',
+          'The inbox consolidates conflicts, risks, and stale items that need human decisions.',
         scrollTarget: '.ri-section',
         quickAction: 'scroll-review-inbox'
       },
       {
         id: 'review-inbox-2',
-        label: 'Filtrar por prioridade alta',
+        label: 'Filter by high priority',
         rationale:
-          'Concentre-se primeiro nos itens de risco crítico para evitar gargalos no pipeline.',
+          'Focus first on critical-risk items to avoid pipeline bottlenecks.',
         scrollTarget: '.ri-section',
         quickAction: 'scroll-review-inbox'
       },
       {
         id: 'review-inbox-3',
-        label: 'Inspecionar cada item e tomar uma decisão',
+        label: 'Inspect each item and make a decision',
         rationale:
-          'Aprove, rejeite, adie ou marque para refresh. Cada decisão é registrada no histórico.',
+          'Approve, reject, defer, or mark for refresh. Each decision is recorded in history.',
         scrollTarget: '.ri-section',
         quickAction: 'scroll-review-inbox'
       },
       {
         id: 'review-inbox-4',
-        label: 'Resolver itens de diff / compare context',
+        label: 'Resolve diff / compare-context items',
         rationale:
-          'Abra o Diff Viewer para itens com conflitos de contexto e valide as diferenças.',
+          'Open Diff Viewer for items with context conflicts and validate the differences.',
         scrollTarget: '.dv-section',
         quickAction: 'scroll-diff-viewer'
       },
       {
         id: 'review-inbox-5',
-        label: 'Verificar prontidão do projeto no Dashboard',
+        label: 'Check project readiness in the dashboard',
         rationale:
-          'Após resolução, confirme que o score de prontidão melhorou no Production Readiness Dashboard.',
+          'After resolution, confirm that the readiness score improved in the Production Readiness Dashboard.',
         scrollTarget: '.ap-section',
         quickAction: 'scroll-assistive'
       }
@@ -148,101 +148,101 @@ export const WORKFLOW_RECIPES = [
   },
   {
     id: 'pre-export',
-    title: 'Fluxo de prontidão pré-export',
+    title: 'Pre-export readiness flow',
     description:
-      'Checklist guiado para garantir que o projeto está pronto antes de gerar o pacote de exportação.',
+      'Guided checklist to ensure the project is ready before generating the export package.',
     steps: [
       {
         id: 'pre-export-1',
-        label: 'Verificar Production Readiness via Assistive Planning',
+        label: 'Check Production Readiness via Assistive Planning',
         rationale:
-          'O painel de Assistive Planning mostra o score de prontidão e bloqueia identificados por cena/sequência.',
+          'The Assistive Planning panel shows the readiness score and blockers identified by scene/sequence.',
         scrollTarget: '.ap-section',
         quickAction: 'scroll-assistive'
       },
       {
         id: 'pre-export-2',
-        label: 'Resolver itens bloqueados na Review Inbox',
+        label: 'Resolve blocked items in Review Inbox',
         rationale:
-          'Todo item com status "blocked" ou prioridade alta precisa ser resolvido antes do export.',
+          'Every item with status "blocked" or high priority must be resolved before export.',
         scrollTarget: '.ri-section',
         quickAction: 'scroll-review-inbox'
       },
       {
         id: 'pre-export-3',
-        label: 'Confirmar que os outputs canônicos estão marcados',
+        label: 'Confirm that canonical outputs are marked',
         rationale:
-          'Revise a galeria de imagens e certifique-se que cada cena tem pelo menos um output canônico.',
+          'Review the image gallery and ensure each scene has at least one canonical output.',
         quickAction: 'open-image-review'
       },
       {
         id: 'pre-export-4',
-        label: 'Revisar lineage e supersession de assets',
+        label: 'Review asset lineage and supersession',
         rationale:
-          'Verifique o grafo de lineage para garantir que nenhum asset supersedido ainda está marcado como canon.',
+          'Check the lineage graph to ensure no superseded asset is still marked as canon.',
         scrollTarget: '.irs-section',
         quickAction: 'open-image-review'
       },
       {
         id: 'pre-export-5',
-        label: 'Exportar pacote JSON do projeto',
+        label: 'Export project JSON package',
         rationale:
-          'Gere o export JSON completo como snapshot final antes do handoff ou publicação.',
+          'Generate the full JSON export as the final snapshot before handoff or publication.',
         quickAction: 'export-json'
       }
     ]
   },
   {
     id: 'sandbox-closure',
-    title: 'Do sandbox ao closure final',
+    title: 'From sandbox to final closure',
     description:
-      'Playbook operacional para revisar uma hipótese, promover a decisão e fechar o pacote final com rastreabilidade.',
+      'Operational playbook to review a hypothesis, promote the decision, and close the final package with traceability.',
     steps: [
       {
         id: 'sandbox-closure-1',
-        label: 'Revisar o sandbox candidato',
+        label: 'Review the candidate sandbox',
         rationale:
-          'Comece pelo Scenario Sandbox para validar propósito, status e snapshot antes de comparar com o workspace principal.',
+          'Start with Scenario Sandbox to validate purpose, status, and snapshot before comparing with the main workspace.',
         scrollTarget: '.sb-section',
         quickAction: 'scroll-sandbox'
       },
       {
         id: 'sandbox-closure-2',
-        label: 'Comparar contexto no Diff Viewer',
+        label: 'Compare context in Diff Viewer',
         rationale:
-          'Use o Diff Viewer / Context Compare para entender diferenças relevantes e reduzir ambiguidade antes da promoção.',
+          'Use Diff Viewer / Context Compare to understand relevant differences and reduce ambiguity before promotion.',
         scrollTarget: '.dv-section',
         quickAction: 'scroll-diff-viewer'
       },
       {
         id: 'sandbox-closure-3',
-        label: 'Confirmar Promote / Merge / Commit',
+        label: 'Confirm Promote / Merge / Commit',
         rationale:
-          'Revise o impacto resumido, registre notas e confirme a promoção do candidato escolhido.',
+          'Review the summarized impact, record notes, and confirm promotion of the chosen candidate.',
         scrollTarget: '.pm-section',
         quickAction: 'scroll-promote'
       },
       {
         id: 'sandbox-closure-4',
-        label: 'Salvar um Workspace Checkpoint',
+        label: 'Save a Workspace Checkpoint',
         rationale:
-          'Crie um checkpoint antes do fechamento para registrar o estado operacional aprovado.',
+          'Create a checkpoint before closure to record the approved operational state.',
         scrollTarget: '.sc-section',
         quickAction: 'scroll-checkpoints'
       },
       {
         id: 'sandbox-closure-5',
-        label: 'Resolver Review Inbox e validar readiness',
+        label: 'Resolve Review Inbox and validate readiness',
         rationale:
-          'Limpe bloqueios pendentes e confirme o Production Readiness Dashboard antes do export final.',
+          'Clear pending blockers and confirm the Production Readiness Dashboard before final export.',
         scrollTarget: '.ri-section',
         quickAction: 'scroll-review-inbox'
       },
       {
         id: 'sandbox-closure-6',
-        label: 'Gerar Export / Delivery / Production Closure',
+        label: 'Generate Export / Delivery / Production Closure',
         rationale:
-          'Finalize o handoff gerando o resumo estruturado de closure com as seções necessárias do pacote.',
+          'Finalize the handoff by generating the structured closure summary with the required package sections.',
         scrollTarget: '.pc-section',
         quickAction: 'scroll-closure'
       }

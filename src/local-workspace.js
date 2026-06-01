@@ -38,7 +38,7 @@ const ensureDirectoryPath = async (rootHandle, path) => {
 const writeTextFile = async (rootHandle, path, content) => {
   const segments = joinPath(path).split('/').filter(Boolean);
   const fileName = segments.pop();
-  if (!fileName) throw new Error('Nome do arquivo não pode estar vazio.');
+  if (!fileName) throw new Error('File name cannot be empty.');
   const directory = await ensureDirectoryPath(rootHandle, segments.join('/'));
   const fileHandle = await directory.getFileHandle(fileName, { create: true });
   const writable = await fileHandle.createWritable();
@@ -75,7 +75,7 @@ export const initializeLocalWorkspace = async (settings) => {
   if (!root) {
     return {
       ok: false,
-      message: 'Filesystem local avançado indisponível neste runtime. Estado seguirá em localStorage.'
+      message: 'Advanced local filesystem is unavailable in this runtime. State will remain in localStorage.'
     };
   }
 
@@ -100,7 +100,7 @@ export const initializeLocalWorkspace = async (settings) => {
   );
   return {
     ok: true,
-    message: 'Workspace local inicializado com sucesso.'
+    message: 'Local workspace initialized successfully.'
   };
 };
 

@@ -70,7 +70,7 @@ export const runLocalApiGeneration = async (spec, config) => {
     return {
       status: 'error',
       provider: 'local-api',
-      error: `Falha ao conectar com ${endpoint}: ${error.message}. Verifique se o servidor local está rodando.`
+      error: `Failed to connect to ${endpoint}: ${error.message}. Check whether the local server is running.`
     };
   }
   if (!response.ok) {
@@ -78,14 +78,14 @@ export const runLocalApiGeneration = async (spec, config) => {
     return {
       status: 'error',
       provider: 'local-api',
-      error: `Erro ${response.status} do endpoint local: ${text || response.statusText}`
+      error: `Error ${response.status} from the local endpoint: ${text || response.statusText}`
     };
   }
   let data;
   try {
     data = await response.json();
   } catch (error) {
-    return { status: 'error', provider: 'local-api', error: `Resposta inválida do servidor: ${error.message}` };
+    return { status: 'error', provider: 'local-api', error: `Invalid server response: ${error.message}` };
   }
   const images = data.images || [];
   let infoSeeds = [];
@@ -113,7 +113,7 @@ export const runImagePipeline = async (sceneSpec) => {
   return {
     status: 'not-implemented',
     message:
-      'Conecte aqui seu runner local (ComfyUI, InvokeAI, A1111, etc.) para gerar imagem mantendo fidelidade canônica.',
+      'Connect your local runner here (ComfyUI, InvokeAI, A1111, etc.) to generate images while preserving canonical fidelity.',
     input: sceneSpec
   };
 };
@@ -122,7 +122,7 @@ export const runVideoPipeline = async (videoSpec) => {
   return {
     status: 'not-implemented',
     message:
-      'Conecte aqui seu runner local de image-to-video para exportar clipes offline no seu computador.',
+      'Connect your local image-to-video runner here to export offline clips on your computer.',
     input: videoSpec
   };
 };

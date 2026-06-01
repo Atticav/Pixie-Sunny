@@ -16,11 +16,11 @@ test('buildProjectCollectionSummary handles empty and populated collections', ()
       count: 0,
       singular: 'sandbox',
       plural: 'sandboxes',
-      emptyMessage: 'Nenhum sandbox criado ainda neste projeto.',
-      nextStepWhenEmpty: 'crie um sandbox',
-      nextStepWhenPopulated: 'compare um candidato'
+      emptyMessage: 'No sandbox has been created for this project yet.',
+      nextStepWhenEmpty: 'create a sandbox',
+      nextStepWhenPopulated: 'compare a candidate'
     }),
-    'Nenhum sandbox criado ainda neste projeto. Próximo passo: crie um sandbox'
+    'No sandbox has been created for this project yet. Next step: create a sandbox'
   );
 
   assert.equal(
@@ -28,18 +28,18 @@ test('buildProjectCollectionSummary handles empty and populated collections', ()
       count: 2,
       singular: 'checkpoint',
       plural: 'checkpoints',
-      emptyMessage: 'Nenhum checkpoint criado ainda neste projeto.',
-      nextStepWhenEmpty: 'salve um checkpoint',
-      nextStepWhenPopulated: 'compare um checkpoint'
+      emptyMessage: 'No checkpoint has been created for this project yet.',
+      nextStepWhenEmpty: 'save a checkpoint',
+      nextStepWhenPopulated: 'compare a checkpoint'
     }),
-    '2 checkpoints salvos localmente neste projeto. Próximo passo: compare um checkpoint'
+    '2 checkpoints saved locally in this project. Next step: compare a checkpoint'
   );
 });
 
 test('buildReviewInboxSummary describes clean and filtered inbox states', () => {
   assert.match(
     buildReviewInboxSummary({ totalCount: 0 }),
-    /Inbox limpa neste projeto/
+    /Inbox is clear for this project/
   );
 
   assert.equal(
@@ -50,31 +50,31 @@ test('buildReviewInboxSummary describes clean and filtered inbox states', () => 
       highRiskCount: 3,
       hasActiveFilters: true
     }),
-    '2/5 itens visíveis com os filtros atuais · 1 bloqueado(s) · 3 de alto risco. Próximo passo: resolva os bloqueios e use o Diff Viewer / Context Compare para decidir os casos ambíguos.'
+    '2/5 visible items with the current filters · 1 blocked · 3 high risk. Next step: resolve the blockers and use Diff Viewer / Context Compare to decide ambiguous cases.'
   );
 });
 
 test('buildPromotionGuidance reflects project, sandbox and selection state', () => {
-  assert.match(buildPromotionGuidance({ hasProject: false }), /Selecione um projeto/);
-  assert.match(buildPromotionGuidance({ hasProject: true, sandboxCount: 0 }), /Nenhum sandbox disponível/);
+  assert.match(buildPromotionGuidance({ hasProject: false }), /Select a project/);
+  assert.match(buildPromotionGuidance({ hasProject: true, sandboxCount: 0 }), /No sandbox available/);
   assert.match(
     buildPromotionGuidance({ hasProject: true, sandboxCount: 2, selectedSandboxName: 'Candidato A' }),
-    /Candidato "Candidato A" pronto para revisão/
+    /Candidate "Candidato A" is ready for review/
   );
 });
 
 test('buildPreflightStatusMessage prioritizes blockers, then warnings, then ready state', () => {
   assert.equal(
     buildPreflightStatusMessage({ blockers: 2, warnings: 1, ready: 4 }),
-    'Export bloqueado no momento · 2 bloqueador(es) · 1 aviso(s).'
+    'Export currently blocked · 2 blocker(s) · 1 warning(s).'
   );
   assert.equal(
     buildPreflightStatusMessage({ blockers: 0, warnings: 3, ready: 4 }),
-    'Pronto com alertas · 3 aviso(s) antes do export de fechamento.'
+    'Ready with alerts · 3 warning(s) before the closure export.'
   );
   assert.equal(
     buildPreflightStatusMessage({ blockers: 0, warnings: 0, ready: 5 }),
-    'Pronto para gerar export de fechamento · 5 sinal(is) positivos no preflight final.'
+    'Ready to generate closure export · 5 positive signal(s) in the final preflight.'
   );
 });
 
@@ -116,6 +116,6 @@ test('buildClosureExportStatusMessage reports blockers and warnings count', () =
       blockers: 2,
       warnings: 1
     }),
-    'Resumo de closure gerado: closure.json (bloqueadores=2 · avisos=1)'
+    'Closure summary generated: closure.json (blockers=2 · warnings=1)'
   );
 });

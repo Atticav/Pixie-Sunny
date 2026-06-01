@@ -1,39 +1,39 @@
-const DEFAULT_PROTAGONIST_TEXT = 'a pessoa protagonista';
+const DEFAULT_PROTAGONIST_TEXT = 'the protagonist';
 export const DEFAULT_NEGATIVE_PROMPT =
-  'anime, cartoon, proporções irreais, maquiagem glamour moderna, olhos inconsistentes, figurino moderno';
+  'anime, cartoon, unrealistic proportions, modern glam makeup, inconsistent eyes, modern wardrobe';
 
 export const PROMPT_STYLE_PRESETS = [
   {
     id: 'cinematic-realism',
-    label: 'Realismo cinematográfico',
-    guidance: 'realismo cinematográfico, textura natural de pele e tecido, fidelidade anatômica, detalhes orgânicos'
+    label: 'Cinematic realism',
+    guidance: 'cinematic realism, natural skin and fabric texture, anatomical fidelity, organic details'
   },
   {
     id: 'dark-fantasy',
     label: 'Dark fantasy',
-    guidance: 'dark fantasy realista, atmosfera sombria, materiais envelhecidos, contraste dramático'
+    guidance: 'realistic dark fantasy, somber atmosphere, weathered materials, dramatic contrast'
   },
   {
     id: 'dreamy-ethereal',
-    label: 'Etéreo onírico',
-    guidance: 'fotografia etérea, névoa delicada, highlights suaves, aura poética sem perder realismo'
+    label: 'Dreamlike ethereal',
+    guidance: 'ethereal photography, delicate mist, soft highlights, poetic aura without losing realism'
   }
 ];
 
 export const PROMPT_CINEMATIC_PRESETS = [
   {
     id: 'portrait-intimate',
-    label: 'Retrato íntimo',
+    label: 'Intimate portrait',
     guidance: 'close portrait, intimacy, emotional focus, subtle background separation'
   },
   {
     id: 'wide-establishing',
-    label: 'Plano aberto',
+    label: 'Wide shot',
     guidance: 'wide establishing shot, environmental storytelling, depth layers, cinematic scale'
   },
   {
     id: 'dramatic-motion',
-    label: 'Movimento dramático',
+    label: 'Dramatic movement',
     guidance: 'dynamic blocking, motion-ready staging, cinematic tension, directional movement'
   }
 ];
@@ -41,17 +41,17 @@ export const PROMPT_CINEMATIC_PRESETS = [
 export const PROMPT_LENS_LIGHT_PRESETS = [
   {
     id: 'natural-soft',
-    label: 'Luz suave natural',
+    label: 'Soft natural light',
     guidance: '50mm look, soft natural light, gentle falloff, grounded exposure'
   },
   {
     id: 'moonlit-cold',
-    label: 'Luz fria lunar',
+    label: 'Cold moonlight',
     guidance: '85mm compression, cold moonlight, blue shadows, low-key contrast'
   },
   {
     id: 'golden-haze',
-    label: 'Contraluz dourado',
+    label: 'Golden backlight',
     guidance: '35mm cinematic lens, golden haze, rim light, atmospheric particles'
   }
 ];
@@ -83,36 +83,36 @@ const findPreset = (collection, id, fallbackId) =>
   collection[0];
 
 const describeReference = (reference) => {
-  if (!reference) return 'referência inválida';
-  const bits = [line(reference.name) || 'referência sem nome'];
-  if (reference.type) bits.push(`tipo ${reference.type}`);
-  if (reference.preserve) bits.push(`preservar ${reference.preserve}`);
-  if (reference.mayVary) bits.push(`variar ${reference.mayVary}`);
+  if (!reference) return 'invalid reference';
+  const bits = [line(reference.name) || 'unnamed reference'];
+  if (reference.type) bits.push(`type ${reference.type}`);
+  if (reference.preserve) bits.push(`preserve ${reference.preserve}`);
+  if (reference.mayVary) bits.push(`vary ${reference.mayVary}`);
   return bits.join(', ');
 };
 
 const extractConsistencyNegatives = (rules) =>
   list(rules)
-    .filter((rule) => /não|nunca|evitar|sem/i.test(rule))
+    .filter((rule) => /não|nunca|evitar|sem|do not|never|avoid|without/i.test(rule))
     .map((rule) => rule.replace(/\.$/, ''));
 
 const formatPromptMediumHint = (promptMedium) =>
   promptMedium === 'video'
-    ? 'otimizado para geração de vídeo com coerência de movimento e continuidade entre quadros'
-    : 'otimizado para geração de imagem estática com alta fidelidade visual';
+    ? 'optimized for video generation with motion coherence and frame-to-frame continuity'
+    : 'optimized for still-image generation with high visual fidelity';
 
 export const suggestNextParagraph = ({ chapterContent, chapterTitle, loreEntries, characters }) => {
   const lore = loreEntries.slice(0, 3).map((entry) => `- ${entry.title}: ${entry.content}`).join('\n');
   const cast = characters.slice(0, 3).map((character) => character.name).join(', ');
 
   return [
-    `Continuação sugerida para "${chapterTitle}":`,
+    `Suggested continuation for "${chapterTitle}":`,
     '',
-    `No silêncio da cena, ${cast || DEFAULT_PROTAGONIST_TEXT} percebe um detalhe que conecta o presente a um fato canônico do universo.`,
-    'Esse detalhe gera uma decisão concreta e irreversível para o próximo conflito.',
+    `In the silence of the scene, ${cast || DEFAULT_PROTAGONIST_TEXT} notices a detail that connects the present moment to a canonical fact in the universe.`,
+    'That detail creates a concrete, irreversible decision for the next conflict.',
     '',
-    'Memória relevante:',
-    lore || '- Sem fatos canônicos cadastrados ainda.'
+    'Relevant memory:',
+    lore || '- No canonical facts added yet.'
   ].join('\n');
 };
 
@@ -150,7 +150,7 @@ export const buildCharacterPromptPack = ({
   ]);
   const identity = joinClause([
     character?.name,
-    character?.apparentAge && `idade aparente ${character.apparentAge}`,
+    character?.apparentAge && `apparent age ${character.apparentAge}`,
     character?.genderPresentation,
     character?.skinTone,
     character?.hair,
@@ -163,23 +163,23 @@ export const buildCharacterPromptPack = ({
     character?.dominantExpression,
     character?.presence,
     character?.visualAesthetic,
-    character?.colorPalette && `paleta ${character.colorPalette}`,
+    character?.colorPalette && `palette ${character.colorPalette}`,
     character?.periodStyle
   ]);
-  const tone = line(projectTone) || 'fantasia sombria cinematográfica';
-  const referenceSentence = joinSentence(referenceList, 'usar apenas cânone interno e descrição textual disponível');
+  const tone = line(projectTone) || 'cinematic dark fantasy';
+  const referenceSentence = joinSentence(referenceList, 'use only internal canon and the available textual description');
   const masterPrompt = [
     identity,
     style.guidance,
     cinematic.guidance,
     lensLighting.guidance,
-    `tom do projeto: ${tone}`,
+    `project tone: ${tone}`,
     formatPromptMediumHint(promptMedium),
-    fixedChecklist.length ? `preservar: ${fixedChecklist.join(', ')}` : '',
-    referenceSentence ? `âncoras de referência: ${referenceSentence}` : '',
-    character?.cinematicNotes ? `notas cinematográficas: ${character.cinematicNotes}` : '',
-    character?.notes ? `contexto narrativo: ${character.notes}` : '',
-    character?.consistencyRules?.length ? `regras de consistência: ${character.consistencyRules.join('; ')}` : ''
+    fixedChecklist.length ? `preserve: ${fixedChecklist.join(', ')}` : '',
+    referenceSentence ? `reference anchors: ${referenceSentence}` : '',
+    character?.cinematicNotes ? `cinematic notes: ${character.cinematicNotes}` : '',
+    character?.notes ? `narrative context: ${character.notes}` : '',
+    character?.consistencyRules?.length ? `consistency rules: ${character.consistencyRules.join('; ')}` : ''
   ]
     .filter(Boolean)
     .join('. ');
@@ -190,19 +190,19 @@ export const buildCharacterPromptPack = ({
     character?.marks,
     character?.typicalClothing,
     style.label.toLowerCase(),
-    promptMedium === 'video' ? 'continuidade temporal' : 'retrato de alta fidelidade'
+    promptMedium === 'video' ? 'temporal continuity' : 'high-fidelity portrait'
   ]
     .filter(Boolean)
     .join(', ');
   const detailedPrompt = [
-    `Retrato de ${character?.name || 'personagem'} com ${identity || 'identidade visual canônica definida'}.`,
-    fixedChecklist.length ? `Elementos fixos: ${fixedChecklist.join('; ')}.` : '',
-    variationList.length ? `Pode variar apenas em: ${variationList.join('; ')}.` : '',
-    referenceSentence ? `Referências internas: ${referenceSentence}.` : '',
+    `Portrait of ${character?.name || 'character'} with ${identity || 'a defined canonical visual identity'}.`,
+    fixedChecklist.length ? `Fixed elements: ${fixedChecklist.join('; ')}.` : '',
+    variationList.length ? `May vary only in: ${variationList.join('; ')}.` : '',
+    referenceSentence ? `Internal references: ${referenceSentence}.` : '',
     `Look & feel: ${style.guidance}; ${cinematic.guidance}; ${lensLighting.guidance}.`,
     promptMedium === 'video'
-      ? 'Manter consistência facial, material e iluminação em cada frame; movimento sutil de câmera e microexpressões naturais.'
-      : 'Manter nitidez orgânica, anatomia coerente, pele realista e fotografia cinematográfica sem estilização cartunesca.'
+      ? 'Maintain facial, material, and lighting consistency in every frame; use subtle camera movement and natural micro-expressions.'
+      : 'Maintain organic sharpness, coherent anatomy, realistic skin, and cinematic photography without cartoon stylization.'
   ]
     .filter(Boolean)
     .join(' ');
@@ -219,11 +219,11 @@ export const buildCharacterPromptPack = ({
     detailedPrompt,
     scenePrompt: '',
     cinematicPrompt: [
-      `Personagem ${character?.name || 'canônico'} em abordagem ${cinematic.label.toLowerCase()}`,
+      `Character ${character?.name || 'canonical'} in a ${cinematic.label.toLowerCase()}`,
       lensLighting.guidance,
-      promptMedium === 'video' ? 'camera drift lento, respiração natural, continuidade entre quadros' : 'profundidade de campo cinematográfica'
+      promptMedium === 'video' ? 'slow camera drift, natural breathing, frame-to-frame continuity' : 'cinematic depth of field'
     ].join(', '),
-    variations: variationList.map((item) => `Variar ${item} mantendo os demais traços canônicos.`),
+    variations: variationList.map((item) => `Vary ${item} while keeping the other canonical traits.`),
     fixedChecklist
   };
 };
@@ -293,37 +293,37 @@ export const buildScenePromptPack = ({
         character.presence
       ])
     ),
-    'sem personagens canônicos identificados automaticamente'
+    'no canonical characters automatically identified'
   );
   const loreSentence = joinSentence(
     relevantLore.map((entry) => `${entry.title}: ${entry.content}`),
-    'sem lore diretamente associado'
+    'no directly associated lore'
   );
   const scenePrompt = [
-    `Cena "${scene?.title || 'sem título'}"`,
-    line(scene?.description) || 'descrever ação principal',
-    scene?.location || environment ? `ambiente ${joinClause([environment, scene?.location], 'não definido')}` : '',
-    emotionalTone ? `tom emocional ${emotionalTone}` : '',
-    lighting ? `iluminação ${lighting}` : '',
-    composition ? `composição ${composition}` : '',
-    `estilo ${style.guidance}`,
+    `Scene "${scene?.title || 'untitled'}"`,
+    line(scene?.description) || 'describe the main action',
+    scene?.location || environment ? `environment ${joinClause([environment, scene?.location], 'undefined')}` : '',
+    emotionalTone ? `emotional tone ${emotionalTone}` : '',
+    lighting ? `lighting ${lighting}` : '',
+    composition ? `composition ${composition}` : '',
+    `style ${style.guidance}`,
     cinematic.guidance,
     lensLighting.guidance,
-    `personagens: ${characterSentence}`,
-    `lore relacionado: ${loreSentence}`,
-    fixedChecklist.length ? `manter fixo: ${fixedChecklist.join(', ')}` : '',
+    `characters: ${characterSentence}`,
+    `related lore: ${loreSentence}`,
+    fixedChecklist.length ? `keep fixed: ${fixedChecklist.join(', ')}` : '',
     formatPromptMediumHint(promptMedium)
   ]
     .filter(Boolean)
     .join('. ');
   const cinematicPrompt = [
-    `Sequência cinematográfica para "${scene?.title || 'cena'}"`,
+    `Cinematic sequence for "${scene?.title || 'scene'}"`,
     cinematic.guidance,
     lensLighting.guidance,
-    emotionalTone ? `subtexto emocional: ${emotionalTone}` : '',
+    emotionalTone ? `emotional subtext: ${emotionalTone}` : '',
     promptMedium === 'video'
-      ? 'movimento de câmera controlado, blocking legível, continuidade de vento/roupa/cabelo entre frames'
-      : 'frame único com blocking claro, profundidade de campo e direção de olhar consistente'
+      ? 'controlled camera movement, readable blocking, continuity of wind/clothing/hair across frames'
+      : 'single frame with clear blocking, depth of field, and consistent eyeline direction'
   ]
     .filter(Boolean)
     .join('. ');
@@ -344,17 +344,17 @@ export const buildScenePromptPack = ({
     ]),
     detailedPrompt: [
       scenePrompt,
-      variationList.length ? `Variações permitidas: ${variationList.join('; ')}.` : '',
-      referenceList.length ? `Referências visuais internas: ${referenceList.join('; ')}.` : ''
+      variationList.length ? `Allowed variations: ${variationList.join('; ')}.` : '',
+      referenceList.length ? `Internal visual references: ${referenceList.join('; ')}.` : ''
     ]
       .filter(Boolean)
       .join(' '),
     scenePrompt,
     cinematicPrompt,
     variations: [
-      `Variação 1 — aproximar a câmera e intensificar ${emotionalTone || 'a emoção principal'} mantendo ${joinClause(fixedChecklist, 'os elementos fixos')}.`,
-      `Variação 2 — mudar o ângulo/composição dentro de ${joinClause(variationList, 'pequenas variações permitidas')} sem perder a fidelidade dos personagens.`,
-      `Variação 3 — reforçar ambiente ${joinClause([environment, scene?.location], 'base')} e atmosfera ${emotionalTone || 'cinematográfica'} preservando referências oficiais.`
+      `Variation 1 — move the camera closer and intensify ${emotionalTone || 'the main emotion'} while keeping ${joinClause(fixedChecklist, 'the fixed elements')}.`,
+      `Variation 2 — change the angle/composition within ${joinClause(variationList, 'small allowed variations')} without losing character fidelity.`,
+      `Variation 3 — reinforce the environment ${joinClause([environment, scene?.location], 'base')} and atmosphere ${emotionalTone || 'cinematic'} while preserving official references.`
     ],
     fixedChecklist
   };
@@ -363,22 +363,22 @@ export const buildScenePromptPack = ({
 export const buildSceneSpec = ({ projectTone, scene, characters }) => ({
   mode: 'image-spec',
   sceneTitle: scene?.title,
-  sceneLocation: scene?.location || 'não definido',
-  cinematicTone: projectTone || 'fantasia sombria cinematográfica',
+  sceneLocation: scene?.location || 'undefined',
+  cinematicTone: projectTone || 'cinematic dark fantasy',
   continuityChecklist: characters.map((character) => ({
     character: character.name,
     lockTraits: character.canonTraits
   })),
-  prompt: `Cena "${scene?.title}": ${scene?.description}. Local: ${scene?.location || 'não definido'}. Estilo realista cinematográfico, textura natural de pele e tecido, iluminação dramática coerente com o cenário descrito.`,
+  prompt: `Scene "${scene?.title}": ${scene?.description}. Location: ${scene?.location || 'undefined'}. Cinematic realistic style, natural skin and fabric texture, and dramatic lighting consistent with the described setting.`,
   negativePrompt: DEFAULT_NEGATIVE_PROMPT
 });
 
 export const buildVideoSpec = ({ scene, imageAsset, projectTone }) => ({
   mode: 'video-spec',
-  sourceImage: imageAsset?.path || 'definir arquivo local',
+  sourceImage: imageAsset?.path || 'define local file',
   sceneTitle: scene?.title,
-  motionPrompt: `Movimento sutil e cinematográfico para ${scene?.title || 'cena'}: vento leve, respiração natural, micro expressão facial e deslocamento de câmera lento.`,
-  ambiencePrompt: 'Ambiência natural coerente com o cenário (vento, folhas, passos em solo úmido).',
-  outputHint: 'gerar clipe curto (4-8s) para manter qualidade máxima local/offline',
-  tone: projectTone || 'dark fantasy realista'
+  motionPrompt: `Subtle cinematic movement for ${scene?.title || 'scene'}: light wind, natural breathing, facial micro-expression, and slow camera movement.`,
+  ambiencePrompt: 'Natural ambience consistent with the setting (wind, leaves, footsteps on damp ground).',
+  outputHint: 'generate a short clip (4–8s) to keep maximum local/offline quality',
+  tone: projectTone || 'realistic dark fantasy'
 });
